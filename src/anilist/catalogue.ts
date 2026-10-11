@@ -41,7 +41,9 @@ export interface LoadProgress {
 
 /** Fetches the most popular anime, most popular first. */
 export async function fetchCatalogue(onProgress: (p: LoadProgress) => void, total = CATALOGUE_SIZE): Promise<RawMedia[]> {
-  let perPage = 50;
+  // AniList sometimes returns an empty page, with no error, when a page asks for too much.
+  // 40 per page works; on an empty page, halve the size (40, 20, 10 keep pages aligned) and retry.
+  let perPage = 40;
   const out: RawMedia[] = [];
   const seen = new Set<number>();
   while (out.length < total) {
@@ -54,10 +56,14 @@ export async function fetchCatalogue(onProgress: (p: LoadProgress) => void, tota
       );
     } catch (e) {
       if (e instanceof AniListError && e.kind === 'complexity' && perPage > 10) {
-        perPage = Math.max(10, Math.floor(perPage / 2));
+        perPage /= 2;
         continue;
       }
       throw e;
+    }
+    if (data.Page.media.length === 0 && perPage > 10) {
+      perPage /= 2;
+      continue;
     }
     for (const m of data.Page.media) {
       if (!seen.has(m.id)) {

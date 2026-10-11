@@ -14,6 +14,7 @@ export function Welcome({ app }: { app: AppState }) {
     setProgress({ loaded: 0, total: CATALOGUE_SIZE });
     try {
       const media = await fetchCatalogue(setProgress);
+      if (media.length === 0) throw new Error('AniList sent back no titles. Wait a minute and try again.');
       await app.saveItems(groupFranchises(media));
     } catch (e) {
       setError((e as Error).message);
@@ -29,7 +30,7 @@ export function Welcome({ app }: { app: AppState }) {
     }
   }
 
-  const secondsLeft = progress ? Math.ceil(((progress.total - progress.loaded) / 50) * 2.1) : 0;
+  const secondsLeft = progress ? Math.ceil(((progress.total - progress.loaded) / 40) * 2.1) : 0;
 
   return (
     <main className="welcome">
@@ -57,7 +58,7 @@ export function Welcome({ app }: { app: AppState }) {
           <button className="btn btn-primary" onClick={load}>
             Load the {CATALOGUE_SIZE.toLocaleString()} most popular anime
           </button>
-          <p className="hint">This happens once and takes about a minute. Seasons and films are grouped into one entry per series.</p>
+          <p className="hint">This happens once and takes about a minute and a half. Seasons and films are grouped into one entry per series.</p>
           <button className="btn btn-quiet" onClick={() => fileRef.current?.click()}>
             Restore from a saved file
           </button>
