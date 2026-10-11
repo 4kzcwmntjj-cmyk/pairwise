@@ -1,5 +1,19 @@
 export type Status = 'seen' | 'unseen';
 
+/** One AniList entry (a season, film or extra) inside a franchise. Kept so franchises can be split and joined. */
+export interface Entry {
+  id: number;
+  format: string;
+  year?: number;
+  titleEnglish?: string;
+  titleRomaji?: string;
+  popularity: number;
+  averageScore?: number;
+  cover?: string;
+  studio?: string;
+  genres?: string[];
+}
+
 /** One rankable item. For anime, a franchise: several AniList entries grouped together. */
 export interface Item {
   id: string;
@@ -26,6 +40,8 @@ export interface Item {
   genres?: string[];
   /** AniList user recommendations from this title: [item id, total rating], strongest first. */
   recs?: [string, number][];
+  /** The entries that make up the franchise, when known (catalogues built before October 2026 lack them). */
+  entries?: Entry[];
 }
 
 export interface Mark {

@@ -113,6 +113,30 @@ export function SettingsScreen({ app }: { app: AppState }) {
         )}
       </section>
 
+      {app.groupOps.length > 0 && (
+        <section>
+          <h3>Your grouping changes</h3>
+          <p>
+            Titles you split up or joined. These are kept on top of every catalogue update. Undoing one puts the titles back as
+            they were, with their own duels.
+          </p>
+          <ul className="op-list">
+            {[...app.groupOps].reverse().map((op) => (
+              <li key={`${op.kind}${op.at}`}>
+                <span>
+                  {op.kind === 'join' ? 'Joined ' : 'Split '}
+                  {op.label ?? (op.kind === 'join' ? 'two titles' : 'part of a title')}
+                  <span className="hint"> · {new Date(op.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                </span>
+                <button className="btn btn-quiet btn-small" onClick={() => app.removeGroupOp(op)}>
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section>
         <h3>Catalogue</h3>
         <p>

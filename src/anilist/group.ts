@@ -1,4 +1,4 @@
-import type { Item } from '../types';
+import type { Entry, Item } from '../types';
 
 export interface RawMedia {
   id: number;
@@ -98,40 +98,73 @@ export function groupFranchises(media: RawMedia[], existing: Item[] = []): Item[
   return items.sort((a, b) => b.popularity - a.popularity);
 }
 
-export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, string>(), used = new Set<string>()): Item {
-  const series = members.filter((m) => SERIES_FORMATS.has(m.format ?? ''));
-  const candidates = series.length > 0 ? series : members;
-  const rep = [...candidates].sort(
-    (a, b) => (yearOf(a) ?? 9999) - (yearOf(b) ?? 9999) || (b.popularity ?? 0) - (a.popularity ?? 0),
-  )[0];
-  const top = [...members].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))[0];
-  const years = members.map(yearOf).filter((y): y is number => y !== undefined);
-  const entryIds = members.map((m) => m.id).sort((a, b) => a - b);
-  let id = entryIds.map((e) => oldIdByEntry.get(e)).find((x) => x && !used.has(x)) ?? `al-${entryIds[0]}`;
-  if (used.has(id)) id = `al-${entryIds[0]}-${used.size}`;
-  used.add(id);
-  const genreCount = new Map<string, number>();
-  for (const m of members) for (const g of m.genres ?? []) genreCount.set(g, (genreCount.get(g) ?? 0) + 1);
-  const genres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
+export function entryOf(m: RawMedia): Entry {
+  const genres = m.genres ?? [];
   return {
-    id,
-    category: 'anime',
-    source: 'anilist',
-    title: rep.title.english ?? rep.title.romaji ?? `AniList ${rep.id}`,
-    titleEnglish: rep.title.english ?? undefined,
-    titleRomaji: rep.title.romaji ?? undefined,
-    entryIds,
-    formats: members.map((m) => m.format ?? 'OTHER'),
-    startYear: years.length ? Math.min(...years) : undefined,
-    endYear: years.length ? Math.max(...years) : undefined,
-    studio: rep.studios?.nodes[0]?.name ?? top.studios?.nodes[0]?.name,
-    cover: rep.coverImage?.large ?? undefined,
-    coverLarge: rep.coverImage?.extraLarge ?? undefined,
-    coverColor: rep.coverImage?.color ?? undefined,
-    popularity: top.popularity ?? 0,
-    averageScore: top.averageScore ?? undefined,
+    id: m.id,
+    format: m.format ?? 'OTHER',
+    year: yearOf(m),
+    titleEnglish: m.title.english ?? undefined,
+    titleRomaji: m.title.romaji ?? undefined,
+    popularity: m.popularity ?? 0,
+    averageScore: m.averageScore ?? undefined,
+    cover: m.coverImage?.large ?? undefined,
+    studio: m.studios?.nodes[0]?.name,
     ...(genres.length ? { genres } : {}),
   };
+}
+
+/** The entry a franchise is named after: its first series, or its first entry if it has no series. */
+export function representative(entries: Entry[]): Entry {
+  const series = entries.filter((e) => SERIES_FORMATS.has(e.format));
+  const candidates = series.length > 0 ? series : entries;
+  return [...candidates].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || b.popularity - a.popularity)[0];
+}
+
+/** Franchise-level fields worked out from its entries. `entries` must not be empty. */
+export function summarise(entries: Entry[]): Omit<Item, 'id' | 'recs'> {
+  const rep = representative(entries);
+  const top = [...entries].sort((a, b) => b.popularity - a.popularity)[0];
+  const years = entries.map((e) => e.year).filter((y): y is number => y !== undefined);
+  const genreCount = new Map<string, number>();
+  for (const e of entries) for (const g of e.genres ?? []) genreCount.set(g, (genreCount.get(g) ?? 0) + 1);
+  const genres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
+  return {
+    category: 'anime',
+    source: 'anilist',
+    title: rep.titleEnglish ?? rep.titleRomaji ?? `AniList ${rep.id}`,
+    titleEnglish: rep.titleEnglish,
+    titleRomaji: rep.titleRomaji,
+    entryIds: entries.map((e) => e.id).sort((a, b) => a - b),
+    formats: entries.map((e) => e.format),
+    startYear: years.length ? Math.min(...years) : undefined,
+    endYear: years.length ? Math.max(...years) : undefined,
+    studio: rep.studio ?? top.studio,
+    cover: rep.cover,
+    popularity: top.popularity,
+    averageScore: top.averageScore,
+    ...(genres.length ? { genres } : {}),
+    entries,
+  };
+}
+
+export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, string>(), used = new Set<string>()): Item {
+  const entries = members.map(entryOf);
+  const summary = summarise(entries);
+  const rep = members.find((m) => m.id === representative(entries).id)!;
+  let id = summary.entryIds.map((e) => oldIdByEntry.get(e)).find((x) => x && !used.has(x)) ?? `al-${summary.entryIds[0]}`;
+  if (used.has(id)) id = `al-${summary.entryIds[0]}-${used.size}`;
+  used.add(id);
+  const item: Item = {
+    id,
+    ...summary,
+    coverLarge: rep.coverImage?.extraLarge ?? undefined,
+    coverColor: rep.coverImage?.color ?? undefined,
+  };
+  // Drop empty fields so the catalogue file stays small.
+  for (const k of Object.keys(item) as (keyof Item)[]) if (item[k] === undefined) delete item[k];
+  for (const e of item.entries!) for (const k of Object.keys(e) as (keyof Entry)[]) if (e[k] === undefined) delete e[k];
+  return item;
 }
 
 /** Finds the franchise a newly found entry belongs to, if any. */
@@ -151,6 +184,7 @@ export function addEntry(item: Item, m: RawMedia): Item {
     ...item,
     entryIds: [...item.entryIds, m.id].sort((a, b) => a - b),
     formats: [...item.formats, m.format ?? 'OTHER'],
+    ...(item.entries ? { entries: [...item.entries, entryOf(m)] } : {}),
     startYear: years.length ? Math.min(...years) : undefined,
     endYear: years.length ? Math.max(...years) : undefined,
     popularity: Math.max(item.popularity, m.popularity ?? 0),

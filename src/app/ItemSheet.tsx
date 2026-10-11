@@ -2,9 +2,20 @@ import { useEffect, useMemo } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import { Cover } from './Cover';
 import { anilistUrl, metaLine } from './meta';
+import { Regroup } from './Regroup';
 import type { AppState } from './useApp';
 
-export function ItemSheet({ app, itemId, onClose }: { app: AppState; itemId: string; onClose: () => void }) {
+export function ItemSheet({
+  app,
+  itemId,
+  onClose,
+  onOpen,
+}: {
+  app: AppState;
+  itemId: string;
+  onClose: () => void;
+  onOpen: (id: string) => void;
+}) {
   const item = app.itemById.get(itemId);
   const mark = app.marks.get(itemId);
 
@@ -78,6 +89,10 @@ export function ItemSheet({ app, itemId, onClose }: { app: AppState; itemId: str
             </button>
           )}
         </div>
+        {!mark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
+          <p className="hint">Split off from another title. Mark whether you've seen it.</p>
+        )}
+        <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />
       </div>
     </div>
   );

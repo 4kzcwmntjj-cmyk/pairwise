@@ -47,10 +47,12 @@ export function mergeCatalogue(local: Item[], incoming: Item[]): Item[] {
     used.add(id);
     finalId.set(inc.id, id);
     const extraEntries = owner ? owner.entryIds.filter((e) => !inc.entryIds.includes(e)) : [];
+    const extraData = (owner?.entries ?? []).filter((e) => extraEntries.includes(e.id));
     out.push({
       ...inc,
       id,
       entryIds: [...inc.entryIds, ...extraEntries].sort((a, b) => a - b),
+      ...(inc.entries ? { entries: [...inc.entries, ...extraData] } : {}),
     });
   }
   // Recommendation links point at catalogue ids; follow any that were renamed above.

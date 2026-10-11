@@ -63,7 +63,7 @@ export function App() {
       {current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
       {current === 'ranking' && <Ranking app={app} onOpen={setOpenId} />}
       {current === 'settings' && <SettingsScreen app={app} />}
-      {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} />}
+      {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />}
     </div>
   );
 }

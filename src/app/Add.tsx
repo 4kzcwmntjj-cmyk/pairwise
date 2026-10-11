@@ -45,10 +45,11 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
   async function addRemote(m: RawMedia) {
     const owned = entryOwner.get(m.id);
     if (owned) return onOpen(owned.id);
-    const parent = franchiseFor(m, app.items);
+    // New entries join the catalogue's own franchise; your grouping changes then apply on top.
+    const parent = franchiseFor(m, app.baseItems);
     const item = parent ? addEntry(parent, m) : toItem([m]);
     await app.saveItems([item]);
-    onOpen(item.id);
+    onOpen(app.resolveId(item.id));
   }
 
   const row = (item: Item) => {

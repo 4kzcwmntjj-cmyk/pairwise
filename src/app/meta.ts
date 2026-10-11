@@ -13,3 +13,14 @@ export function metaLine(item: Item) {
 
 export const anilistUrl = (item: Item) =>
   item.source === 'anilist' ? `https://anilist.co/anime/${item.entryIds[0]}` : undefined;
+
+const FORMAT_LABEL: Record<string, string> = {
+  TV: 'Series',
+  TV_SHORT: 'Short series',
+  ONA: 'Web series',
+  MOVIE: 'Film',
+  OVA: 'OVA',
+  SPECIAL: 'Special',
+  MUSIC: 'Music video',
+};
+export const formatLabel = (format: string) => FORMAT_LABEL[format] ?? 'Other';
