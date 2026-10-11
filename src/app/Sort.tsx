@@ -47,18 +47,23 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   const [hideUnseen, setHideUnseen] = useState(true);
   const [hideSeen, setHideSeen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  // Titles tapped since the filters last changed stay on screen, so a tap never makes a tile vanish under your finger.
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const sentinel = useRef<HTMLDivElement>(null);
 
   const q = query.trim().toLowerCase();
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
     if (q) items = items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
-    if (hideUnseen) items = items.filter((i) => app.marks.get(i.id)?.status !== 'unseen');
-    if (hideSeen) items = items.filter((i) => app.marks.get(i.id)?.status !== 'seen');
+    if (hideUnseen) items = items.filter((i) => touched.has(i.id) || app.marks.get(i.id)?.status !== 'unseen');
+    if (hideSeen) items = items.filter((i) => touched.has(i.id) || app.marks.get(i.id)?.status !== 'seen');
     return items;
-  }, [app.items, app.marks, q, hideUnseen, hideSeen]);
+  }, [app.items, app.marks, q, hideUnseen, hideSeen, touched]);
 
-  useEffect(() => setLimit(PAGE), [q, hideUnseen, hideSeen]);
+  useEffect(() => {
+    setLimit(PAGE);
+    setTouched(new Set());
+  }, [q, hideUnseen, hideSeen]);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -70,16 +75,19 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
     return () => io.disconnect();
   }, [list.length]);
 
-  const toggle = (item: Item) => {
-    const mark = app.marks.get(item.id);
-    if (mark?.status === 'seen') app.clearMark(item.id);
-    else app.markItem(item.id, 'seen');
+  // One tap: seen. Two: haven't seen. Three: back to unmarked.
+  const cycle = (item: Item) => {
+    setTouched((t) => new Set(t).add(item.id));
+    const status = app.marks.get(item.id)?.status;
+    if (!status) app.markItem(item.id, 'seen');
+    else if (status === 'seen') app.markItem(item.id, 'unseen');
+    else app.clearMark(item.id);
   };
 
   return (
     <>
       <p className="hint">
-        Tap every title you've seen; tap again to take it back. Duels work out the order.
+        Tap once for seen, twice for haven't seen, a third time to clear. Duels work out the order.
       </p>
       <div className="grid-tools">
         <input
@@ -116,14 +124,14 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
             const state = mark?.status ?? 'none';
             return (
               <li key={item.id} className={`grid-item is-${state}`}>
-                <button onClick={() => toggle(item)} aria-pressed={state === 'seen'} aria-label={`${title}${state === 'seen' ? ', seen' : ''}`}>
+                <button onClick={() => cycle(item)} aria-label={`${title}${state === 'seen' ? ', seen' : state === 'unseen' ? ", haven't seen" : ''}`}>
                   <Cover item={item} title={title} size="sm" />
                   {state === 'seen' && (
                     <span className="grid-badge" aria-hidden="true">
                       ✓
                     </span>
                   )}
-                  {state === 'unseen' && <span className="grid-note">Not seen</span>}
+                  {state === 'unseen' && <span className="grid-note">Haven't seen</span>}
                   <span className="grid-title">{title}</span>
                   <span className="grid-year">{years(item)}</span>
                 </button>
