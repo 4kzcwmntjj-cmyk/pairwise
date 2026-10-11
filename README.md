@@ -2,9 +2,9 @@
 
 Rank anime by picking between two at a time (勝負, shōbu: a match or contest). The app ships with a catalogue of AniList's 5,000 most popular anime, grouped into one entry per series, and keeps a ranking that updates after every duel.
 
-- **Sort**: tap every title you've seen in a cover grid, or go one at a time and optionally give each a starting tier (S to D).
+- **Sort**: go one at a time (seen it, haven't seen, ask later), or tap every title you've seen in a cover grid.
 - **Duel**: pick the one you prefer. The ranking is a Bradley-Terry fit over every vote you've made.
-- **Ranking**: your list, plus want-to-watch and not-seen lists.
+- **Ranking**: your list, plus the titles you've marked haven't seen.
 - **For you**: unseen titles suggested from AniList users' recommendations for the shows you rank highest, plus the genres you rank well.
 - **Add**: find titles outside the catalogue on AniList.
 
