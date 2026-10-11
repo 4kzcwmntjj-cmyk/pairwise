@@ -1,5 +1,5 @@
 import type { Entry, Item, Mark, Vote } from '../types';
-import { summarise } from './group';
+import { isMangaOnly, summarise } from './group';
 
 /**
  * Your own corrections to how the catalogue groups entries into franchises.
@@ -67,6 +67,7 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
   }
 
   const alias = new Map<string, string>();
+  const splitIds = new Set(ops.flatMap((o) => (o.kind === 'split' ? [o.id] : [])));
   const retire = (g: Group, into: string) => {
     groups.delete(g.id);
     alias.set(g.id, into);
@@ -171,7 +172,16 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
     const recs = [...totals].sort((a, b) => b[1] - a[1]).slice(0, MAX_RECS);
     return { ...item, recs };
   });
-  return { items: out, resolve };
+
+  // Splitting the manga out of a franchise leaves two titles with one name; mark the manga one.
+  const titles = new Map<string, number>();
+  for (const i of out) titles.set(i.title, (titles.get(i.title) ?? 0) + 1);
+  const named = out.map((i) => {
+    if (!splitIds.has(i.id) || !isMangaOnly(i) || (titles.get(i.title) ?? 0) < 2) return i;
+    const tag = (t?: string) => (t ? `${t} (manga)` : t);
+    return { ...i, title: `${i.title} (manga)`, titleEnglish: tag(i.titleEnglish), titleRomaji: tag(i.titleRomaji) };
+  });
+  return { items: named, resolve };
 }
 
 /** Votes with ids mapped to current titles. A duel between two titles that are now one is set aside. */

@@ -95,6 +95,15 @@ describe('applyGroupOps', () => {
   });
 });
 
+describe('splitting the manga out', () => {
+  it('names the manga title so the two can be told apart', () => {
+    const dn = item('al-50', [entry(50, 'Death Note', 'TV', 2006), { ...entry(51, 'Death Note', 'MANGA', 2003), genres: [] }]);
+    const g = applyGroupOps([dn], [{ kind: 'split', entryIds: [51], id: 's-51', at: 1 }]);
+    expect(g.items.find((i) => i.id === 's-51')!.title).toBe('Death Note (manga)');
+    expect(g.items.find((i) => i.id === 'al-50')!.title).toBe('Death Note');
+  });
+});
+
 describe('resolveVotes and resolveMarks', () => {
   const resolve = (id: string) => (id === 'b' ? 'a' : id);
   it('moves votes to the surviving title and sets aside duels between the joined pair', () => {

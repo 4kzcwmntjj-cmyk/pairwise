@@ -65,7 +65,15 @@ export function project(item: Pick<Item, 'formats'>, mark: Mark | undefined, vie
     const status: Status = k ? 'seen' : 'unseen';
     return status === mark.status ? mark : { ...mark, status };
   }
-  if (!hasBoth(item) || !flagsSet(mark)) return mark;
+  if (!flagsSet(mark)) return mark;
+  if (!hasBoth(item)) {
+    // A title that lost one form to a split: only the form it still has counts.
+    const forms = formsOf(item);
+    const k = knownIn(item, mark, forms.anime ? 'anime' : 'manga');
+    if (k === undefined) return undefined;
+    const status: Status = k ? 'seen' : 'unseen';
+    return status === mark.status ? mark : { ...mark, status };
+  }
   const a = knownIn(item, mark, 'anime');
   const m = knownIn(item, mark, 'manga');
   if (a || m) return mark.status === 'seen' ? mark : { ...mark, status: 'seen' };

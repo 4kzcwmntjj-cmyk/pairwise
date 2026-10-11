@@ -1125,3 +1125,9 @@ a {
 .action-row.choices-4 .btn {
   padding-inline: 4px;
 }
+.made-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

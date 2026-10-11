@@ -15,15 +15,15 @@ export const anilistUrl = (item: Item) =>
   item.source === 'anilist' ? `https://anilist.co/anime/${item.entryIds[0]}` : undefined;
 
 const FORMAT_LABEL: Record<string, string> = {
-  TV: 'Series',
-  TV_SHORT: 'Short series',
-  ONA: 'Web series',
-  MOVIE: 'Film',
-  OVA: 'OVA',
-  SPECIAL: 'Special',
+  TV: 'Anime series',
+  TV_SHORT: 'Anime shorts',
+  ONA: 'Web anime',
+  MOVIE: 'Anime film',
+  OVA: 'Anime OVA',
+  SPECIAL: 'Anime special',
   MUSIC: 'Music video',
   MANGA: 'Manga',
-  ONE_SHOT: 'One-shot',
+  ONE_SHOT: 'One-shot manga',
   NOVEL: 'Novel',
 };
 export const formatLabel = (format: string) => FORMAT_LABEL[format] ?? 'Other';

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Item } from '../types';
 import { Cover } from './Cover';
-import { formatLabel, years } from './meta';
+import { isManga } from '../anilist/group';
+import { formatLabel, metaLine, years } from './meta';
 import type { AppState } from './useApp';
 
 type Mode = null | 'split' | 'join';
@@ -33,6 +34,7 @@ export function Regroup({ app, item, onOpen }: { app: AppState; item: Item; onOp
 
 function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOpen: (id: string) => void; onClose: () => void }) {
   const [ticked, setTicked] = useState<Set<number>>(new Set());
+  const [made, setMade] = useState<string[] | null>(null);
   const entries = useMemo(
     () => [...(item.entries ?? [])].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.id - b.id),
     [item.entries],
@@ -60,12 +62,62 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
       return n;
     });
   const valid = ticked.size > 0 && ticked.size < entries.length;
+  const mangaIds = entries.filter((e) => isManga(e.format)).map((e) => e.id);
+  const [busy, setBusy] = useState(false);
+  const split = async (groups: number[][]) => {
+    setBusy(true);
+    const ids = await app.splitItem(item.id, groups);
+    setBusy(false);
+    setTicked(new Set());
+    setMade(ids);
+  };
+
+  if (made) {
+    return (
+      <div className="regroup-panel">
+        <p>
+          {made.length === 1 ? 'Made a separate title.' : `Made ${made.length} separate titles.`} Past duels stay with{' '}
+          {app.title(item)}; new titles start with no duels.
+        </p>
+        <ul className="plain-list">
+          {made.map((id) => {
+            const it = app.itemById.get(id);
+            const m = app.allMarks.get(id);
+            return (
+              <li key={id} className="made-row">
+                <span>
+                  {it ? app.title(it) : 'New title'}
+                  {it && <span className="hint"> · {metaLine(it)}{m ? `, ${m.status === 'seen' ? 'marked seen' : 'marked not seen'}` : ', not marked yet'}</span>}
+                </span>
+                <button className="btn btn-quiet btn-small" onClick={() => onOpen(id)}>
+                  Open
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="action-row start">
+          <button className="btn btn-quiet btn-small" onClick={() => setMade(null)}>
+            Split more
+          </button>
+          <button className="btn btn-quiet btn-small" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="regroup-panel">
       <p className="hint">
-        Tick the parts that should be a title of their own. Past duels stay with {app.title(item)}; the new title starts unranked.
+        Tick the parts that should come out of {app.title(item)}. Past duels stay with {app.title(item)}.
       </p>
+      {mangaIds.length > 0 && mangaIds.length < entries.length && (
+        <button className="btn btn-quiet btn-small" onClick={() => setTicked(new Set(mangaIds))}>
+          Tick the manga
+        </button>
+      )}
       <ul className="entry-list">
         {entries.map((e) => (
           <li key={e.id}>
@@ -85,16 +137,14 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
         ))}
       </ul>
       <div className="action-row start">
-        <button
-          className="btn btn-primary btn-small"
-          disabled={!valid}
-          onClick={async () => {
-            const id = await app.splitItem(item.id, [...ticked]);
-            if (id) onOpen(id);
-          }}
-        >
-          Make {ticked.size > 1 ? 'these' : 'it'} a separate title
+        <button className="btn btn-primary btn-small" disabled={!valid || busy} onClick={() => split([[...ticked]])}>
+          {ticked.size > 1 ? 'Make these one title' : 'Make it a separate title'}
         </button>
+        {ticked.size > 1 && valid && (
+          <button className="btn btn-small" disabled={busy} onClick={() => split([...ticked].map((e) => [e]))}>
+            Make each its own title
+          </button>
+        )}
         <button className="btn btn-quiet btn-small" onClick={onClose}>
           Cancel
         </button>

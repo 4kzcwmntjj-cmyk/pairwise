@@ -5,7 +5,7 @@ import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
-import { applyAnswer, clearIn, hasBoth, inView, projectMarks, type Answer } from '../rank/medium';
+import { applyAnswer, clearIn, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
 import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
 export const store = new LocalStore();
@@ -103,8 +103,8 @@ export function useApp() {
 
   // One ranking over everything you've seen in any form; each view shows its part of it.
   const seenIds = useMemo(
-    () => [...allMarks.values()].filter((m) => m.status === 'seen' && itemById.has(m.itemId)).map((m) => m.itemId),
-    [allMarks, itemById],
+    () => [...projectMarks(allItems, allMarks, 'both').values()].filter((m) => m.status === 'seen').map((m) => m.itemId),
+    [allItems, allMarks],
   );
 
   const fullFit: Fit = useMemo(() => {
@@ -365,9 +365,10 @@ export function useApp() {
     await store.setMeta('backup', note);
   };
 
+  // Saved before the screen changes, so whoever asked for the change can show its result in the same update.
   const saveOps = async (next: GroupOp[]) => {
-    setGroupOps(next);
     await store.setMeta('groupOps', next);
+    setGroupOps(next);
   };
 
   async function writeMark(itemId: string, mark: Mark | null) {
@@ -410,26 +411,49 @@ export function useApp() {
   };
 
   /** Moves the given entries of a title into a title of their own, unmarked. Returns its id. */
-  const splitItem = async (itemId: string, entryIds: number[]) => {
+  /**
+   * Moves groups of a title's entries into titles of their own (one new title per group). Returns their ids.
+   * Past duels stay with the original. A new title that is all anime or all manga takes its mark from what
+   * you said about that form of the original, if anything; otherwise it starts unmarked.
+   */
+  const splitItem = async (itemId: string, groups: number[][]) => {
     const item = itemById.get(itemId);
-    if (!item || entryIds.length === 0 || entryIds.length >= item.entryIds.length) return null;
-    const id = splitId(entryIds, (x) => itemById.has(x) || groupOps.some((o) => o.kind === 'split' && o.id === x));
-    const names = (item.entries ?? []).filter((e) => entryIds.includes(e.id)).map((e) => e.titleEnglish ?? e.titleRomaji);
-    const op: GroupOp = {
-      kind: 'split',
-      entryIds,
-      id,
-      at: Date.now(),
-      label: `${names[0] ?? 'Part'}${names.length > 1 ? ` and ${names.length - 1} more` : ''} out of ${displayTitle(item, settings)}`,
-    };
+    const moving = groups.flat();
+    if (!item || moving.length === 0 || moving.length >= item.entryIds.length || groups.some((g) => g.length === 0)) return [];
+    const parentMark = allMarks.get(itemId);
+    const taken = new Set(groupOps.flatMap((o) => (o.kind === 'split' ? [o.id] : [])));
+    const ops: GroupOp[] = [];
+    const ids: string[] = [];
+    const now = Date.now();
+    for (const [n, entryIds] of groups.entries()) {
+      const id = splitId(entryIds, (x) => itemById.has(x) || taken.has(x));
+      taken.add(id);
+      ids.push(id);
+      const names = (item.entries ?? []).filter((e) => entryIds.includes(e.id)).map((e) => e.titleEnglish ?? e.titleRomaji);
+      ops.push({
+        kind: 'split',
+        entryIds,
+        id,
+        at: now + n,
+        label: `${names[0] ?? 'Part'}${names.length > 1 ? ` and ${names.length - 1} more` : ''} out of ${displayTitle(item, settings)}`,
+      });
+      const formats = (item.entries ?? []).filter((e) => entryIds.includes(e.id)).map((e) => e.format);
+      const forms = formsOf({ formats });
+      if (forms.anime !== forms.manga) {
+        const known = knownIn(item, parentMark, forms.anime ? 'anime' : 'manga');
+        if (known !== undefined && parentMark && (parentMark.anime !== undefined || parentMark.manga !== undefined)) {
+          await writeMark(id, { itemId: id, status: known ? 'seen' : 'unseen', updatedAt: now });
+        }
+      }
+    }
     setMoved(null);
-    await saveOps([...groupOps, op]);
-    return id;
+    await saveOps([...groupOps, ...ops]);
+    return ids;
   };
 
   /** Takes a grouping change back out. A joined title gets its old mark back. */
   async function removeGroupOp(op: GroupOp) {
-    const next = groupOps.filter((o) => o !== op && !(o.at === op.at && o.kind === op.kind));
+    const next = groupOps.filter((o) => o !== op && !(o.at === op.at && o.kind === op.kind && (o.kind !== 'split' || o.id === (op as { id?: string }).id)));
     await saveOps(next);
     if (op.kind === 'join') {
       if (op.otherMark && !rawMarks.has(op.otherMark.itemId)) await writeMark(op.otherMark.itemId, op.otherMark);

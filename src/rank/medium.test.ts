@@ -87,4 +87,13 @@ describe('choicesFor', () => {
     const on = choicesFor(mixed, 'both').filter((c) => chosen(mixed, m, c)).map((c) => c.label);
     expect(on).toEqual(['Read']);
   });
+
+  it('reads a title split down to one form by that form only', () => {
+    const readOnly = applyAnswer(mixed, undefined, { anime: false, manga: true }, 2);
+    const animeLeft = { formats: ['TV'] };
+    expect(project(animeLeft, readOnly, 'both')?.status).toBe('unseen');
+    expect(project(animeLeft, readOnly, 'anime')?.status).toBe('unseen');
+    const partial = applyAnswer(mixed, undefined, { manga: true }, 2);
+    expect(project(animeLeft, partial, 'both')).toBeUndefined();
+  });
 });
