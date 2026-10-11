@@ -57,6 +57,24 @@ export function App() {
           ))}
         </nav>
       </header>
+      {app.backupDue && (
+        <div className="notice backup-note" role="status">
+          <p>
+            {app.backup
+              ? 'You have new sorting and duels since your last saved copy.'
+              : 'Your list only exists in this browser so far.'}{' '}
+            Save a copy so it can't be lost.
+          </p>
+          <div className="action-row start">
+            <button className="btn btn-primary btn-small" onClick={() => app.saveBackup()}>
+              Save a copy
+            </button>
+            <button className="btn btn-quiet btn-small" onClick={() => app.snoozeBackup()}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       {current === 'duel' && <Duel app={app} onSort={() => setTab('sort')} />}
       {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onOpen={setOpenId} />}
       {current === 'stats' && <Stats app={app} onOpen={setOpenId} />}

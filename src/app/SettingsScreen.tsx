@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { CATALOGUE_SIZE, MANGA_SIZE } from '../anilist/catalogue';
-import { fromExport, toExport, type Snapshot } from '../store/store';
-import { saveCopy } from './saveCopy';
+import { fromExport, type Snapshot } from '../store/store';
 import type { AppState } from './useApp';
 
 export function SettingsScreen({ app }: { app: AppState }) {
@@ -11,8 +10,7 @@ export function SettingsScreen({ app }: { app: AppState }) {
   const [refreshing, setRefreshing] = useState(false);
 
   async function exportData() {
-    const name = `shobu-${new Date().toISOString().slice(0, 10)}.json`;
-    const result = await saveCopy(name, JSON.stringify(toExport(app.snapshot())));
+    const result = await app.saveBackup();
     if (result === 'shared') setMessage('Shared. Pick Save to Files to keep it.');
     else if (result === 'downloaded') setMessage('Saved a copy of your data.');
   }
@@ -76,7 +74,8 @@ export function SettingsScreen({ app }: { app: AppState }) {
         <h3>Your data</h3>
         <p>
           Everything is saved in this browser only: {app.marks.size.toLocaleString()} titles sorted and{' '}
-          {app.votes.length.toLocaleString()} duels. Save a copy now and then. On a phone it opens the share sheet: choose Save to Files, or send it to yourself. You can also use it to move your list to another device.
+          {app.votes.length.toLocaleString()} duels.
+          {app.backup?.at ? ` Last saved to a file on ${new Date(app.backup.at).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}.` : ' Not saved to a file yet.'} Save a copy now and then. On a phone it opens the share sheet: choose Save to Files, or send it to yourself. You can also use it to move your list to another device.
         </p>
         <div className="action-row start">
           <button className="btn" onClick={exportData}>

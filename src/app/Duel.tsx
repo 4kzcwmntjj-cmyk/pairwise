@@ -30,7 +30,7 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
       else if (e.key.toLowerCase() === 's') app.skipPair();
-      else if (e.key === 'Backspace' || e.key.toLowerCase() === 'z') app.undo();
+      else if (e.key === 'Backspace' || e.key.toLowerCase() === 'z') app.undo('duel');
       else return;
       e.preventDefault();
     }
@@ -68,7 +68,7 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
         <button
           className="btn btn-quiet btn-small"
           onClick={() => {
-            if (!picked) app.markItem(item.id, 'unseen');
+            if (!picked) app.markItem(item.id, 'unseen', 'duel');
           }}
         >
           Haven't seen
@@ -98,7 +98,7 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
         <button className="btn btn-quiet" onClick={app.skipPair} title="Key S">
           Skip
         </button>
-        <button className="btn btn-quiet" onClick={app.undo} disabled={!app.canUndo} title="Key Z">
+        <button className="btn btn-quiet" onClick={() => app.undo('duel')} disabled={!app.canUndo('duel')} title="Key Z">
           Undo
         </button>
       </div>

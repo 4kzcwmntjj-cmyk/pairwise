@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LocalStore, type Snapshot } from '../store/store';
+import { LocalStore, toExport, type Snapshot } from '../store/store';
+import { saveCopy } from './saveCopy';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
@@ -9,11 +10,25 @@ import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, ty
 
 export const store = new LocalStore();
 
-type UndoEntry =
+/** When the list was last saved to a file, how much was in it then, and when to stop reminding. */
+export interface BackupNote {
+  at: number;
+  size: number;
+  snoozeUntil?: number;
+}
+/** Remind after this many new marks and duels since the last copy (or since the start, if never saved)... */
+export const BACKUP_AFTER_CHANGES = 150;
+/** ...or after this long, if anything changed at all. */
+export const BACKUP_AFTER_DAYS = 14;
+
+/** Each screen undoes only what was done on it. Grouping changes are undone from Settings. */
+export type UndoScope = 'duel' | 'sort';
+
+type UndoEntry = { scope: UndoScope } & (
   | { kind: 'vote'; voteId: number; pair: Pair }
   | { kind: 'mark'; itemId: string; prev?: Mark; pair?: Pair | null }
   | { kind: 'skip'; itemId: string }
-  | { kind: 'group'; op: GroupOp; keepId?: string; keepPrev?: Mark | null };
+);
 
 export interface Moved {
   title: string;
@@ -34,6 +49,7 @@ export function useApp() {
   const [rawMarks, setMarks] = useState<Map<string, Mark>>(new Map());
   const [rawVotes, setVotes] = useState<Vote[]>([]);
   const [groupOps, setGroupOps] = useState<GroupOp[]>([]);
+  const [backup, setBackup] = useState<BackupNote | null>(null);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [catalogueAt, setCatalogueAt] = useState<string | null>(null);
@@ -53,6 +69,7 @@ export function useApp() {
     setSettingsState(s.settings);
     setSkipped((s.meta.skipped as string[]) ?? []);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
+    setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
     setUndoStack([]);
     setPair(null);
@@ -98,18 +115,18 @@ export function useApp() {
   const pushUndo = (e: UndoEntry) => setUndoStack((s) => [...s.slice(-99), e]);
 
   const markItem = useCallback(
-    async (itemId: string, status: Status) => {
+    async (itemId: string, status: Status, scope: UndoScope = 'sort') => {
       const prev = rawMarks.get(itemId);
       const mark: Mark = { itemId, status, updatedAt: Date.now() };
       setMarks((m) => new Map(m).set(itemId, mark));
-      pushUndo({ kind: 'mark', itemId, prev, pair });
+      pushUndo({ scope, kind: 'mark', itemId, prev, pair });
       await store.setMark(mark);
     },
     [rawMarks, pair],
   );
 
   const clearMark = useCallback(
-    async (itemId: string) => {
+    async (itemId: string, scope: UndoScope = 'sort') => {
       // Marks left on titles that were joined into this one count for it too, so clear those as well.
       const keys = [...rawMarks.keys()].filter((k) => grouping.resolve(k) === itemId);
       if (keys.length === 0) return;
@@ -118,7 +135,7 @@ export function useApp() {
         for (const k of keys) n.delete(k);
         return n;
       });
-      pushUndo({ kind: 'mark', itemId, prev: rawMarks.get(itemId) ?? marks.get(itemId), pair });
+      pushUndo({ scope, kind: 'mark', itemId, prev: rawMarks.get(itemId) ?? marks.get(itemId), pair });
       await Promise.all(keys.map((k) => store.deleteMark(k)));
     },
     [rawMarks, marks, grouping, pair],
@@ -128,7 +145,7 @@ export function useApp() {
     async (itemId: string) => {
       const next = [...skipped.filter((id) => id !== itemId), itemId];
       setSkipped(next);
-      pushUndo({ kind: 'skip', itemId });
+      pushUndo({ scope: 'sort', kind: 'skip', itemId });
       await store.setMeta('skipped', next);
     },
     [skipped],
@@ -144,7 +161,7 @@ export function useApp() {
       const saved = { ...v, id };
       const nextVotes = [...votes, saved];
       setVotes((vs) => [...vs, saved]);
-      pushUndo({ kind: 'vote', voteId: id, pair });
+      pushUndo({ scope: 'duel', kind: 'vote', voteId: id, pair });
       if (winner && before !== undefined) {
         const after = fitModel({ ids: seenIds, anchors: {}, votes: nextVotes, warm: warm.current });
         const to = after.order.indexOf(winner) + 1;
@@ -162,10 +179,11 @@ export function useApp() {
     setPair(null);
   }, [pair]);
 
-  const undo = useCallback(async () => {
-    const last = undoStack[undoStack.length - 1];
-    if (!last) return;
-    setUndoStack((s) => s.slice(0, -1));
+  const undo = useCallback(async (scope: UndoScope) => {
+    const at = undoStack.map((e) => e.scope).lastIndexOf(scope);
+    if (at < 0) return;
+    const last = undoStack[at];
+    setUndoStack((s) => s.filter((_, i) => i !== at));
     setMoved(null);
     if (last.kind === 'vote') {
       setVotes((vs) => vs.filter((v) => v.id !== last.voteId));
@@ -185,15 +203,12 @@ export function useApp() {
         await store.deleteMark(last.itemId);
       }
       if (last.pair !== undefined) setPair(last.pair);
-    } else if (last.kind === 'skip') {
+    } else {
       const next = skipped.filter((id) => id !== last.itemId);
       setSkipped(next);
       await store.setMeta('skipped', next);
-    } else {
-      await removeGroupOp(last.op);
-      if (last.keepId) await writeMark(last.keepId, last.keepPrev ?? null);
     }
-  }, [undoStack, skipped, groupOps, rawMarks]);
+  }, [undoStack, skipped]);
 
   const setSettings = useCallback(async (s: Settings) => {
     setSettingsState(s);
@@ -232,6 +247,10 @@ export function useApp() {
     async (s: Snapshot) => {
       await store.replaceAll(s);
       applySnapshot(await store.loadAll());
+      // A list loaded from a file is, by definition, saved in that file.
+      const note: BackupNote = { at: Date.now(), size: s.marks.length + s.votes.length };
+      setBackup(note);
+      await store.setMeta('backup', note);
     },
     [applySnapshot],
   );
@@ -252,6 +271,34 @@ export function useApp() {
     }),
     [baseItems, rawMarks, rawVotes, settings, skipped, groupOps, catalogueAt],
   );
+
+  const size = rawMarks.size + rawVotes.length;
+  const backupDue = (() => {
+    if (!ready || size === 0) return false;
+    if (backup?.snoozeUntil && Date.now() < backup.snoozeUntil) return false;
+    const changed = size - (backup?.size ?? 0);
+    if (changed <= 0) return false;
+    if (!backup) return changed >= BACKUP_AFTER_CHANGES / 3;
+    return changed >= BACKUP_AFTER_CHANGES || Date.now() - backup.at > BACKUP_AFTER_DAYS * 86_400_000;
+  })();
+
+  /** Saves a copy of everything to a file (the share sheet on phones). */
+  const saveBackup = async () => {
+    const name = `shobu-${new Date().toISOString().slice(0, 10)}.json`;
+    const result = await saveCopy(name, JSON.stringify(toExport(snapshot())));
+    if (result !== 'cancelled') {
+      const note: BackupNote = { at: Date.now(), size };
+      setBackup(note);
+      await store.setMeta('backup', note);
+    }
+    return result;
+  };
+
+  const snoozeBackup = async () => {
+    const note: BackupNote = { at: backup?.at ?? 0, size: backup?.size ?? 0, snoozeUntil: Date.now() + 3 * 86_400_000 };
+    setBackup(note);
+    await store.setMeta('backup', note);
+  };
 
   const saveOps = async (next: GroupOp[]) => {
     setGroupOps(next);
@@ -277,21 +324,22 @@ export function useApp() {
     const keep = itemById.get(keepId);
     const other = itemById.get(otherId);
     if (!keep || !other || keepId === otherId) return;
+    const now = Date.now();
     const keepMark = rawMarks.get(keepId);
     const otherMark = rawMarks.get(otherId) ?? null;
     const op: GroupOp = {
       kind: 'join',
       keep: keep.entryIds[0],
       other: other.entryIds[0],
-      at: Date.now(),
+      at: now,
       otherMark,
+      keepMark: keepMark ?? null,
       label: `${displayTitle(other, settings)} into ${displayTitle(keep, settings)}`,
     };
     const either = [marks.get(keepId)?.status, marks.get(otherId)?.status];
     const status: Status | null = either.includes('seen') ? 'seen' : either.includes('unseen') ? 'unseen' : null;
-    if (status && status !== keepMark?.status) await writeMark(keepId, { itemId: keepId, status, updatedAt: Date.now() });
+    if (status && status !== keepMark?.status) await writeMark(keepId, { itemId: keepId, status, updatedAt: now });
     if (otherMark) await writeMark(otherId, null);
-    pushUndo({ kind: 'group', op, keepId, keepPrev: keepMark ?? null });
     setMoved(null);
     await saveOps([...groupOps, op]);
   };
@@ -309,7 +357,6 @@ export function useApp() {
       at: Date.now(),
       label: `${names[0] ?? 'Part'}${names.length > 1 ? ` and ${names.length - 1} more` : ''} out of ${displayTitle(item, settings)}`,
     };
-    pushUndo({ kind: 'group', op });
     setMoved(null);
     await saveOps([...groupOps, op]);
     return id;
@@ -321,6 +368,9 @@ export function useApp() {
     await saveOps(next);
     if (op.kind === 'join') {
       if (op.otherMark && !rawMarks.has(op.otherMark.itemId)) await writeMark(op.otherMark.itemId, op.otherMark);
+      // The kept title's mark goes back to what it was before the join, unless it was changed since.
+      const keepId = [...baseItems].find((i) => i.entryIds.includes(op.keep))?.id;
+      if (keepId && op.keepMark !== undefined && rawMarks.get(keepId)?.updatedAt === op.at) await writeMark(keepId, op.keepMark);
     }
   }
 
@@ -336,8 +386,7 @@ export function useApp() {
     rankOf,
     pair,
     moved,
-    canUndo: undoStack.length > 0,
-    lastUndoKind: undoStack[undoStack.length - 1]?.kind,
+    canUndo: (scope: UndoScope) => undoStack.some((e) => e.scope === scope),
     markItem,
     clearMark,
     skipSort,
@@ -354,6 +403,10 @@ export function useApp() {
     title: (item: Item) => displayTitle(item, settings),
     baseItems,
     groupOps,
+    backup,
+    backupDue,
+    saveBackup,
+    snoozeBackup,
     resolveId: grouping.resolve,
     joinItems,
     splitItem,

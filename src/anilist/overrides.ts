@@ -24,6 +24,8 @@ export type GroupOp =
       at: number;
       /** The joined title's mark before the join, restored if the join is removed. */
       otherMark?: Mark | null;
+      /** The kept title's mark before the join. */
+      keepMark?: Mark | null;
       /** Titles at the time, for the list in Settings. */
       label?: string;
     }

@@ -8,7 +8,7 @@ Rank anime by picking between two at a time (勝負, shōbu: a match or contest)
 - **For you**: unseen titles suggested from AniList users' recommendations for the shows you rank highest, plus the genres you rank well.
 - **Stats**: totals, your top 10 over time (replayed from the vote log), how settled the list is, taste by genre, studio and decade, how you compare with AniList's scores, rivalries and upsets. Group stats wait for 30 ranked titles and 100 duels.
 
-The catalogue (`public/catalogue.json`) is built by `scripts/build-catalogue.ts` on GitHub Actions monthly (`.github/workflows/catalogue.yml`), so devices never download it from AniList. Everything you do is saved in your browser (IndexedDB). Settings has "Save a copy" (the share sheet on phones) and "Load a copy" for backups and moving devices.
+The catalogue (`public/catalogue.json`) is built by `scripts/build-catalogue.ts` on GitHub Actions monthly (`.github/workflows/catalogue.yml`), so devices never download it from AniList. Everything you do is saved in your browser (IndexedDB). Settings has "Save a copy" (the share sheet on phones) and "Load a copy" for backups and moving devices. A banner reminds you to save after 150 new marks and duels or two weeks. Undo on Duel and Sort only undoes what was done on that screen; split and join changes are undone from Settings.
 
 ## Development
 

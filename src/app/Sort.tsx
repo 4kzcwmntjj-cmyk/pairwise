@@ -167,7 +167,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
       )}
       <div ref={sentinel} aria-hidden="true" />
       <p className="undo-row">
-        <button className="btn btn-quiet btn-small" onClick={app.undo} disabled={!app.canUndo}>
+        <button className="btn btn-quiet btn-small" onClick={() => app.undo('sort')} disabled={!app.canUndo('sort')}>
           Undo
         </button>
       </p>
@@ -242,7 +242,7 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
       if (k === 'y' || k === 'enter' || k === 'arrowleft') app.markItem(item.id, 'seen');
       else if (k === 'n' || k === 'arrowright') app.markItem(item.id, 'unseen');
       else if (k === 's') app.skipSort(item.id);
-      else if (k === 'backspace' || k === 'z') app.undo();
+      else if (k === 'backspace' || k === 'z') app.undo('sort');
       else return;
       e.preventDefault();
     }
@@ -306,7 +306,7 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
         <button className="btn btn-quiet" onClick={() => app.skipSort(item.id)} title="Key S">
           Ask later
         </button>
-        <button className="btn btn-quiet" onClick={app.undo} disabled={!app.canUndo} title="Key Z">
+        <button className="btn btn-quiet" onClick={() => app.undo('sort')} disabled={!app.canUndo('sort')} title="Key Z">
           Undo
         </button>
       </div>
