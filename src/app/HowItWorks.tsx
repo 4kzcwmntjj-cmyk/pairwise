@@ -57,6 +57,11 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           you've watched, the manga view what you've read, and both shows everything. A title you've only read counts as
           not seen in the anime view. Duels only use titles in the current view.
         </p>
+        <p>
+          A title's card shows the side you know. In the manga view, Death Note shows the manga's cover and years. In the
+          both view, a title you've only read shows as the manga, one you've only watched as the anime, and one you know
+          both ways as the anime with the manga noted.
+        </p>
       </section>
 
       <section>

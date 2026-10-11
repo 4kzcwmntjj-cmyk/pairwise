@@ -20,6 +20,7 @@ import {
 } from '../rank/stats';
 import type { Item } from '../types';
 import { Cover } from './Cover';
+import { withLook, type Look } from '../rank/look';
 import type { AppState } from './useApp';
 
 const shortDate = (at: number | string) => {
@@ -33,8 +34,14 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
 
   // Titles that have played at least one duel, best first. Unplayed ones sit at the midpoint and would blur the groups.
   const ranked: Item[] = useMemo(
-    () => fit.order.filter((id) => (fit.duels.get(id) ?? 0) > 0).map((id) => app.itemById.get(id)!).filter(Boolean),
-    [fit, app.itemById],
+    () =>
+      fit.order
+        .filter((id) => (fit.duels.get(id) ?? 0) > 0)
+        .map((id) => app.itemById.get(id)!)
+        .filter(Boolean)
+        // Years, studio and AniList score of the side you know: in the manga view, the manga's.
+        .map((i) => withLook(i, app.look(i))),
+    [fit, app.itemById, app.look],
   );
   // The fit runs over everything you've seen; ranks are counted within the current view.
   const seenIds = app.seenIds;
@@ -152,8 +159,8 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
               {Math.round(crowd.agreement * 100)}% agreement
               <span className="hint"> across {n(crowd.n)} titles. 100% would be AniList's exact order.</span>
             </p>
-            <TakeList heading="You rank these higher than AniList does" takes={crowd.lovedMore} onOpen={onOpen} title={app.title} />
-            <TakeList heading="You rank these lower" takes={crowd.lovedLess} onOpen={onOpen} title={app.title} />
+            <TakeList heading="You rank these higher than AniList does" takes={crowd.lovedMore} onOpen={onOpen} title={app.title} look={app.look} />
+            <TakeList heading="You rank these lower" takes={crowd.lovedLess} onOpen={onOpen} title={app.title} look={app.look} />
           </>
         ) : (
           <Locked text={`Needs ${MIN_RANKED_FOR_CROWD} ranked titles with an AniList score.`} have={`You have ${n(ranked.length)} ranked.`} />
@@ -315,7 +322,7 @@ function TasteBlock({ heading, data }: { heading: string; data: { best: TasteGro
   );
 }
 
-function TakeList({ heading, takes, onOpen, title }: { heading: string; takes: HotTake[]; onOpen: (id: string) => void; title: (i: Item) => string }) {
+function TakeList({ heading, takes, onOpen, title, look }: { heading: string; takes: HotTake[]; onOpen: (id: string) => void; title: (i: Item) => string; look: (i: Item) => Look }) {
   if (takes.length === 0) return null;
   return (
     <div className="stat-block">
@@ -324,7 +331,7 @@ function TakeList({ heading, takes, onOpen, title }: { heading: string; takes: H
         {takes.map((t) => (
           <li key={t.item.id}>
             <button className="rank-row" onClick={() => onOpen(t.item.id)}>
-              <Cover item={t.item} title={title(t.item)} size="sm" />
+              <Cover look={look(t.item)} title={title(t.item)} size="sm" />
               <span className="rank-body">
                 <span className="rank-title">{title(t.item)}</span>
                 <span className="rank-meta">

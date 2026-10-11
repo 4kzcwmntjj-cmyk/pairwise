@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import type { Item } from '../types';
+import type { Look } from '../rank/look';
 
-export function Cover({ item, title, size = 'md' }: { item: Item; title: string; size?: 'sm' | 'md' | 'lg' }) {
-  const [failed, setFailed] = useState(false);
+export function Cover({ look, title, size = 'md' }: { look: Pick<Look, 'cover' | 'coverLarge' | 'coverColor'>; title: string; size?: 'sm' | 'md' | 'lg' }) {
+  const item = look;
+  const [failedSrc, setFailed] = useState<string | null>(null);
   const initials = title
     .split(/[\s:]+/)
     .filter(Boolean)
@@ -12,7 +13,7 @@ export function Cover({ item, title, size = 'md' }: { item: Item; title: string;
     .toUpperCase();
   return (
     <div className={`cover cover-${size}`} style={{ backgroundColor: item.coverColor ?? undefined }}>
-      {item.cover && !failed ? (
+      {item.cover && failedSrc !== item.cover ? (
         <img
           src={size === 'lg' ? item.coverLarge ?? item.cover : item.cover}
           alt=""
@@ -20,7 +21,7 @@ export function Cover({ item, title, size = 'md' }: { item: Item; title: string;
           decoding="async"
           referrerPolicy="no-referrer"
           draggable={false}
-          onError={() => setFailed(true)}
+          onError={() => setFailed(item.cover ?? null)}
         />
       ) : (
         <span className="cover-fallback" aria-hidden="true">

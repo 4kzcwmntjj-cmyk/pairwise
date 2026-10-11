@@ -3,7 +3,7 @@ import { searchAniList } from '../anilist/catalogue';
 import { addEntry, franchiseFor, toItem, type RawMedia } from '../anilist/group';
 import type { Item } from '../types';
 import { Cover } from './Cover';
-import { metaLine } from './meta';
+import { lookOf } from '../rank/look';
 import type { AppState } from './useApp';
 
 const STATUS_LABEL = { seen: 'Seen', unseen: "Haven't seen" } as const;
@@ -58,10 +58,10 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
     return (
       <li key={item.id}>
         <button className="rank-row" onClick={() => onOpen(item.id)}>
-          <Cover item={item} title={title} size="sm" />
+          <Cover look={app.look(item)} title={title} size="sm" />
           <span className="rank-body">
             <span className="rank-title">{title}</span>
-            <span className="rank-meta">{metaLine(item)}</span>
+            <span className="rank-meta">{app.look(item).meta}</span>
           </span>
           <span className="status-note">{mark ? STATUS_LABEL[mark.status] : 'Not sorted'}</span>
         </button>
@@ -118,10 +118,10 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
                 return (
                   <li key={m.id}>
                     <button className="rank-row" onClick={() => addRemote(m)}>
-                      <Cover item={preview} title={title} size="sm" />
+                      <Cover look={lookOf(preview, 'both')} title={title} size="sm" />
                       <span className="rank-body">
                         <span className="rank-title">{title}</span>
-                        <span className="rank-meta">{metaLine(preview)}</span>
+                        <span className="rank-meta">{lookOf(preview, 'both').meta}</span>
                       </span>
                       <span className="status-note">{owned ? `Part of ${app.title(owned)}` : 'Add'}</span>
                     </button>

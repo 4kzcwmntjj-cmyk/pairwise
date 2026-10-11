@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { MIN_RANKED, recommend } from '../rank/recommend';
 import { Cover } from './Cover';
-import { metaLine } from './meta';
 import type { AppState } from './useApp';
 
 export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: string) => void; onSort: () => void }) {
@@ -56,10 +55,10 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
             return (
               <li key={item.id} className="rec-item">
                 <button className="rank-row rec-row" onClick={() => onOpen(item.id)}>
-                  <Cover item={item} title={title} size="sm" />
+                  <Cover look={app.look(item)} title={title} size="sm" />
                   <span className="rank-body">
                     <span className="rank-title">{title}</span>
-                    <span className="rank-meta">{metaLine(item)}</span>
+                    <span className="rank-meta">{app.look(item).meta}</span>
                     <span className="rec-reason">{reason}</span>
                   </span>
                   {status === 'unseen' && <span className="status-note">Marked not seen</span>}

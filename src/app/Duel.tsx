@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import type { Item, Outcome } from '../types';
 import { Cover } from './Cover';
-import { metaLine, viewWords } from './meta';
+import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
 export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
@@ -60,11 +60,11 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
     return (
       <div className={`contender ${state}`}>
         <button className="contender-pick" onClick={() => choose(outcome)} aria-label={`Pick ${title}`}>
-          <Cover item={item} title={title} size="lg" />
+          <Cover look={app.look(item)} title={title} size="lg" />
           <span className="contender-rank">#{app.rankOf.get(item.id)}</span>
         </button>
         <h2 className="item-title">{title}</h2>
-        <p className="item-meta">{metaLine(item)}</p>
+        <p className="item-meta">{app.look(item).meta}</p>
         <button
           className="btn btn-quiet btn-small"
           onClick={() => {

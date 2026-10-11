@@ -5,7 +5,6 @@ import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
 import { Add } from './Add';
 import { Cover } from './Cover';
-import { metaLine, years } from './meta';
 import type { AppState } from './useApp';
 
 const PAGE = 60;
@@ -153,7 +152,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
             return (
               <li key={item.id} className={`grid-item is-${state}`}>
                 <button onClick={() => cycle(item)} aria-label={`${title}${state === 'seen' ? ', seen' : state === 'unseen' ? ", haven't seen" : ''}`}>
-                  <Cover item={item} title={title} size="sm" />
+                  <Cover look={app.look(item)} title={title} size="sm" />
                   {state === 'seen' && (
                     <span className="grid-badge" aria-hidden="true">
                       ✓
@@ -161,7 +160,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
                   )}
                   {state === 'unseen' && <span className="grid-note">Haven't seen</span>}
                   <span className="grid-title">{title}</span>
-                  <span className="grid-year">{years(item)}</span>
+                  <span className="grid-year">{app.look(item).years}</span>
                 </button>
               </li>
             );
@@ -235,7 +234,8 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
   const next = queue[1];
 
   useEffect(() => {
-    if (next?.coverLarge ?? next?.cover) new Image().src = (next.coverLarge ?? next.cover)!;
+    const nl = next && app.look(next);
+    if (nl?.coverLarge ?? nl?.cover) new Image().src = (nl.coverLarge ?? nl.cover)!;
   }, [next]);
 
   useEffect(() => {
@@ -296,9 +296,9 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
         </div>
       )}
       <div className="sort-card" key={item.id}>
-        <Cover item={item} title={title} size="lg" />
+        <Cover look={app.look(item)} title={title} size="lg" />
         <h2 className="item-title">{title}</h2>
-        <p className="item-meta">{metaLine(item)}</p>
+        <p className="item-meta">{app.look(item).meta}</p>
       </div>
       <div className={`action-row choices-${choicesFor(item, app.view).length}`}>
         {choicesFor(item, app.view).map((c, i) => (

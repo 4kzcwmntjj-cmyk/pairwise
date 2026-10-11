@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { isSettled as isSettledIn } from '../rank/stats';
 import type { Item, Status } from '../types';
 import { Cover } from './Cover';
-import { formsOf, formUnknown, knownIn } from '../rank/medium';
-import { viewWords, years } from './meta';
+import { formUnknown, knownIn } from '../rank/medium';
+import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
 type View = 'ranked' | 'unseen';
@@ -25,13 +25,12 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
     };
   }, [app.fit, app.marks, app.itemById]);
 
-  // For titles with both forms, in the both view: how you know them.
+  // For titles with both forms, in the both view. The cover already shows which one you know when it's one;
+  // this covers the cases it can't.
   const formLabel = (item: Item) => {
     const m = app.allMarks.get(item.id);
     if (formUnknown(item, m)) return 'watched or read?';
-    const a = knownIn(item, m, 'anime');
-    const r = knownIn(item, m, 'manga');
-    return a && r ? 'watched and read' : a ? 'watched' : r ? 'read' : '';
+    return knownIn(item, m, 'anime') && knownIn(item, m, 'manga') ? 'watched and read' : '';
   };
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
@@ -85,19 +84,17 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
               <li key={item.id}>
                 <button className="rank-row" onClick={() => onOpen(item.id)}>
                   {view === 'ranked' && <span className="rank-num">{rank}</span>}
-                  <Cover item={item} title={title} size="sm" />
+                  <Cover look={app.look(item)} title={title} size="sm" />
                   <span className="rank-body">
                     <span className="rank-title">{title}</span>
                     <span className="rank-meta">
-                      {[years(item), item.studio].filter(Boolean).join(', ')}
+                      {app.look(item).short}
                       {view === 'ranked' && (
                         <>
                           {' · '}
                           {duels === 0 ? 'no duels' : duels === 1 ? '1 duel' : `${duels} duels`}
                           {isSettled ? ', settled' : ''}
-                          {app.view === 'both' && formsOf(item).anime && formsOf(item).manga && (
-                            <>{' · '}{formLabel(item)}</>
-                          )}
+                          {app.view === 'both' && formLabel(item) && <>{' · '}{formLabel(item)}</>}
                         </>
                       )}
                     </span>

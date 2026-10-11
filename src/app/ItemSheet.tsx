@@ -2,7 +2,6 @@ import { useEffect, useMemo } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import { Cover } from './Cover';
 import { choicesFor, chosen, formUnknown } from '../rank/medium';
-import { anilistUrl, metaLine } from './meta';
 import { Regroup } from './Regroup';
 import type { AppState } from './useApp';
 
@@ -46,7 +45,8 @@ export function ItemSheet({
   const title = app.title(item);
   const rank = app.rankOf.get(itemId);
   const duels = app.fit.duels.get(itemId) ?? 0;
-  const url = anilistUrl(item);
+  const look = app.look(item);
+  const url = look.url;
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -55,10 +55,10 @@ export function ItemSheet({
           Close
         </button>
         <div className="sheet-head">
-          <Cover item={item} title={title} size="md" />
+          <Cover look={look} title={title} size="md" />
           <div>
             <h2 className="item-title">{title}</h2>
-            <p className="item-meta">{metaLine(item)}</p>
+            <p className="item-meta">{look.meta}</p>
             {rank !== undefined && (
               <p className="sheet-rank">
                 <span className="big-rank">#{rank}</span>

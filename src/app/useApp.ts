@@ -5,6 +5,7 @@ import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
+import { lookOf, sideFor, type Look } from '../rank/look';
 import { applyAnswer, clearIn, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
 import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
@@ -102,6 +103,8 @@ export function useApp() {
   const view = settings.view;
   const items = useMemo(() => allItems.filter((i) => inView(i, view)), [allItems, view]);
   const marks = useMemo(() => projectMarks(items, allMarks, view), [items, allMarks, view]);
+  /** How a title is shown in this view: the side of it you know. */
+  const look = useCallback((item: Item): Look => lookOf(item, sideFor(item, view, allMarks.get(item.id))), [view, allMarks]);
 
   // One ranking over everything you've seen in any form; each view shows its part of it.
   const seenIds = useMemo(
@@ -511,6 +514,7 @@ export function useApp() {
     resetAll,
     snapshot,
     title: (item: Item) => displayTitle(item, settings),
+    look,
     baseItems,
     groupOps,
     backup,

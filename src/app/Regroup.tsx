@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Item } from '../types';
 import { Cover } from './Cover';
 import { isManga } from '../anilist/group';
-import { formatLabel, metaLine, years } from './meta';
+import { formatLabel } from './meta';
 import type { AppState } from './useApp';
 
 type Mode = null | 'split' | 'join';
@@ -87,7 +87,7 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
               <li key={id} className="made-row">
                 <span>
                   {it ? app.title(it) : 'New title'}
-                  {it && <span className="hint"> · {metaLine(it)}{m ? `, ${m.status === 'seen' ? 'marked seen' : 'marked not seen'}` : ', not marked yet'}</span>}
+                  {it && <span className="hint"> · {app.look(it).meta}{m ? `, ${m.status === 'seen' ? 'marked seen' : 'marked not seen'}` : ', not marked yet'}</span>}
                 </span>
                 <button className="btn btn-quiet btn-small" onClick={() => onOpen(id)}>
                   Open
@@ -209,10 +209,10 @@ function Join({ app, item, onClose }: { app: AppState; item: Item; onClose: () =
           {matches.map((m) => (
             <li key={m.id}>
               <button className="rank-row" onClick={() => setPicked(m)}>
-                <Cover item={m} title={app.title(m)} size="sm" />
+                <Cover look={app.look(m)} title={app.title(m)} size="sm" />
                 <span className="rank-body">
                   <span className="rank-title">{app.title(m)}</span>
-                  <span className="rank-meta">{[years(m), m.studio].filter(Boolean).join(', ')}</span>
+                  <span className="rank-meta">{app.look(m).short}</span>
                 </span>
               </button>
             </li>

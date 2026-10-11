@@ -29,3 +29,7 @@ Anime data and cover art from [AniList](https://anilist.co).
 ## How it works page and hiding suggestions
 
 Settings and the welcome screen link to a short in-app guide (`src/app/HowItWorks.tsx`). In For you, **Not interested** hides a suggestion. Hidden titles are stored by AniList entry id in the `dismissed` meta key, are included in saved copies, and can be restored from the list at the bottom of the page.
+
+## How a title is shown
+
+`src/rank/look.ts` picks the side of a title to show (`sideFor`) and builds its cover, years and description from that side's entries (`lookOf`). Anime and manga views show their side; the both view shows the side you know, or the anime with the manga noted when you know both or haven't said. Stats read years, studio and AniList score from the shown side (`withLook`).
