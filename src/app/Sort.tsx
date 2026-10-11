@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isMangaOnly } from '../anilist/group';
 import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
 import { Add } from './Add';
@@ -174,6 +175,13 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   );
 }
 
+/**
+ * Until you've answered about a few manga, one card in every MANGA_EVERY is the likeliest manga, so the
+ * model gets to learn whether you read them. Otherwise anime would fill the queue and manga would never come up.
+ */
+const MANGA_EVERY = 5;
+const MANGA_LEARNED = 8;
+
 /** Long-shot notice: shown once enough has been sorted and recent answers are nearly all "haven't seen". */
 const RECENT = 25;
 const RECENT_HITS_AT_MOST = 2;
@@ -192,11 +200,27 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
     const p = (i: Item) => model.probability.get(i.id) ?? 0;
     const unmarked = app.items.filter((i) => !app.marks.has(i.id)).sort((a, b) => p(b) - p(a) || b.popularity - a.popularity);
     const order = new Map(app.skipped.map((id, i) => [id, i]));
+    let fresh = unmarked.filter((i) => !skipped.has(i.id));
+    if (app.settings.manga) {
+      const isMangaId = (id: string) => {
+        const it = app.itemById.get(id);
+        return !!it && isMangaOnly(it);
+      };
+      const answered = [...app.marks.values()].filter((m) => isMangaId(m.itemId));
+      if (answered.length < MANGA_LEARNED) {
+        // Cards answered since the last manga.
+        const recent = [...app.marks.values()].sort((x, y) => y.updatedAt - x.updatedAt);
+        const since = recent.findIndex((m) => isMangaId(m.itemId));
+        const gap = since === -1 ? recent.length : since;
+        const first = fresh.findIndex(isMangaOnly);
+        if (gap >= MANGA_EVERY - 1 && first > 0) fresh = [fresh[first], ...fresh.slice(0, first), ...fresh.slice(first + 1)];
+      }
+    }
     return [
-      ...unmarked.filter((i) => !skipped.has(i.id)),
+      ...fresh,
       ...unmarked.filter((i) => skipped.has(i.id)).sort((a, b) => order.get(a.id)! - order.get(b.id)!),
     ];
-  }, [app.items, app.marks, app.skipped, model]);
+  }, [app.items, app.itemById, app.marks, app.skipped, app.settings.manga, model]);
 
   const recentHits = useMemo(() => {
     const recent = [...app.marks.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT);

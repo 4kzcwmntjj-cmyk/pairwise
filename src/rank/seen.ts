@@ -11,9 +11,9 @@ import type { Item, Mark } from '../types';
  *   haven't seen. AniList recommendation links are written by people who
  *   watched both shows, so they stand in for "watched together";
  * - distance in years from the middle of what you've seen;
- * - whether the title is manga with no anime. Popularity is standardised
- *   within anime and within manga separately, since AniList's numbers run
- *   lower for manga; this flag then learns how much manga you read.
+ * - whether the title is manga with no anime. AniList's popularity numbers
+ *   run lower for manga, which already puts manga-only titles further down;
+ *   this flag learns how much manga you read on top of that.
  *
  * A logistic model turns these into a probability. It starts from fixed
  * weights and, once you've marked enough titles, refits the weights to your
@@ -33,7 +33,7 @@ export interface SeenModel {
 
 type Vec = [number, number, number, number, number, number];
 /** intercept, popularity, seen share of linked titles, amount of link evidence, years from your middle, manga only */
-const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.8, 0, -0.25, -0.8];
+const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.8, 0, -0.25, -0.3];
 const MIN_TO_FIT = 30;
 const MIN_PER_CLASS = 8;
 /**
@@ -69,8 +69,7 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
     return { mean, sd };
   };
   const mangaOnly = new Set(items.filter(isMangaOnly).map((i) => i.id));
-  const animeScale = scale(items.filter((i) => !mangaOnly.has(i.id)));
-  const mangaScale = scale(items.filter((i) => mangaOnly.has(i.id)));
+  const { mean, sd } = scale(items);
 
   const seenYears = items
     .filter((i) => marks.get(i.id)?.status === 'seen' && i.startYear)
@@ -93,7 +92,6 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
     // many links.
     const share = Math.log((pos + 1) / (neg + 1));
     const manga = mangaOnly.has(it.id);
-    const { mean, sd } = manga ? mangaScale : animeScale;
     return [1, (Math.log1p(it.popularity) - mean) / sd, share, Math.sqrt(pos + neg), years, manga ? 1 : 0];
   };
 
