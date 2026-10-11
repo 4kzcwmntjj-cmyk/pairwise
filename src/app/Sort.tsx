@@ -1,15 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
+import { Add } from './Add';
 import { Cover } from './Cover';
 import { metaLine, years } from './meta';
 import type { AppState } from './useApp';
 
 const PAGE = 60;
 
-export function Sort({ app, onDone, onFind }: { app: AppState; onDone: () => void; onFind: () => void }) {
+export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => void; onOpen: (id: string) => void }) {
+  const [finding, setFinding] = useState(false);
+  const onFind = () => setFinding(true);
   const seen = useMemo(() => [...app.marks.values()].filter((m) => m.status === 'seen').length, [app.marks]);
   const mode = app.settings.sortMode;
+  if (finding) {
+    return (
+      <main className="screen sort">
+        <div className="sort-head">
+          <button className="btn btn-quiet btn-small" onClick={() => setFinding(false)}>
+            Back to sorting
+          </button>
+        </div>
+        <Add app={app} onOpen={onOpen} />
+      </main>
+    );
+  }
   return (
     <main className="screen sort">
       <div className="sort-head">
@@ -31,11 +46,16 @@ export function Sort({ app, onDone, onFind }: { app: AppState; onDone: () => voi
             </button>
           ))}
         </div>
-        {seen >= 2 && (
-          <button className="btn btn-primary btn-small" onClick={onDone}>
-            Start duels ({seen} seen)
+        <div className="action-row start">
+          <button className="btn btn-small" onClick={onFind}>
+            Search
           </button>
-        )}
+          {seen >= 2 && (
+            <button className="btn btn-primary btn-small" onClick={onDone}>
+              Start duels ({seen} seen)
+            </button>
+          )}
+        </div>
       </div>
       {mode === 'grid' ? <SortGrid app={app} onFind={onFind} /> : <SortSingle app={app} onDone={onDone} onFind={onFind} />}
     </main>
@@ -95,7 +115,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
           id="sort-filter"
           className="search"
           type="search"
-          placeholder="Find a title"
+          placeholder="Filter these titles"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />

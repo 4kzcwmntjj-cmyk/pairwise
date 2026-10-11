@@ -69,7 +69,7 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
   };
 
   return (
-    <main className="screen add">
+    <div className="screen-body add">
       <form
         className="search-form"
         onSubmit={(e) => {
@@ -81,7 +81,7 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
           id="add-search"
           className="search"
           type="search"
-          placeholder="Find a title"
+          placeholder="Search by title"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -131,6 +131,6 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
           )}
         </>
       )}
-    </main>
+    </div>
   );
 }

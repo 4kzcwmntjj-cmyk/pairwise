@@ -2,13 +2,13 @@
 
 Rank anime by picking between two at a time (勝負, shōbu: a match or contest). The app ships with a catalogue of AniList's 5,000 most popular anime, grouped into one entry per series, and keeps a ranking that updates after every duel.
 
-- **Sort**: go one at a time (seen it, haven't seen, ask later), or tap every title you've seen in a cover grid.
+- **Sort**: go one at a time (seen it, haven't seen, ask later), or tap every title you've seen in a cover grid. Search finds anything in the catalogue, or on AniList for titles outside it.
 - **Duel**: pick the one you prefer. The ranking is a Bradley-Terry fit over every vote you've made.
 - **Ranking**: your list, plus the titles you've marked haven't seen.
 - **For you**: unseen titles suggested from AniList users' recommendations for the shows you rank highest, plus the genres you rank well.
-- **Add**: find titles outside the catalogue on AniList.
+- **Stats**: totals, your top 10 over time (replayed from the vote log), how settled the list is, taste by genre, studio and decade, how you compare with AniList's scores, rivalries and upsets. Group stats wait for 30 ranked titles and 100 duels.
 
-The catalogue (`public/catalogue.json`) is built by `scripts/build-catalogue.ts` on GitHub Actions monthly (`.github/workflows/catalogue.yml`), so devices never download it from AniList. Everything you do is saved in your browser (IndexedDB). Settings has "Save a copy" and "Load a copy" for backups and moving devices.
+The catalogue (`public/catalogue.json`) is built by `scripts/build-catalogue.ts` on GitHub Actions monthly (`.github/workflows/catalogue.yml`), so devices never download it from AniList. Everything you do is saved in your browser (IndexedDB). Settings has "Save a copy" (the share sheet on phones) and "Load a copy" for backups and moving devices.
 
 ## Development
 

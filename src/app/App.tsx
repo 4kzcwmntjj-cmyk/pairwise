@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Add } from './Add';
 import { Duel } from './Duel';
 import { ForYou } from './ForYou';
 import { ItemSheet } from './ItemSheet';
 import { Ranking } from './Ranking';
 import { SettingsScreen } from './SettingsScreen';
 import { Sort } from './Sort';
+import { Stats } from './Stats';
 import { useApp } from './useApp';
 import { Welcome } from './Welcome';
 
-type Tab = 'duel' | 'sort' | 'ranking' | 'foryou' | 'add' | 'settings';
+type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
 const TABS: [Tab, string][] = [
   ['duel', 'Duel'],
   ['sort', 'Sort'],
   ['ranking', 'Ranking'],
+  ['stats', 'Stats'],
   ['foryou', 'For you'],
-  ['add', 'Add'],
   ['settings', 'Settings'],
 ];
 
@@ -58,10 +58,10 @@ export function App() {
         </nav>
       </header>
       {current === 'duel' && <Duel app={app} onSort={() => setTab('sort')} />}
-      {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onFind={() => setTab('add')} />}
+      {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onOpen={setOpenId} />}
+      {current === 'stats' && <Stats app={app} onOpen={setOpenId} />}
       {current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
       {current === 'ranking' && <Ranking app={app} onOpen={setOpenId} />}
-      {current === 'add' && <Add app={app} onOpen={setOpenId} />}
       {current === 'settings' && <SettingsScreen app={app} />}
       {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} />}
     </div>

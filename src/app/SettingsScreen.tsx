@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CATALOGUE_SIZE } from '../anilist/catalogue';
 import { fromExport, toExport, type Snapshot } from '../store/store';
+import { saveCopy } from './saveCopy';
 import type { AppState } from './useApp';
 
 export function SettingsScreen({ app }: { app: AppState }) {
@@ -9,15 +10,11 @@ export function SettingsScreen({ app }: { app: AppState }) {
   const [message, setMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify(toExport(app.snapshot()))], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `shobu-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setMessage('Saved a copy of your data.');
+  async function exportData() {
+    const name = `shobu-${new Date().toISOString().slice(0, 10)}.json`;
+    const result = await saveCopy(name, JSON.stringify(toExport(app.snapshot())));
+    if (result === 'shared') setMessage('Shared. Pick Save to Files to keep it.');
+    else if (result === 'downloaded') setMessage('Saved a copy of your data.');
   }
 
   async function chooseImport(file: File) {
@@ -70,7 +67,7 @@ export function SettingsScreen({ app }: { app: AppState }) {
         <h3>Your data</h3>
         <p>
           Everything is saved in this browser only: {app.marks.size.toLocaleString()} titles sorted and{' '}
-          {app.votes.length.toLocaleString()} duels. Save a copy now and then, and use it to move your list to another device.
+          {app.votes.length.toLocaleString()} duels. Save a copy now and then. On a phone it opens the share sheet: choose Save to Files, or send it to yourself. You can also use it to move your list to another device.
         </p>
         <div className="action-row start">
           <button className="btn" onClick={exportData}>
