@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Add } from './Add';
 import { Duel } from './Duel';
+import { ForYou } from './ForYou';
 import { ItemSheet } from './ItemSheet';
 import { Ranking } from './Ranking';
 import { SettingsScreen } from './SettingsScreen';
@@ -8,11 +9,12 @@ import { Sort } from './Sort';
 import { useApp } from './useApp';
 import { Welcome } from './Welcome';
 
-type Tab = 'duel' | 'sort' | 'ranking' | 'add' | 'settings';
+type Tab = 'duel' | 'sort' | 'ranking' | 'foryou' | 'add' | 'settings';
 const TABS: [Tab, string][] = [
   ['duel', 'Duel'],
   ['sort', 'Sort'],
   ['ranking', 'Ranking'],
+  ['foryou', 'For you'],
   ['add', 'Add'],
   ['settings', 'Settings'],
 ];
@@ -46,7 +48,7 @@ export function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="wordmark">Pairwise</span>
+        <span className="wordmark">Shōbu</span>
         <nav className="tabs" aria-label="Sections">
           {TABS.map(([t, label]) => (
             <button key={t} className={current === t ? 'on' : ''} aria-current={current === t ? 'page' : undefined} onClick={() => setTab(t)}>
@@ -56,7 +58,8 @@ export function App() {
         </nav>
       </header>
       {current === 'duel' && <Duel app={app} onSort={() => setTab('sort')} />}
-      {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} />}
+      {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onFind={() => setTab('add')} />}
+      {current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
       {current === 'ranking' && <Ranking app={app} onOpen={setOpenId} />}
       {current === 'add' && <Add app={app} onOpen={setOpenId} />}
       {current === 'settings' && <SettingsScreen app={app} />}

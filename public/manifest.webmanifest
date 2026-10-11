@@ -1,6 +1,6 @@
 {
-  "name": "Pairwise",
-  "short_name": "Pairwise",
+  "name": "Shōbu",
+  "short_name": "Shōbu",
   "description": "Rank anime by picking between two at a time.",
   "start_url": "./",
   "scope": "./",

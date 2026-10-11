@@ -11,7 +11,12 @@ export interface RawMedia {
   coverImage: { large: string | null; extraLarge?: string | null; color: string | null } | null;
   studios: { nodes: { name: string }[] } | null;
   relations: { edges: { relationType: string; node: { id: number; type: string } }[] } | null;
+  genres?: string[] | null;
+  recommendations?: { nodes: { rating: number | null; mediaRecommendation: { id: number; type: string } | null }[] } | null;
 }
+
+/** Recommendation links kept per franchise. */
+const MAX_RECS = 12;
 
 /** Relations that make two entries part of the same franchise. */
 const SAME_FRANCHISE = new Set(['PREQUEL', 'SEQUEL', 'PARENT', 'SIDE_STORY', 'SUMMARY', 'COMPILATION', 'CONTAINS']);
@@ -64,9 +69,31 @@ export function groupFranchises(media: RawMedia[], existing: Item[] = []): Item[
   for (const item of existing) for (const e of item.entryIds) oldIdByEntry.set(e, item.id);
 
   const items: Item[] = [];
+  const membersById = new Map<string, RawMedia[]>();
   const used = new Set<string>();
   for (const members of groups.values()) {
-    items.push(toItem(members, oldIdByEntry, used));
+    const item = toItem(members, oldIdByEntry, used);
+    items.push(item);
+    membersById.set(item.id, members);
+  }
+
+  // AniList users' "if you liked this, try that" links, summed up to franchise level.
+  const franchiseOfEntry = new Map<number, string>();
+  for (const item of items) for (const e of item.entryIds) franchiseOfEntry.set(e, item.id);
+  for (const item of items) {
+    const totals = new Map<string, number>();
+    for (const m of membersById.get(item.id)!) {
+      for (const n of m.recommendations?.nodes ?? []) {
+        const target = n.mediaRecommendation;
+        if (!target || target.type !== 'ANIME' || !n.rating || n.rating <= 0) continue;
+        const f = franchiseOfEntry.get(target.id);
+        if (!f || f === item.id) continue;
+        totals.set(f, (totals.get(f) ?? 0) + n.rating);
+      }
+    }
+    if (totals.size) {
+      item.recs = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_RECS);
+    }
   }
   return items.sort((a, b) => b.popularity - a.popularity);
 }
@@ -83,6 +110,9 @@ export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, strin
   let id = entryIds.map((e) => oldIdByEntry.get(e)).find((x) => x && !used.has(x)) ?? `al-${entryIds[0]}`;
   if (used.has(id)) id = `al-${entryIds[0]}-${used.size}`;
   used.add(id);
+  const genreCount = new Map<string, number>();
+  for (const m of members) for (const g of m.genres ?? []) genreCount.set(g, (genreCount.get(g) ?? 0) + 1);
+  const genres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
   return {
     id,
     category: 'anime',
@@ -100,6 +130,7 @@ export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, strin
     coverColor: rep.coverImage?.color ?? undefined,
     popularity: top.popularity ?? 0,
     averageScore: top.averageScore ?? undefined,
+    ...(genres.length ? { genres } : {}),
   };
 }
 

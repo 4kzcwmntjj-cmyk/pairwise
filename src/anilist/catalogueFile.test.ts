@@ -35,3 +35,12 @@ describe('mergeCatalogue', () => {
     expect(merged.map((i) => i.id).sort()).toEqual(['al-1', 'al-7']);
   });
 });
+
+describe('mergeCatalogue recommendation links', () => {
+  it('points links at the ids this device uses', () => {
+    const local = [item('al-5', [5, 6])];
+    const incoming = [item('al-4', [4, 5, 6]), item('al-9', [9], { recs: [['al-4', 12]] })];
+    const merged = mergeCatalogue(local, incoming);
+    expect(merged.find((i) => i.id === 'al-9')!.recs).toEqual([['al-5', 12]]);
+  });
+});

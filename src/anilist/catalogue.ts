@@ -1,7 +1,7 @@
 import { AniListError, gql } from './client';
 import type { RawMedia } from './group';
 
-export const CATALOGUE_SIZE = 1500;
+export const CATALOGUE_SIZE = 5000;
 
 const FIELDS = `
   id
@@ -14,6 +14,8 @@ const FIELDS = `
   coverImage { large extraLarge color }
   studios(isMain: true) { nodes { name } }
   relations { edges { relationType(version: 2) node { id type } } }
+  genres
+  recommendations(perPage: 8, sort: RATING_DESC) { nodes { rating mediaRecommendation { id type } } }
 `;
 
 const PAGE_QUERY = `query ($page: Int, $perPage: Int) {
@@ -46,6 +48,7 @@ export async function fetchCatalogue(onProgress: (p: LoadProgress) => void, tota
   let perPage = 40;
   const out: RawMedia[] = [];
   const seen = new Set<number>();
+  let emptyAtSmallest = 0;
   while (out.length < total) {
     // Pages are counted at the current page size from the number already loaded.
     const page = Math.floor(out.length / perPage) + 1;
@@ -61,9 +64,16 @@ export async function fetchCatalogue(onProgress: (p: LoadProgress) => void, tota
       }
       throw e;
     }
-    if (data.Page.media.length === 0 && perPage > 10) {
-      perPage /= 2;
-      continue;
+    if (data.Page.media.length === 0 && out.length < total) {
+      if (perPage > 10) {
+        perPage /= 2;
+        continue;
+      }
+      // Still empty at the smallest page: give AniList a moment, then try a few more times.
+      if (++emptyAtSmallest <= 3) {
+        await new Promise((r) => setTimeout(r, 20000));
+        continue;
+      }
     }
     for (const m of data.Page.media) {
       if (!seen.has(m.id)) {

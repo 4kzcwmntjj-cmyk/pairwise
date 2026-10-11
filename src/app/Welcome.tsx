@@ -41,7 +41,7 @@ export function Welcome({ app }: { app: AppState }) {
         <span className="welcome-vs">vs</span>
         <span>B</span>
       </div>
-      <h1>Pairwise</h1>
+      <h1>Shōbu</h1>
       <p className="lede">Rank the anime you've watched by picking between two at a time. Your list sorts itself as you go.</p>
 
       {loading && !error ? (
@@ -49,7 +49,7 @@ export function Welcome({ app }: { app: AppState }) {
           <div className="bar">
             <div className="bar-fill indeterminate" />
           </div>
-          <p>Loading the 1,500 most popular anime…</p>
+          <p>Loading the anime catalogue…</p>
         </div>
       ) : (
         <div className="welcome-actions">

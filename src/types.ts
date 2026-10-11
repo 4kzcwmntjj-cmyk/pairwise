@@ -28,6 +28,10 @@ export interface Item {
   popularity: number;
   /** AniList mean score of the most popular entry, 0–100. */
   averageScore?: number;
+  /** AniList genres across the franchise, most common first. */
+  genres?: string[];
+  /** AniList user recommendations from this title: [item id, total rating], strongest first. */
+  recs?: [string, number][];
 }
 
 export interface Mark {
@@ -51,6 +55,7 @@ export interface Vote {
 
 export interface Settings {
   titleLanguage: 'english' | 'romaji';
+  sortMode: 'grid' | 'single';
 }
 
-export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english' };
+export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'grid' };

@@ -39,17 +39,23 @@ export function mergeCatalogue(local: Item[], incoming: Item[]): Item[] {
   for (const item of local) for (const e of item.entryIds) ownerOfEntry.set(e, item);
   const used = new Set<string>();
   const out: Item[] = [];
+  const finalId = new Map<string, string>();
   for (const inc of incoming) {
     const owner = inc.entryIds.map((e) => ownerOfEntry.get(e)).find((o) => o && !used.has(o.id));
     const id = owner?.id ?? inc.id;
     if (used.has(id) || (!owner && localById.has(id) && localById.get(id)!.source === 'manual')) continue;
     used.add(id);
+    finalId.set(inc.id, id);
     const extraEntries = owner ? owner.entryIds.filter((e) => !inc.entryIds.includes(e)) : [];
     out.push({
       ...inc,
       id,
       entryIds: [...inc.entryIds, ...extraEntries].sort((a, b) => a - b),
     });
+  }
+  // Recommendation links point at catalogue ids; follow any that were renamed above.
+  for (const item of out) {
+    if (item.recs) item.recs = item.recs.map(([target, w]) => [finalId.get(target) ?? target, w]);
   }
   return out;
 }

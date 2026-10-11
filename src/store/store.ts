@@ -37,6 +37,7 @@ class PairwiseDB extends Dexie {
   votes!: Table<Vote, number>;
   kv!: Table<KV, string>;
   constructor() {
+    // The database keeps its original name so lists saved before the rename survive.
     super('pairwise');
     this.version(1).stores({ items: 'id', marks: 'itemId', votes: '++id, at', kv: 'key' });
   }
@@ -107,7 +108,7 @@ export function toExport(s: Snapshot) {
 export function fromExport(raw: unknown): Snapshot {
   const o = raw as Partial<Snapshot> & { format?: string };
   if (!o || o.format !== EXPORT_FORMAT || !Array.isArray(o.items) || !Array.isArray(o.marks) || !Array.isArray(o.votes)) {
-    throw new Error('This file is not a Pairwise export.');
+    throw new Error('This file is not a saved Shōbu list.');
   }
   return {
     items: o.items,

@@ -64,3 +64,23 @@ describe('franchiseFor and addEntry', () => {
     expect(updated.endYear).toBe(2020);
   });
 });
+
+describe('recommendation links', () => {
+  it('sums AniList recommendations up to franchise level and drops self-links', () => {
+    const rec = (id: number, rating: number) => ({ rating, mediaRecommendation: { id, type: 'ANIME' } });
+    const items = groupFranchises([
+      { ...media(1, 'A', { rel: [['SEQUEL', 2]] }), recommendations: { nodes: [rec(10, 30), rec(2, 99)] } },
+      { ...media(2, 'A2', { rel: [['PREQUEL', 1]] }), recommendations: { nodes: [rec(10, 5), rec(20, 7), rec(999, 50)] } },
+      media(10, 'B'),
+      media(20, 'C'),
+    ]);
+    const a = items.find((i) => i.entryIds.includes(1))!;
+    const b = items.find((i) => i.entryIds.includes(10))!;
+    const c = items.find((i) => i.entryIds.includes(20))!;
+    expect(a.recs).toEqual([
+      [b.id, 35],
+      [c.id, 7],
+    ]);
+    expect(b.recs).toBeUndefined();
+  });
+});

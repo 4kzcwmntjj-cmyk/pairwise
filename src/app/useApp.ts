@@ -3,7 +3,7 @@ import { LocalStore, type Snapshot } from '../store/store';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
-import { TIER_ANCHOR, type Item, type Mark, type Outcome, type Settings, type Status, type Tier, type Vote } from '../types';
+import { DEFAULT_SETTINGS, TIER_ANCHOR, type Item, type Mark, type Outcome, type Settings, type Status, type Tier, type Vote } from '../types';
 
 export const store = new LocalStore();
 
@@ -18,6 +18,9 @@ export interface Moved {
   to: number;
 }
 
+/** A title marked seen without a tier starts in the middle of the list. */
+const anchorOf = (m?: Mark) => (m?.tier ? TIER_ANCHOR[m.tier] : 0);
+
 export function displayTitle(item: Item, settings: Settings) {
   return settings.titleLanguage === 'romaji'
     ? item.titleRomaji ?? item.title
@@ -29,7 +32,7 @@ export function useApp() {
   const [items, setItems] = useState<Item[]>([]);
   const [marks, setMarks] = useState<Map<string, Mark>>(new Map());
   const [votes, setVotes] = useState<Vote[]>([]);
-  const [settings, setSettingsState] = useState<Settings>({ titleLanguage: 'english' });
+  const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [catalogueAt, setCatalogueAt] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
@@ -65,7 +68,7 @@ export function useApp() {
 
   const fit: Fit = useMemo(() => {
     const anchors: Record<string, number> = {};
-    for (const id of seenIds) anchors[id] = TIER_ANCHOR[marks.get(id)?.tier ?? 'B'];
+    for (const id of seenIds) anchors[id] = anchorOf(marks.get(id));
     const f = fitModel({ ids: seenIds, anchors, votes, warm: warm.current });
     warm.current = f.theta;
     return f;
@@ -85,7 +88,7 @@ export function useApp() {
   const markItem = useCallback(
     async (itemId: string, status: Status, tier?: Tier) => {
       const prev = marks.get(itemId);
-      const mark: Mark = { itemId, status, tier: status === 'seen' ? tier ?? prev?.tier ?? 'B' : prev?.tier, updatedAt: Date.now() };
+      const mark: Mark = { itemId, status, tier: status === 'seen' ? tier ?? prev?.tier : prev?.tier, updatedAt: Date.now() };
       setMarks((m) => new Map(m).set(itemId, mark));
       pushUndo({ kind: 'mark', itemId, prev, pair });
       await store.setMark(mark);
@@ -131,7 +134,7 @@ export function useApp() {
       pushUndo({ kind: 'vote', voteId: id, pair });
       if (winner && before !== undefined) {
         const anchors: Record<string, number> = {};
-        for (const sid of seenIds) anchors[sid] = TIER_ANCHOR[marks.get(sid)?.tier ?? 'B'];
+        for (const sid of seenIds) anchors[sid] = anchorOf(marks.get(sid));
         const after = fitModel({ ids: seenIds, anchors, votes: nextVotes, warm: warm.current });
         const to = after.order.indexOf(winner) + 1;
         setMoved({ title: displayTitle(itemById.get(winner)!, settings), from: before, to });
