@@ -42,7 +42,7 @@ export function Welcome({ app }: { app: AppState }) {
         <span>B</span>
       </div>
       <h1>Shōbu</h1>
-      <p className="lede">Rank the anime you've watched by picking between two at a time. Your list sorts itself as you go.</p>
+      <p className="lede">Rank the anime you've watched and the manga you've read by picking between two at a time. Your list sorts itself as you go.</p>
 
       {loading && !error ? (
         <div className="loader" role="status">

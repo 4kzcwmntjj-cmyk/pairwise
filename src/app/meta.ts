@@ -1,5 +1,5 @@
 import { describeFormats } from '../anilist/group';
-import type { Item } from '../types';
+import type { Item, Settings } from '../types';
 
 export function years(item: Item) {
   if (!item.startYear) return '';
@@ -22,5 +22,12 @@ const FORMAT_LABEL: Record<string, string> = {
   OVA: 'OVA',
   SPECIAL: 'Special',
   MUSIC: 'Music video',
+  MANGA: 'Manga',
+  ONE_SHOT: 'One-shot',
+  NOVEL: 'Novel',
 };
 export const formatLabel = (format: string) => FORMAT_LABEL[format] ?? 'Other';
+
+/** Button wording for marking a title, which depends on whether manga is included. */
+export const markWords = (settings: Settings) =>
+  settings.manga ? { seen: 'Seen or read it', unseen: 'Neither' } : { seen: 'Seen it', unseen: "Haven't seen" };

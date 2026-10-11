@@ -1,3 +1,4 @@
+import { isMangaOnly } from '../anilist/group';
 import type { Item, Mark } from '../types';
 
 /**
@@ -9,7 +10,10 @@ import type { Item, Mark } from '../types';
  * - links to titles you've marked seen, and to titles you've marked
  *   haven't seen. AniList recommendation links are written by people who
  *   watched both shows, so they stand in for "watched together";
- * - distance in years from the middle of what you've seen.
+ * - distance in years from the middle of what you've seen;
+ * - whether the title is manga with no anime. Popularity is standardised
+ *   within anime and within manga separately, since AniList's numbers run
+ *   lower for manga; this flag then learns how much manga you read.
  *
  * A logistic model turns these into a probability. It starts from fixed
  * weights and, once you've marked enough titles, refits the weights to your
@@ -27,9 +31,9 @@ export interface SeenModel {
   weights: number[];
 }
 
-type Vec = [number, number, number, number, number];
-/** intercept, popularity, seen share of linked titles, amount of link evidence, years from your middle */
-const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.8, 0, -0.25];
+type Vec = [number, number, number, number, number, number];
+/** intercept, popularity, seen share of linked titles, amount of link evidence, years from your middle, manga only */
+const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.8, 0, -0.25, -0.8];
 const MIN_TO_FIT = 30;
 const MIN_PER_CLASS = 8;
 /**
@@ -38,7 +42,7 @@ const MIN_PER_CLASS = 8;
  * Sort asks in), so they say little about how popularity matters across the
  * long tail, and a free fit would underrate it there.
  */
-const PRIOR_STRENGTH: Vec = [2, 200, 2, 2, 5];
+const PRIOR_STRENGTH: Vec = [2, 200, 2, 2, 5, 2];
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
 
@@ -58,9 +62,15 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
     }
   }
 
-  const logPops = items.map((i) => Math.log1p(i.popularity));
-  const mean = logPops.reduce((a, b) => a + b, 0) / Math.max(1, logPops.length);
-  const sd = Math.sqrt(logPops.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, logPops.length)) || 1;
+  const scale = (group: Item[]) => {
+    const logs = group.map((i) => Math.log1p(i.popularity));
+    const mean = logs.reduce((a, b) => a + b, 0) / Math.max(1, logs.length);
+    const sd = Math.sqrt(logs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, logs.length)) || 1;
+    return { mean, sd };
+  };
+  const mangaOnly = new Set(items.filter(isMangaOnly).map((i) => i.id));
+  const animeScale = scale(items.filter((i) => !mangaOnly.has(i.id)));
+  const mangaScale = scale(items.filter((i) => mangaOnly.has(i.id)));
 
   const seenYears = items
     .filter((i) => marks.get(i.id)?.status === 'seen' && i.startYear)
@@ -82,7 +92,9 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
     // than a count keeps heavily linked (popular) titles from scoring high just for having
     // many links.
     const share = Math.log((pos + 1) / (neg + 1));
-    return [1, (Math.log1p(it.popularity) - mean) / sd, share, Math.sqrt(pos + neg), years];
+    const manga = mangaOnly.has(it.id);
+    const { mean, sd } = manga ? mangaScale : animeScale;
+    return [1, (Math.log1p(it.popularity) - mean) / sd, share, Math.sqrt(pos + neg), years, manga ? 1 : 0];
   };
 
   // Fit to the titles already marked, if there are enough of each kind.
@@ -114,10 +126,10 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
 /**
  * Logistic regression by Newton's method (iteratively reweighted least
  * squares), with a Gaussian prior of the given strength centred on `prior`.
- * Five weights, so each step solves a 5x5 system.
+ * Six weights, so each step solves a 6x6 system.
  */
 export function fitLogistic(data: [Vec, number][], prior: Vec, strength: Vec): Vec {
-  const K = 5;
+  const K = prior.length;
   let w: Vec = [...prior];
   for (let iter = 0; iter < 25; iter++) {
     const g = new Array(K).fill(0);
@@ -159,7 +171,7 @@ function objective(data: [Vec, number][], w: Vec, prior: Vec, strength: Vec): nu
     // log sigmoid(z) for y = 1, log(1 - sigmoid(z)) for y = 0, computed stably.
     ll += y === 1 ? -Math.log1p(Math.exp(-z)) : -Math.log1p(Math.exp(z));
   }
-  for (let k = 0; k < 5; k++) ll -= (strength[k] / 2) * (w[k] - prior[k]) ** 2;
+  for (let k = 0; k < prior.length; k++) ll -= (strength[k] / 2) * (w[k] - prior[k]) ** 2;
   return ll;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Fetches the most popular anime from AniList, groups them into franchises
+ * Fetches the most popular anime and manga from AniList, groups them into franchises
  * and writes public/catalogue.json. Runs on GitHub Actions (see
  * .github/workflows/catalogue.yml) so phones never have to download the
  * catalogue from AniList themselves.
@@ -7,7 +7,7 @@
  * Run locally with: npx vite-node scripts/build-catalogue.ts
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { CATALOGUE_SIZE, fetchCatalogue } from '../src/anilist/catalogue';
+import { CATALOGUE_SIZE, MANGA_SIZE, fetchCatalogue, type Medium } from '../src/anilist/catalogue';
 import { configureClient } from '../src/anilist/client';
 import { groupFranchises } from '../src/anilist/group';
 import { CATALOGUE_FORMAT, type CatalogueFile } from '../src/anilist/catalogueFile';
@@ -22,17 +22,27 @@ async function main() {
     previous = (JSON.parse(readFileSync(OUT, 'utf8')) as CatalogueFile).items;
   }
   const started = Date.now();
-  let lastLog = 0;
-  const media = await fetchCatalogue((p) => {
-    if (p.waitingSeconds) console.log(`AniList rate limit: waiting ${p.waitingSeconds}s`);
-    if (p.loaded - lastLog >= 200 || p.loaded === p.total) {
-      lastLog = p.loaded;
-      console.log(`${p.loaded}/${p.total} after ${Math.round((Date.now() - started) / 1000)}s`);
+  const fetchAll = async (medium: Medium, total: number) => {
+    let lastLog = 0;
+    const media = await fetchCatalogue(
+      (p) => {
+        if (p.waitingSeconds) console.log(`AniList rate limit: waiting ${p.waitingSeconds}s`);
+        if (p.loaded - lastLog >= 200 || p.loaded === p.total) {
+          lastLog = p.loaded;
+          console.log(`${medium}: ${p.loaded}/${p.total} after ${Math.round((Date.now() - started) / 1000)}s`);
+        }
+      },
+      total,
+      medium,
+    );
+    if (media.length < total * 0.9) {
+      throw new Error(`Only ${media.length} ${medium.toLowerCase()} entries came back; keeping the previous catalogue.`);
     }
-  });
-  if (media.length < CATALOGUE_SIZE * 0.9) {
-    throw new Error(`Only ${media.length} entries came back; keeping the previous catalogue.`);
-  }
+    return media;
+  };
+  const anime = await fetchAll('ANIME', CATALOGUE_SIZE);
+  const manga = await fetchAll('MANGA', MANGA_SIZE);
+  const media = [...anime, ...manga];
   // Keep the ids of franchises from the previous file so saved marks and votes still match.
   const items = groupFranchises(media, previous);
   const file: CatalogueFile = {

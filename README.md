@@ -1,6 +1,6 @@
 # Shōbu
 
-Rank anime by picking between two at a time (勝負, shōbu: a match or contest). The app ships with a catalogue of AniList's 5,000 most popular anime, grouped into one entry per series, and keeps a ranking that updates after every duel.
+Rank anime by picking between two at a time (勝負, shōbu: a match or contest). The app ships with a catalogue of AniList's 5,000 most popular anime and 3,000 most popular manga, grouped into one entry per franchise (a manga joins the anime made from it; manga with no anime get their own entry), and keeps a ranking that updates after every duel.
 
 - **Sort**: go one at a time (seen it, haven't seen, ask later), or tap every title you've seen in a cover grid. Search finds anything in the catalogue, or on AniList for titles outside it.
 - **Duel**: pick the one you prefer. The ranking is a Bradley-Terry fit over every vote you've made.

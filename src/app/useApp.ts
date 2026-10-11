@@ -4,6 +4,7 @@ import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
+import { isMangaOnly } from '../anilist/group';
 import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type Vote } from '../types';
 
 export const store = new LocalStore();
@@ -66,7 +67,10 @@ export function useApp() {
 
   // What the app works with: titles after your grouping changes, with marks and votes following them.
   const grouping = useMemo(() => applyGroupOps(baseItems, groupOps), [baseItems, groupOps]);
-  const items = grouping.items;
+  const items = useMemo(
+    () => (settings.manga ? grouping.items : grouping.items.filter((i) => !isMangaOnly(i))),
+    [grouping, settings.manga],
+  );
   const marks = useMemo(() => resolveMarks(rawMarks.values(), grouping.resolve), [rawMarks, grouping]);
   const votes = useMemo(() => resolveVotes(rawVotes, grouping.resolve), [rawVotes, grouping]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);

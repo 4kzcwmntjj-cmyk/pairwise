@@ -77,4 +77,20 @@ describe('seenModel', () => {
     const sum = m.probability.get('a')! + m.probability.get('b')!;
     expect(m.expectedRemaining).toBeCloseTo(sum, 10);
   });
+
+  it('starts manga below anime of the same standing, then learns that you read manga', () => {
+    const items: Item[] = [];
+    for (let i = 0; i < 40; i++) items.push(item(`a${i}`, 50000 + i));
+    for (let i = 0; i < 40; i++) items.push(item(`m${i}`, 5000 + i, { formats: ['MANGA'] }));
+    const fresh = seenModel(items, new Map());
+    expect(fresh.probability.get('m39')!).toBeLessThan(fresh.probability.get('a39')!);
+
+    // A reader: every manga sorted so far was read, most anime were not watched.
+    const entries: [string, 'seen' | 'unseen'][] = [];
+    for (let i = 0; i < 20; i++) entries.push([`m${i}`, 'seen'], [`a${i}`, i < 4 ? 'seen' : 'unseen']);
+    const reader = seenModel(items, mark(entries));
+    expect(reader.fitted).toBe(true);
+    expect(reader.weights[5]).toBeGreaterThan(0);
+    expect(reader.probability.get('m39')!).toBeGreaterThan(reader.probability.get('a39')!);
+  });
 });

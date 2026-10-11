@@ -23,6 +23,13 @@ const SAME_FRANCHISE = new Set(['PREQUEL', 'SEQUEL', 'PARENT', 'SIDE_STORY', 'SU
 /** Relations followed through entries that are not in the catalogue (missing middle seasons). */
 const BRIDGE = new Set(['PREQUEL', 'SEQUEL']);
 const SERIES_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA']);
+/** Formats of printed works. Everything else is anime. */
+export const MANGA_FORMATS = new Set(['MANGA', 'ONE_SHOT', 'NOVEL']);
+export const isManga = (format: string | null | undefined) => MANGA_FORMATS.has(format ?? '');
+/** A title known only in print, with no anime. */
+export const isMangaOnly = (item: { formats: string[] }) => item.formats.length > 0 && item.formats.every(isManga);
+/** Relations that link a manga and an anime telling the same story. */
+const SAME_STORY = new Set(['ADAPTATION', 'SOURCE']);
 
 const yearOf = (m: RawMedia) => m.startDate?.year ?? m.seasonYear ?? undefined;
 
@@ -47,22 +54,64 @@ class UnionFind {
  * Groups AniList entries into franchises. `existing` lets a refreshed
  * catalogue keep the ids of franchises it already had, so marks and votes
  * still point at the right item.
+ *
+ * Anime join anime (seasons, films, side stories) and manga join manga the
+ * same way. Each manga group then attaches to the one anime franchise it is
+ * most linked to by adaptation, if any. A manga never joins two anime
+ * franchises together: many manga were adapted more than once (a remake, a
+ * spin-off), and letting those links join franchises would weld unrelated
+ * anime into one title.
  */
 export function groupFranchises(media: RawMedia[], existing: Item[] = []): Item[] {
   const byId = new Map<number, RawMedia>();
   for (const m of media) if (!byId.has(m.id)) byId.set(m.id, m);
+  const mediumOf = (m: RawMedia) => (isManga(m.format) ? 'MANGA' : 'ANIME');
   const uf = new UnionFind();
   for (const m of byId.values()) {
     for (const e of m.relations?.edges ?? []) {
-      if (e.node.type !== 'ANIME' || !SAME_FRANCHISE.has(e.relationType)) continue;
-      if (byId.has(e.node.id) || BRIDGE.has(e.relationType)) uf.union(m.id, e.node.id);
+      if (e.node.type !== mediumOf(m) || !SAME_FRANCHISE.has(e.relationType)) continue;
+      const other = byId.get(e.node.id);
+      if (other ? mediumOf(other) === mediumOf(m) : BRIDGE.has(e.relationType)) uf.union(m.id, e.node.id);
     }
   }
-  const groups = new Map<number, RawMedia[]>();
+  const raw = new Map<number, RawMedia[]>();
   for (const m of byId.values()) {
     const root = uf.find(m.id);
-    if (!groups.has(root)) groups.set(root, []);
-    groups.get(root)!.push(m);
+    if (!raw.has(root)) raw.set(root, []);
+    raw.get(root)!.push(m);
+  }
+
+  // Attach each manga group to the anime group it has the most adaptation links with; ties go to the more popular.
+  const groups = new Map<number, RawMedia[]>();
+  for (const [root, members] of raw) if (mediumOf(members[0]) === 'ANIME') groups.set(root, [...members]);
+  const groupPopularity = (root: number) => Math.max(...groups.get(root)!.map((m) => m.popularity ?? 0));
+  // Links recorded on the anime side: manga id -> anime groups that name it as their source or adaptation.
+  const fromAnime = new Map<number, number[]>();
+  for (const [r, anime] of groups) {
+    for (const a of anime) {
+      for (const e of a.relations?.edges ?? []) {
+        if (e.node.type !== 'MANGA' || !SAME_STORY.has(e.relationType)) continue;
+        if (!fromAnime.has(e.node.id)) fromAnime.set(e.node.id, []);
+        fromAnime.get(e.node.id)!.push(r);
+      }
+    }
+  }
+  for (const [root, members] of raw) {
+    if (mediumOf(members[0]) !== 'MANGA') continue;
+    const links = new Map<number, number>();
+    const count = (animeId: number) => {
+      const a = byId.get(animeId);
+      if (!a || mediumOf(a) !== 'ANIME') return;
+      const r = uf.find(animeId);
+      links.set(r, (links.get(r) ?? 0) + 1);
+    };
+    for (const m of members) {
+      for (const e of m.relations?.edges ?? []) if (e.node.type === 'ANIME' && SAME_STORY.has(e.relationType)) count(e.node.id);
+    }
+    for (const m of members) for (const r of fromAnime.get(m.id) ?? []) links.set(r, (links.get(r) ?? 0) + 1);
+    const best = [...links].sort((x, y) => y[1] - x[1] || groupPopularity(y[0]) - groupPopularity(x[0]))[0];
+    if (best) groups.get(best[0])!.push(...members);
+    else groups.set(root, [...members]);
   }
 
   const oldIdByEntry = new Map<number, string>();
@@ -85,7 +134,7 @@ export function groupFranchises(media: RawMedia[], existing: Item[] = []): Item[
     for (const m of membersById.get(item.id)!) {
       for (const n of m.recommendations?.nodes ?? []) {
         const target = n.mediaRecommendation;
-        if (!target || target.type !== 'ANIME' || !n.rating || n.rating <= 0) continue;
+        if (!target || !n.rating || n.rating <= 0) continue;
         const f = franchiseOfEntry.get(target.id);
         if (!f || f === item.id) continue;
         totals.set(f, (totals.get(f) ?? 0) + n.rating);
@@ -116,8 +165,11 @@ export function entryOf(m: RawMedia): Entry {
 
 /** The entry a franchise is named after: its first series, or its first entry if it has no series. */
 export function representative(entries: Entry[]): Entry {
-  const series = entries.filter((e) => SERIES_FORMATS.has(e.format));
-  const candidates = series.length > 0 ? series : entries;
+  // Named after the anime where there is one, since that is how most people know it.
+  const anime = entries.filter((e) => !isManga(e.format));
+  const pool = anime.length > 0 ? anime : entries;
+  const series = pool.filter((e) => SERIES_FORMATS.has(e.format));
+  const candidates = series.length > 0 ? series : pool;
   return [...candidates].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || b.popularity - a.popularity)[0];
 }
 
@@ -171,7 +223,7 @@ export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, strin
 export function franchiseFor(m: RawMedia, items: Item[]): Item | undefined {
   const related = new Set<number>([m.id]);
   for (const e of m.relations?.edges ?? []) {
-    if (e.node.type === 'ANIME' && SAME_FRANCHISE.has(e.relationType)) related.add(e.node.id);
+    if (SAME_FRANCHISE.has(e.relationType) || SAME_STORY.has(e.relationType)) related.add(e.node.id);
   }
   return items.find((it) => it.source === 'anilist' && it.entryIds.some((e) => related.has(e)));
 }
@@ -201,5 +253,7 @@ export function describeFormats(formats: string[]): string {
   if (series) parts.push(series === 1 ? '1 season' : `${series} seasons`);
   if (films) parts.push(films === 1 ? '1 film' : `${films} films`);
   if (extras) parts.push(extras === 1 ? '1 extra' : `${extras} extras`);
+  if (count(['MANGA', 'ONE_SHOT'])) parts.push('manga');
+  if (count(['NOVEL'])) parts.push('novel');
   return parts.join(', ');
 }

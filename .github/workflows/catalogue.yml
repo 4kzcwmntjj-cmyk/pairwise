@@ -1,6 +1,6 @@
 name: Refresh catalogue
 
-# Fetches the most popular anime from AniList on GitHub's servers and saves
+# Fetches the most popular anime and manga from AniList on GitHub's servers and saves
 # them as public/catalogue.json, so the app never downloads them on a phone.
 # Runs monthly, whenever the fetching code changes, and on demand
 # (Actions tab → Refresh catalogue → Run workflow).

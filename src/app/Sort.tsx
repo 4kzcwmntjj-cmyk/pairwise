@@ -3,7 +3,7 @@ import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
 import { Add } from './Add';
 import { Cover } from './Cover';
-import { metaLine, years } from './meta';
+import { markWords, metaLine, years } from './meta';
 import type { AppState } from './useApp';
 
 const PAGE = 60;
@@ -108,7 +108,10 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   return (
     <>
       <p className="hint">
-        Tap once for seen, twice for haven't seen, a third time to clear. Duels work out the order.
+        {app.settings.manga
+          ? "Tap once if you've seen or read it, twice if not, a third time to clear."
+          : "Tap once for seen, twice for haven't seen, a third time to clear."}{' '}
+        Duels work out the order.
       </p>
       <div className="grid-tools">
         <input
@@ -269,10 +272,10 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
       </div>
       <div className="action-row">
         <button className="btn btn-primary" onClick={() => app.markItem(item.id, 'seen')} title="Key Y">
-          Seen it
+          {markWords(app.settings).seen}
         </button>
         <button className="btn" onClick={() => app.markItem(item.id, 'unseen')} title="Key N">
-          Haven't seen
+          {markWords(app.settings).unseen}
         </button>
       </div>
       <div className="action-row">

@@ -65,6 +65,8 @@ export interface Vote {
 export interface Settings {
   titleLanguage: 'english' | 'romaji';
   sortMode: 'grid' | 'single';
+  /** Include manga: manga-only titles appear, and Sort asks "seen or read". */
+  manga: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'single' };
+export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'single', manga: true };

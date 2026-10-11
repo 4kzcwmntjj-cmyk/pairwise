@@ -94,7 +94,7 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
           {busy ? 'Searching…' : 'Search AniList'}
         </button>
       </form>
-      <p className="hint">Matches in your catalogue show as you type. Search AniList for anything older or less popular.</p>
+      <p className="hint">Matches in your catalogue show as you type. Search AniList for anything older or less popular, anime or manga.</p>
       {error && <p className="error">{error}</p>}
 
       {local.length > 0 && (

@@ -84,3 +84,59 @@ describe('recommendation links', () => {
     expect(b.recs).toBeUndefined();
   });
 });
+
+describe('manga in franchises', () => {
+  const rel = (pairs: [string, number, 'ANIME' | 'MANGA'][]) => ({
+    edges: pairs.map(([relationType, id, type]) => ({ relationType, node: { id, type } })),
+  });
+  const manga = (id: number, title: string, rels: [string, number, 'ANIME' | 'MANGA'][] = [], popularity = 500): RawMedia => ({
+    ...media(id, title, { format: 'MANGA', popularity, year: 2005 }),
+    relations: rel(rels),
+  });
+  const anime = (id: number, title: string, rels: [string, number, 'ANIME' | 'MANGA'][] = [], popularity = 1000): RawMedia => ({
+    ...media(id, title, { popularity, year: 2008 }),
+    relations: rel(rels),
+  });
+
+  it('attaches a manga to the anime made from it and keeps the anime as the name', () => {
+    const items = groupFranchises([anime(1, 'Death Note', [['SOURCE', 100, 'MANGA']]), manga(100, 'Death Note (manga)', [['ADAPTATION', 1, 'ANIME']])]);
+    expect(items).toHaveLength(1);
+    expect(items[0].entryIds).toEqual([1, 100]);
+    expect(items[0].title).toBe('Death Note');
+    expect(describeFormats(items[0].formats)).toBe('1 season, manga');
+  });
+
+  it('makes a manga with no anime its own title, grouped with its sequels', () => {
+    const items = groupFranchises([manga(200, 'Bokurano'), manga(201, 'Bokurano 2', [['PREQUEL', 200, 'MANGA']]), anime(1, 'Other')]);
+    const b = items.find((i) => i.entryIds.includes(200))!;
+    expect(b.entryIds).toEqual([200, 201]);
+    expect(b.title).toBe('Bokurano');
+    expect(describeFormats(b.formats)).toBe('manga');
+  });
+
+  it('never joins two anime franchises through a manga adapted twice', () => {
+    const items = groupFranchises([
+      anime(1, 'FMA 2003', [['SOURCE', 300, 'MANGA']], 2000),
+      anime(2, 'FMA Brotherhood', [['SOURCE', 300, 'MANGA']], 5000),
+      manga(300, 'FMA (manga)', [['ADAPTATION', 1, 'ANIME'], ['ADAPTATION', 2, 'ANIME']]),
+    ]);
+    expect(items).toHaveLength(2);
+    expect(items.find((i) => i.entryIds.includes(2))!.entryIds).toEqual([2, 300]);
+    expect(items.find((i) => i.entryIds.includes(1))!.entryIds).toEqual([1]);
+  });
+
+  it('does not let a manga sequel link join anime to anime', () => {
+    const items = groupFranchises([
+      anime(1, 'Show A', [['SEQUEL', 2, 'ANIME']]),
+      anime(5, 'Show B'),
+      manga(400, 'B manga', [['ADAPTATION', 5, 'ANIME'], ['PREQUEL', 1, 'ANIME']]),
+    ]);
+    expect(items.find((i) => i.entryIds.includes(1))!.entryIds).toEqual([1]);
+    expect(items.find((i) => i.entryIds.includes(5))!.entryIds).toEqual([5, 400]);
+  });
+
+  it('finds the franchise for a manga found by search', () => {
+    const items = groupFranchises([anime(1, 'Death Note')]);
+    expect(franchiseFor(manga(100, 'DN manga', [['ADAPTATION', 1, 'ANIME']]), items)?.entryIds).toEqual([1]);
+  });
+});

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { CATALOGUE_SIZE } from '../anilist/catalogue';
+import { CATALOGUE_SIZE, MANGA_SIZE } from '../anilist/catalogue';
 import { fromExport, toExport, type Snapshot } from '../store/store';
 import { saveCopy } from './saveCopy';
 import type { AppState } from './useApp';
@@ -61,6 +61,15 @@ export function SettingsScreen({ app }: { app: AppState }) {
             </button>
           ))}
         </div>
+        <label className="check">
+          <input
+            id="include-manga"
+            type="checkbox"
+            checked={app.settings.manga}
+            onChange={(e) => app.setSettings({ ...app.settings, manga: e.target.checked })}
+          />
+          Include manga. A manga counts towards its anime's title; manga with no anime get titles of their own.
+        </label>
       </section>
 
       <section>
@@ -140,7 +149,8 @@ export function SettingsScreen({ app }: { app: AppState }) {
       <section>
         <h3>Catalogue</h3>
         <p>
-          {app.items.length.toLocaleString()} titles, built from AniList's {CATALOGUE_SIZE.toLocaleString()} most popular anime
+          {app.items.length.toLocaleString()} titles, built from AniList's {CATALOGUE_SIZE.toLocaleString()} most popular anime and{' '}
+          {MANGA_SIZE.toLocaleString()} most popular manga
           {app.catalogueAt ? ` on ${new Date(app.catalogueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.
           The list is rebuilt monthly and new titles are added when you open the app. Your sorting and duels are kept.
         </p>

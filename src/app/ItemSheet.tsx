@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import { Cover } from './Cover';
-import { anilistUrl, metaLine } from './meta';
+import { anilistUrl, markWords, metaLine } from './meta';
 import { Regroup } from './Regroup';
 import type { AppState } from './useApp';
 
@@ -78,10 +78,10 @@ export function ItemSheet({
 
         <div className="action-row">
           <button className="btn" aria-pressed={mark?.status === 'seen'} onClick={() => app.markItem(itemId, 'seen')}>
-            Seen it
+            {markWords(app.settings).seen}
           </button>
           <button className="btn" aria-pressed={mark?.status === 'unseen'} onClick={() => app.markItem(itemId, 'unseen')}>
-            Haven't seen
+            {markWords(app.settings).unseen}
           </button>
           {mark && (
             <button className="btn btn-quiet" onClick={() => app.clearMark(itemId)}>
