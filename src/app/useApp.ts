@@ -3,7 +3,7 @@ import { LocalStore, type Snapshot } from '../store/store';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
-import { DEFAULT_SETTINGS, TIER_ANCHOR, type Item, type Mark, type Outcome, type Settings, type Status, type Tier, type Vote } from '../types';
+import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type Vote } from '../types';
 
 export const store = new LocalStore();
 
@@ -17,9 +17,6 @@ export interface Moved {
   from: number;
   to: number;
 }
-
-/** A title marked seen without a tier starts in the middle of the list. */
-const anchorOf = (m?: Mark) => (m?.tier ? TIER_ANCHOR[m.tier] : 0);
 
 export function displayTitle(item: Item, settings: Settings) {
   return settings.titleLanguage === 'romaji'
@@ -43,7 +40,10 @@ export function useApp() {
 
   const applySnapshot = useCallback((s: Snapshot) => {
     setItems(s.items);
-    setMarks(new Map(s.marks.map((m) => [m.itemId, m])));
+    // "Want to watch" was removed; those titles go back to unsorted.
+    const dropped = s.marks.filter((m) => (m.status as string) === 'want');
+    for (const m of dropped) store.deleteMark(m.itemId).catch(() => undefined);
+    setMarks(new Map(s.marks.filter((m) => !dropped.includes(m)).map((m) => [m.itemId, m])));
     setVotes(s.votes);
     setSettingsState(s.settings);
     setSkipped((s.meta.skipped as string[]) ?? []);
@@ -67,9 +67,7 @@ export function useApp() {
   );
 
   const fit: Fit = useMemo(() => {
-    const anchors: Record<string, number> = {};
-    for (const id of seenIds) anchors[id] = anchorOf(marks.get(id));
-    const f = fitModel({ ids: seenIds, anchors, votes, warm: warm.current });
+    const f = fitModel({ ids: seenIds, anchors: {}, votes, warm: warm.current });
     warm.current = f.theta;
     return f;
   }, [seenIds, marks, votes]);
@@ -86,9 +84,9 @@ export function useApp() {
   const pushUndo = (e: UndoEntry) => setUndoStack((s) => [...s.slice(-99), e]);
 
   const markItem = useCallback(
-    async (itemId: string, status: Status, tier?: Tier) => {
+    async (itemId: string, status: Status) => {
       const prev = marks.get(itemId);
-      const mark: Mark = { itemId, status, tier: status === 'seen' ? tier ?? prev?.tier : prev?.tier, updatedAt: Date.now() };
+      const mark: Mark = { itemId, status, updatedAt: Date.now() };
       setMarks((m) => new Map(m).set(itemId, mark));
       pushUndo({ kind: 'mark', itemId, prev, pair });
       await store.setMark(mark);
@@ -133,9 +131,7 @@ export function useApp() {
       setVotes(nextVotes);
       pushUndo({ kind: 'vote', voteId: id, pair });
       if (winner && before !== undefined) {
-        const anchors: Record<string, number> = {};
-        for (const sid of seenIds) anchors[sid] = anchorOf(marks.get(sid));
-        const after = fitModel({ ids: seenIds, anchors, votes: nextVotes, warm: warm.current });
+        const after = fitModel({ ids: seenIds, anchors: {}, votes: nextVotes, warm: warm.current });
         const to = after.order.indexOf(winner) + 1;
         setMoved({ title: displayTitle(itemById.get(winner)!, settings), from: before, to });
       } else setMoved(null);

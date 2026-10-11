@@ -6,7 +6,7 @@ import { Cover } from './Cover';
 import { metaLine } from './meta';
 import type { AppState } from './useApp';
 
-const STATUS_LABEL = { seen: 'Seen', unseen: "Haven't seen", want: 'Want to watch' } as const;
+const STATUS_LABEL = { seen: 'Seen', unseen: "Haven't seen" } as const;
 
 export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
   const [query, setQuery] = useState('');

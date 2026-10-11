@@ -5,7 +5,7 @@ import { Cover } from './Cover';
 import { years } from './meta';
 import type { AppState } from './useApp';
 
-type View = 'ranked' | 'want' | 'unseen';
+type View = 'ranked' | 'unseen';
 const SETTLED_SE = 0.5;
 
 export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
@@ -21,7 +21,6 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
         .sort((x, y) => y.popularity - x.popularity);
     return {
       ranked: app.fit.order.map((id) => app.itemById.get(id)!).filter(Boolean),
-      want: byStatus('want'),
       unseen: byStatus('unseen'),
     };
   }, [app.fit, app.marks, app.itemById]);
@@ -40,7 +39,6 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           {(
             [
               ['ranked', `Ranked (${lists.ranked.length})`],
-              ['want', `Want to watch (${lists.want.length})`],
               ['unseen', `Haven't seen (${lists.unseen.length})`],
             ] as const
           ).map(([v, label]) => (
@@ -72,7 +70,6 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
         <ol className="rank-list">
           {shown.map((item) => {
             const rank = app.rankOf.get(item.id);
-            const mark = app.marks.get(item.id);
             const duels = app.fit.duels.get(item.id) ?? 0;
             const isSettled = (app.fit.se.get(item.id) ?? 9) < SETTLED_SE && duels >= PLACED_AFTER;
             const title = app.title(item);
@@ -94,7 +91,6 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
                       )}
                     </span>
                   </span>
-                  {view === 'ranked' && mark?.tier && <span className={`tier-chip tier-${mark.tier}`}>{mark.tier}</span>}
                 </button>
               </li>
             );

@@ -1,16 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TIERS, type Item, type Tier } from '../types';
+import type { Item } from '../types';
 import { Cover } from './Cover';
 import { metaLine, years } from './meta';
 import type { AppState } from './useApp';
-
-export const TIER_HELP: Record<Tier, string> = {
-  S: 'All-time favourite',
-  A: 'Loved it',
-  B: 'Liked it',
-  C: 'It was fine',
-  D: 'Did not like it',
-};
 
 const PAGE = 60;
 
@@ -23,8 +15,8 @@ export function Sort({ app, onDone, onFind }: { app: AppState; onDone: () => voi
         <div className="segmented" role="radiogroup" aria-label="How to sort">
           {(
             [
-              ['grid', 'Tap what you’ve seen'],
               ['single', 'One at a time'],
+              ['grid', 'Tap what you’ve seen'],
             ] as const
           ).map(([v, label]) => (
             <button
@@ -52,7 +44,8 @@ export function Sort({ app, onDone, onFind }: { app: AppState; onDone: () => voi
 /** Every title as a cover grid, most popular first. Tap marks it seen; tap again to undo. */
 function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   const [query, setQuery] = useState('');
-  const [hideSorted, setHideSorted] = useState(false);
+  const [hideUnseen, setHideUnseen] = useState(true);
+  const [hideSeen, setHideSeen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -60,11 +53,12 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
     if (q) items = items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
-    if (hideSorted) items = items.filter((i) => !app.marks.has(i.id));
+    if (hideUnseen) items = items.filter((i) => app.marks.get(i.id)?.status !== 'unseen');
+    if (hideSeen) items = items.filter((i) => app.marks.get(i.id)?.status !== 'seen');
     return items;
-  }, [app.items, app.marks, q, hideSorted]);
+  }, [app.items, app.marks, q, hideUnseen, hideSeen]);
 
-  useEffect(() => setLimit(PAGE), [q, hideSorted]);
+  useEffect(() => setLimit(PAGE), [q, hideUnseen, hideSeen]);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -85,8 +79,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   return (
     <>
       <p className="hint">
-        Tap every title you've seen; tap again to take it back. Duels sort out the order, so there's no need to rate anything
-        here.
+        Tap every title you've seen; tap again to take it back. Duels work out the order.
       </p>
       <div className="grid-tools">
         <input
@@ -97,10 +90,16 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <label className="check">
-          <input id="hide-sorted" type="checkbox" checked={hideSorted} onChange={(e) => setHideSorted(e.target.checked)} />
-          Hide titles already marked
-        </label>
+        <div className="checks">
+          <label className="check">
+            <input id="hide-unseen" type="checkbox" checked={hideUnseen} onChange={(e) => setHideUnseen(e.target.checked)} />
+            Hide titles marked haven't seen
+          </label>
+          <label className="check">
+            <input id="hide-seen" type="checkbox" checked={hideSeen} onChange={(e) => setHideSeen(e.target.checked)} />
+            Hide titles marked seen
+          </label>
+        </div>
       </div>
       {list.length === 0 ? (
         <p className="empty-list">
@@ -124,9 +123,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
                       ✓
                     </span>
                   )}
-                  {(state === 'want' || state === 'unseen') && (
-                    <span className="grid-note">{state === 'want' ? 'Want to watch' : 'Not seen'}</span>
-                  )}
+                  {state === 'unseen' && <span className="grid-note">Not seen</span>}
                   <span className="grid-title">{title}</span>
                   <span className="grid-year">{years(item)}</span>
                 </button>
@@ -145,7 +142,7 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   );
 }
 
-/** One title at a time, with an optional starting tier. */
+/** One title at a time: seen it, haven't seen, or ask later. */
 function SortSingle({ app, onDone }: { app: AppState; onDone: () => void }) {
   const queue = useMemo(() => {
     const skipped = new Set(app.skipped);
@@ -168,11 +165,8 @@ function SortSingle({ app, onDone }: { app: AppState; onDone: () => void }) {
     function onKey(e: KeyboardEvent) {
       if (!item || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
       const k = e.key.toLowerCase();
-      const tier = TIERS[Number(k) - 1];
-      if (tier) app.markItem(item.id, 'seen', tier);
-      else if (k === 'y' || k === 'enter') app.markItem(item.id, 'seen');
-      else if (k === 'w') app.markItem(item.id, 'want');
-      else if (k === 'n') app.markItem(item.id, 'unseen');
+      if (k === 'y' || k === 'enter' || k === 'arrowleft') app.markItem(item.id, 'seen');
+      else if (k === 'n' || k === 'arrowright') app.markItem(item.id, 'unseen');
       else if (k === 's') app.skipSort(item.id);
       else if (k === 'backspace' || k === 'z') app.undo();
       else return;
@@ -212,18 +206,6 @@ function SortSingle({ app, onDone }: { app: AppState; onDone: () => void }) {
         <button className="btn" onClick={() => app.markItem(item.id, 'unseen')} title="Key N">
           Haven't seen
         </button>
-        <button className="btn" onClick={() => app.markItem(item.id, 'want')} title="Key W">
-          Want to watch
-        </button>
-      </div>
-      <p className="sort-question">Or rate it as you mark it (optional)</p>
-      <div className="tier-row compact" role="group" aria-label="Seen it: choose a starting tier">
-        {TIERS.map((t, i) => (
-          <button key={t} className={`tier-btn tier-${t}`} onClick={() => app.markItem(item.id, 'seen', t)} title={`${TIER_HELP[t]} (key ${i + 1})`}>
-            <span className="tier-letter">{t}</span>
-            <span className="tier-help">{TIER_HELP[t]}</span>
-          </button>
-        ))}
       </div>
       <div className="action-row">
         <button className="btn btn-quiet" onClick={() => app.skipSort(item.id)} title="Key S">

@@ -1,10 +1,4 @@
-export type Tier = 'S' | 'A' | 'B' | 'C' | 'D';
-export const TIERS: Tier[] = ['S', 'A', 'B', 'C', 'D'];
-
-/** Log-strength each tier starts from before any duels. */
-export const TIER_ANCHOR: Record<Tier, number> = { S: 2, A: 1, B: 0, C: -1, D: -2 };
-
-export type Status = 'seen' | 'unseen' | 'want';
+export type Status = 'seen' | 'unseen';
 
 /** One rankable item. For anime, a franchise: several AniList entries grouped together. */
 export interface Item {
@@ -37,7 +31,6 @@ export interface Item {
 export interface Mark {
   itemId: string;
   status: Status;
-  tier?: Tier;
   updatedAt: number;
 }
 
@@ -58,4 +51,4 @@ export interface Settings {
   sortMode: 'grid' | 'single';
 }
 
-export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'grid' };
+export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'single' };

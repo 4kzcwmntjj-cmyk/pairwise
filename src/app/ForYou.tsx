@@ -1,15 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { MIN_RANKED, recommend } from '../rank/recommend';
 import { Cover } from './Cover';
 import { metaLine } from './meta';
 import type { AppState } from './useApp';
 
-type Filter = 'all' | 'want';
-
 export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: string) => void; onSort: () => void }) {
-  const [filter, setFilter] = useState<Filter>('all');
   const recs = useMemo(() => recommend(app.items, app.fit, app.marks, 200), [app.items, app.fit, app.marks]);
-  const shown = (filter === 'want' ? recs.filter((r) => app.marks.get(r.item.id)?.status === 'want') : recs).slice(0, 50);
+  const shown = recs.slice(0, 50);
 
   if (app.fit.order.length < MIN_RANKED) {
     return (
@@ -34,21 +31,9 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
         Titles you haven't marked as seen, from AniList users' recommendations for the shows you rank highest, and the genres
         you rank well. They sharpen as your ranking settles.
       </p>
-      <div className="segmented" role="tablist">
-        {(
-          [
-            ['all', 'Everything'],
-            ['want', 'On your want-to-watch list'],
-          ] as const
-        ).map(([v, label]) => (
-          <button key={v} role="tab" aria-selected={filter === v} className={filter === v ? 'on' : ''} onClick={() => setFilter(v)}>
-            {label}
-          </button>
-        ))}
-      </div>
       {shown.length === 0 ? (
         <p className="empty-list">
-          {filter === 'want' ? 'Nothing on your want-to-watch list matches your ranking yet.' : 'No suggestions yet. Rank a few more titles.'}
+          No suggestions yet. Rank a few more titles.
         </p>
       ) : (
         <ol className="rank-list">
@@ -67,7 +52,6 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
                     <span className="rank-meta">{metaLine(item)}</span>
                     <span className="rec-reason">{reason}</span>
                   </span>
-                  {status === 'want' && <span className="status-note">Want to watch</span>}
                   {status === 'unseen' && <span className="status-note">Marked not seen</span>}
                 </button>
               </li>
