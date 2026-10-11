@@ -25,3 +25,7 @@ Every push to `main` is tested, built and published to GitHub Pages by `.github/
 Storage goes through the `Store` interface in `src/store/store.ts`, so a server-backed store (for friends) can replace the local one later without touching the rest of the app.
 
 Anime data and cover art from [AniList](https://anilist.co).
+
+## How it works page and hiding suggestions
+
+Settings and the welcome screen link to a short in-app guide (`src/app/HowItWorks.tsx`). In For you, **Not interested** hides a suggestion. Hidden titles are stored by AniList entry id in the `dismissed` meta key, are included in saved copies, and can be restored from the list at the bottom of the page.

@@ -4,7 +4,7 @@ import { fromExport, type Snapshot } from '../store/store';
 import type { AppState } from './useApp';
 import { ViewSwitch } from './ViewSwitch';
 
-export function SettingsScreen({ app }: { app: AppState }) {
+export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<{ kind: 'import'; snapshot: Snapshot } | { kind: 'reset' } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -40,6 +40,15 @@ export function SettingsScreen({ app }: { app: AppState }) {
 
   return (
     <main className="screen settings">
+      <section>
+        <h3>Help</h3>
+        <div className="action-row start">
+          <button className="btn" onClick={onHelp}>
+            How it works
+          </button>
+        </div>
+      </section>
+
       <section>
         <h3>Titles</h3>
         <div className="segmented" role="radiogroup" aria-label="Title language">

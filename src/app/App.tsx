@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Duel } from './Duel';
 import { ForYou } from './ForYou';
+import { HowItWorks } from './HowItWorks';
 import { ItemSheet } from './ItemSheet';
 import { Ranking } from './Ranking';
 import { SettingsScreen } from './SettingsScreen';
@@ -25,6 +26,7 @@ export function App() {
   const seen = app.fit.order.length;
   const [tab, setTab] = useState<Tab | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [help, setHelp] = useState(false);
 
   const hasItems = app.items.length > 0;
 
@@ -42,7 +44,8 @@ export function App() {
   }, [app.ready, hasItems, tab, seen]);
 
   if (!app.ready) return <div className="boot" />;
-  if (!hasItems) return <Welcome app={app} />;
+  if (help) return <HowItWorks onClose={() => setHelp(false)} />;
+  if (!hasItems) return <Welcome app={app} onHelp={() => setHelp(true)} />;
 
   const current: Tab = tab ?? (seen >= 2 ? 'duel' : 'sort');
 
@@ -82,7 +85,7 @@ export function App() {
       {current === 'stats' && <Stats app={app} onOpen={setOpenId} />}
       {current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
       {current === 'ranking' && <Ranking app={app} onOpen={setOpenId} />}
-      {current === 'settings' && <SettingsScreen app={app} />}
+      {current === 'settings' && <SettingsScreen app={app} onHelp={() => setHelp(true)} />}
       {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />}
     </div>
   );

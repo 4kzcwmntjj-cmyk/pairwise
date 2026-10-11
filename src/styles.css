@@ -1131,3 +1131,30 @@ a {
   justify-content: space-between;
   gap: 10px;
 }
+
+/* For you: dismissing a suggestion */
+.rec-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.rec-hide {
+  align-self: flex-end;
+  margin: 0 4px 6px;
+}
+.hidden-recs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* How it works */
+.howto {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  max-width: 680px;
+  margin: 0 auto;
+}

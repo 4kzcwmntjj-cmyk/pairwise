@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fromExport } from '../store/store';
 import type { AppState } from './useApp';
 
-export function Welcome({ app }: { app: AppState }) {
+export function Welcome({ app, onHelp }: { app: AppState; onHelp: () => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,6 +69,9 @@ export function Welcome({ app }: { app: AppState }) {
           />
         </div>
       )}
+      <button className="btn btn-quiet" onClick={onHelp}>
+        How it works
+      </button>
       {error && <p className="error">{error}</p>}
     </main>
   );

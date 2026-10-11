@@ -13,7 +13,11 @@ on:
     branches: [main]
     paths:
       - scripts/build-catalogue.ts
-      - src/anilist/**
+      - src/anilist/catalogue.ts
+      - src/anilist/client.ts
+      - src/anilist/group.ts
+      - src/anilist/catalogueFile.ts
+      - src/types.ts
 
 permissions:
   contents: write

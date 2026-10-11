@@ -52,6 +52,7 @@ export function useApp() {
   const [backup, setBackup] = useState<BackupNote | null>(null);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipped, setSkipped] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const [catalogueAt, setCatalogueAt] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [pair, setPair] = useState<Pair | null>(null);
@@ -74,6 +75,7 @@ export function useApp() {
     const { manga: _manga, ...rest } = legacy;
     setSettingsState({ ...rest, view });
     setSkipped((s.meta.skipped as string[]) ?? []);
+    setDismissed((s.meta.dismissed as string[]) ?? []);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
     setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
@@ -256,6 +258,18 @@ export function useApp() {
     }
   }, [undoStack, skipped]);
 
+  /** Hide a title from For you. Stored by entry ids so it survives regrouping. */
+  const dismiss = useCallback(
+    async (itemId: string, hide: boolean) => {
+      const entryIds = itemById.get(itemId)?.entryIds ?? [];
+      const keys = entryIds.map(String);
+      const next = hide ? [...new Set([...dismissed, ...keys])] : dismissed.filter((k) => !keys.includes(k));
+      setDismissed(next);
+      await store.setMeta('dismissed', next);
+    },
+    [dismissed, itemById],
+  );
+
   const setSettings = useCallback(async (s: Settings) => {
     setSettingsState(s);
     await store.setSettings(s);
@@ -332,9 +346,9 @@ export function useApp() {
       marks: [...rawMarks.values()],
       votes: rawVotes,
       settings,
-      meta: { skipped, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+      meta: { skipped, dismissed, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
     }),
-    [baseItems, rawMarks, rawVotes, settings, skipped, groupOps, catalogueAt],
+    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, groupOps, catalogueAt],
   );
 
   const size = rawMarks.size + rawVotes.length;
@@ -484,6 +498,8 @@ export function useApp() {
     seenIds,
     clearMark,
     skipSort,
+    dismissed,
+    dismiss,
     vote,
     skipPair,
     undo,
