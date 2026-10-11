@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
 import { Cover } from './Cover';
 import { metaLine, years } from './meta';
@@ -36,7 +37,7 @@ export function Sort({ app, onDone, onFind }: { app: AppState; onDone: () => voi
           </button>
         )}
       </div>
-      {mode === 'grid' ? <SortGrid app={app} onFind={onFind} /> : <SortSingle app={app} onDone={onDone} />}
+      {mode === 'grid' ? <SortGrid app={app} onFind={onFind} /> : <SortSingle app={app} onDone={onDone} onFind={onFind} />}
     </main>
   );
 }
@@ -150,17 +151,35 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   );
 }
 
-/** One title at a time: seen it, haven't seen, or ask later. */
-function SortSingle({ app, onDone }: { app: AppState; onDone: () => void }) {
+/** Long-shot notice: shown once enough has been sorted and recent answers are nearly all "haven't seen". */
+const RECENT = 25;
+const RECENT_HITS_AT_MOST = 2;
+const SORTED_AT_LEAST = 60;
+
+/**
+ * One title at a time: seen it, haven't seen, or ask later. Titles come in
+ * order of how likely you are to have seen them, learned from your answers
+ * so far (see rank/seen.ts), so the ones you've seen surface early.
+ */
+function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void; onFind: () => void }) {
+  const [keepGoing, setKeepGoing] = useState(false);
+  const model = useMemo(() => seenModel(app.items, app.marks), [app.items, app.marks]);
   const queue = useMemo(() => {
     const skipped = new Set(app.skipped);
-    const unmarked = app.items.filter((i) => !app.marks.has(i.id)).sort((a, b) => b.popularity - a.popularity);
+    const p = (i: Item) => model.probability.get(i.id) ?? 0;
+    const unmarked = app.items.filter((i) => !app.marks.has(i.id)).sort((a, b) => p(b) - p(a) || b.popularity - a.popularity);
     const order = new Map(app.skipped.map((id, i) => [id, i]));
     return [
       ...unmarked.filter((i) => !skipped.has(i.id)),
       ...unmarked.filter((i) => skipped.has(i.id)).sort((a, b) => order.get(a.id)! - order.get(b.id)!),
     ];
-  }, [app.items, app.marks, app.skipped]);
+  }, [app.items, app.marks, app.skipped, model]);
+
+  const recentHits = useMemo(() => {
+    const recent = [...app.marks.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT);
+    return recent.filter((m) => m.status === 'seen').length;
+  }, [app.marks]);
+  const longShots = !keepGoing && app.marks.size >= SORTED_AT_LEAST && recentHits <= RECENT_HITS_AT_MOST;
 
   const item = queue[0];
   const next = queue[1];
@@ -202,6 +221,27 @@ function SortSingle({ app, onDone }: { app: AppState; onDone: () => void }) {
       <p className="progress-line">
         {app.marks.size.toLocaleString()} of {app.items.length.toLocaleString()} sorted
       </p>
+      {longShots && (
+        <div className="notice" role="status">
+          <p>
+            {recentHits === 0 ? 'None' : `Only ${recentHits}`} of your last {RECENT} were titles you've seen, so what's left is
+            mostly long shots. Search for anything specific you've seen, or keep going.
+          </p>
+          <div className="action-row start">
+            <button className="btn btn-primary btn-small" onClick={onFind}>
+              Find a title
+            </button>
+            {app.fit.order.length >= 2 && (
+              <button className="btn btn-small" onClick={onDone}>
+                Go to duels
+              </button>
+            )}
+            <button className="btn btn-quiet btn-small" onClick={() => setKeepGoing(true)}>
+              Keep going
+            </button>
+          </div>
+        </div>
+      )}
       <div className="sort-card" key={item.id}>
         <Cover item={item} title={title} size="lg" />
         <h2 className="item-title">{title}</h2>

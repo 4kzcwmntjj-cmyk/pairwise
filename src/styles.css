@@ -827,3 +827,12 @@ a {
   flex-wrap: wrap;
   gap: 4px 16px;
 }
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}

@@ -24,14 +24,21 @@ export interface SeenModel {
   expectedRemaining: number;
   /** Whether the weights were fitted to your marks (false = starting weights). */
   fitted: boolean;
+  weights: number[];
 }
 
 type Vec = [number, number, number, number, number];
-/** intercept, popularity, links to seen, links to haven't seen, years from your middle */
-const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.9, -0.6, -0.25];
+/** intercept, popularity, seen share of linked titles, amount of link evidence, years from your middle */
+const DEFAULT_WEIGHTS: Vec = [-1.2, 1.1, 0.8, 0, -0.25];
 const MIN_TO_FIT = 30;
 const MIN_PER_CLASS = 8;
-const PRIOR_STRENGTH = 2;
+/**
+ * How firmly each weight is held to its starting value. Popularity is held
+ * hard: the titles you've sorted are mostly popular ones (that's the order
+ * Sort asks in), so they say little about how popularity matters across the
+ * long tail, and a free fit would underrate it there.
+ */
+const PRIOR_STRENGTH: Vec = [2, 200, 2, 2, 5];
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
 
@@ -70,8 +77,12 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
       else if (s === 'unseen') neg += w;
     }
     const years = middleYear && it.startYear ? Math.abs(it.startYear - middleYear) / 10 : 0;
-    // Square roots keep a heavily linked title from dominating.
-    return [1, (Math.log1p(it.popularity) - mean) / sd, Math.sqrt(pos), Math.sqrt(neg), years];
+    // The share of a title's marked neighbours that you've seen, as log-odds with a weak
+    // half-and-half start; and how much evidence that share rests on. Using a share rather
+    // than a count keeps heavily linked (popular) titles from scoring high just for having
+    // many links.
+    const share = Math.log((pos + 1) / (neg + 1));
+    return [1, (Math.log1p(it.popularity) - mean) / sd, share, Math.sqrt(pos + neg), years];
   };
 
   // Fit to the titles already marked, if there are enough of each kind.
@@ -97,26 +108,79 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
     probability.set(it.id, p);
     expectedRemaining += p;
   }
-  return { probability, expectedRemaining, fitted };
+  return { probability, expectedRemaining, fitted, weights };
 }
 
-/** Logistic regression by gradient ascent, with a Gaussian prior centred on `prior`. */
-export function fitLogistic(data: [Vec, number][], prior: Vec, strength: number): Vec {
-  const w: Vec = [...prior];
-  const n = data.length;
-  for (let iter = 0; iter < 300; iter++) {
-    const grad: Vec = [0, 0, 0, 0, 0];
+/**
+ * Logistic regression by Newton's method (iteratively reweighted least
+ * squares), with a Gaussian prior of the given strength centred on `prior`.
+ * Five weights, so each step solves a 5x5 system.
+ */
+export function fitLogistic(data: [Vec, number][], prior: Vec, strength: Vec): Vec {
+  const K = 5;
+  let w: Vec = [...prior];
+  for (let iter = 0; iter < 25; iter++) {
+    const g = new Array(K).fill(0);
+    const H = Array.from({ length: K }, () => new Array(K).fill(0));
     for (const [x, y] of data) {
       const p = sigmoid(x.reduce((a, v, k) => a + v * w[k], 0));
-      for (let k = 0; k < 5; k++) grad[k] += (y - p) * x[k];
+      const v = p * (1 - p);
+      for (let a = 0; a < K; a++) {
+        g[a] += (y - p) * x[a];
+        for (let b = 0; b < K; b++) H[a][b] += v * x[a] * x[b];
+      }
     }
-    let moved = 0;
-    for (let k = 0; k < 5; k++) {
-      const step = (0.5 * (grad[k] - strength * (w[k] - prior[k]))) / n;
-      w[k] += step;
-      moved = Math.max(moved, Math.abs(step));
+    for (let a = 0; a < K; a++) {
+      g[a] -= strength[a] * (w[a] - prior[a]);
+      H[a][a] += strength[a];
     }
-    if (moved < 1e-6) break;
+    const step = solve(H, g);
+    // Halve the step until it improves the penalised likelihood (plain Newton can overshoot).
+    const before = objective(data, w, prior, strength);
+    let scale = 1;
+    let next = w;
+    for (let tries = 0; tries < 30; tries++) {
+      next = w.map((v, k) => v + scale * step[k]) as Vec;
+      if (objective(data, next, prior, strength) >= before - 1e-12) break;
+      scale /= 2;
+    }
+    const moved = Math.max(...next.map((v, k) => Math.abs(v - w[k])));
+    w = next;
+    if (moved < 1e-8) break;
   }
   return w;
+}
+
+/** Penalised log-likelihood that the fit maximises. */
+function objective(data: [Vec, number][], w: Vec, prior: Vec, strength: Vec): number {
+  let ll = 0;
+  for (const [x, y] of data) {
+    const z = x.reduce((a, v, k) => a + v * w[k], 0);
+    // log sigmoid(z) for y = 1, log(1 - sigmoid(z)) for y = 0, computed stably.
+    ll += y === 1 ? -Math.log1p(Math.exp(-z)) : -Math.log1p(Math.exp(z));
+  }
+  for (let k = 0; k < 5; k++) ll -= (strength[k] / 2) * (w[k] - prior[k]) ** 2;
+  return ll;
+}
+
+/** Solves A x = b by Gaussian elimination with partial pivoting. */
+function solve(A: number[][], b: number[]): number[] {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = c + 1; r < n; r++) {
+      const f = M[r][c] / M[c][c];
+      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let r = n - 1; r >= 0; r--) {
+    let sum = M[r][n];
+    for (let k = r + 1; k < n; k++) sum -= M[r][k] * x[k];
+    x[r] = sum / M[r][r];
+  }
+  return x;
 }

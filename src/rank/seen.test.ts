@@ -28,7 +28,7 @@ describe('seenModel', () => {
       item('seen1', 100000, { recs: [['niche', 40]] }),
       item('seen2', 100000, { recs: [['niche', 30]] }),
       item('niche', 20000),
-      item('popular', 60000),
+      item('popular', 40000),
     ];
     const m = seenModel(items, mark([['seen1', 'seen'], ['seen2', 'seen']]));
     expect(m.probability.get('niche')!).toBeGreaterThan(m.probability.get('popular')!);
@@ -40,20 +40,36 @@ describe('seenModel', () => {
     expect(m.probability.get('a')!).toBeLessThan(m.probability.get('b')!);
   });
 
-  it('learns from your marks that popularity matters less for you', () => {
-    // A viewer who has seen many obscure titles and skipped popular ones.
+  it('keeps the popularity weight steady when only popular titles have been sorted', () => {
+    // Sort asks popular titles first, so early marks barely vary in popularity.
     const items: Item[] = [];
     const entries: [string, 'seen' | 'unseen'][] = [];
-    for (let i = 0; i < 40; i++) {
-      items.push(item(`obscure${i}`, 1000 + i));
-      entries.push([`obscure${i}`, i < 30 ? 'seen' : 'unseen']);
-      items.push(item(`hit${i}`, 300000 + i));
-      entries.push([`hit${i}`, i < 10 ? 'seen' : 'unseen']);
+    for (let i = 0; i < 60; i++) {
+      items.push(item(`hit${i}`, 300000 + i * 10));
+      entries.push([`hit${i}`, i % 2 ? 'seen' : 'unseen']);
     }
-    items.push(item('newObscure', 1500), item('newHit', 300500));
+    for (let i = 0; i < 400; i++) items.push(item(`tail${i}`, 500 + i * 50));
     const m = seenModel(items, mark(entries));
     expect(m.fitted).toBe(true);
-    expect(m.probability.get('newObscure')!).toBeGreaterThan(m.probability.get('newHit')!);
+    expect(m.weights[1]).toBeGreaterThan(1);
+    expect(m.probability.get('tail0')!).toBeLessThan(0.1);
+  });
+
+  it('learns that links to what you have seen matter for you', () => {
+    // A viewer whose seen titles are exactly the ones linked to their favourite.
+    const items: Item[] = [item('fav', 50000, { recs: Array.from({ length: 12 }, (_, i) => [`linked${i}`, 30] as [string, number]) })];
+    const entries: [string, 'seen' | 'unseen'][] = [['fav', 'seen']];
+    for (let i = 0; i < 12; i++) {
+      items.push(item(`linked${i}`, 20000));
+      if (i < 10) entries.push([`linked${i}`, 'seen']);
+    }
+    for (let i = 0; i < 40; i++) {
+      items.push(item(`other${i}`, 20000));
+      if (i < 30) entries.push([`other${i}`, 'unseen']);
+    }
+    const m = seenModel(items, mark(entries));
+    expect(m.fitted).toBe(true);
+    expect(m.probability.get('linked11')!).toBeGreaterThan(m.probability.get('other39')! * 2);
   });
 
   it('counts the seen titles it expects are left', () => {
