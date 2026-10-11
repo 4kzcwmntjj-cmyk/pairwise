@@ -14,7 +14,6 @@ on:
     paths:
       - scripts/build-catalogue.ts
       - src/anilist/**
-      - .github/workflows/catalogue.yml
 
 permissions:
   contents: write
@@ -34,7 +33,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vite-node scripts/build-catalogue.ts
+      - name: Fetch from AniList (one retry after a pause)
+        run: npx vite-node scripts/build-catalogue.ts || (sleep 180 && npx vite-node scripts/build-catalogue.ts)
       - name: Commit the new catalogue
         run: |
           git config user.name "github-actions[bot]"
