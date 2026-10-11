@@ -109,11 +109,11 @@ function Join({ app, item, onClose }: { app: AppState; item: Item; onClose: () =
   const q = query.trim().toLowerCase();
   const matches = useMemo(() => {
     if (q.length < 2) return [];
-    return app.items
+    return app.allItems
       .filter((i) => i.id !== item.id && [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)))
       .sort((a, b) => b.popularity - a.popularity)
       .slice(0, 8);
-  }, [q, app.items, item.id]);
+  }, [q, app.allItems, item.id]);
 
   if (picked) {
     const both = app.fit.duels.get(picked.id) ?? 0;

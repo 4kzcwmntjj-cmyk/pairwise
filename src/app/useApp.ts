@@ -5,8 +5,8 @@ import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
-import { isMangaOnly } from '../anilist/group';
-import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type Vote } from '../types';
+import { applyAnswer, clearIn, hasBoth, inView, projectMarks, type Answer } from '../rank/medium';
+import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
 export const store = new LocalStore();
 
@@ -58,6 +58,8 @@ export function useApp() {
   const [skippedPairs, setSkippedPairs] = useState<Set<string>>(new Set());
   const [moved, setMoved] = useState<Moved | null>(null);
   const warm = useRef<Map<string, number> | undefined>(undefined);
+  /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
+  const generation = useRef(0);
 
   const applySnapshot = useCallback((s: Snapshot) => {
     setItems(s.items);
@@ -66,7 +68,11 @@ export function useApp() {
     for (const m of dropped) store.deleteMark(m.itemId).catch(() => undefined);
     setMarks(new Map(s.marks.filter((m) => !dropped.includes(m)).map((m) => [m.itemId, m])));
     setVotes(s.votes);
-    setSettingsState(s.settings);
+    // The "Include manga" switch became the anime / manga / both view.
+    const legacy = s.settings as Settings & { manga?: boolean };
+    const view: View = legacy.view ?? (legacy.manga === false ? 'anime' : 'both');
+    const { manga: _manga, ...rest } = legacy;
+    setSettingsState({ ...rest, view });
     setSkipped((s.meta.skipped as string[]) ?? []);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
     setBackup((s.meta.backup as BackupNote) ?? null);
@@ -84,24 +90,31 @@ export function useApp() {
 
   // What the app works with: titles after your grouping changes, with marks and votes following them.
   const grouping = useMemo(() => applyGroupOps(baseItems, groupOps), [baseItems, groupOps]);
-  const items = useMemo(
-    () => (settings.manga ? grouping.items : grouping.items.filter((i) => !isMangaOnly(i))),
-    [grouping, settings.manga],
-  );
-  const marks = useMemo(() => resolveMarks(rawMarks.values(), grouping.resolve), [rawMarks, grouping]);
+  const allItems = grouping.items;
+  const allMarks = useMemo(() => resolveMarks(rawMarks.values(), grouping.resolve), [rawMarks, grouping]);
   const votes = useMemo(() => resolveVotes(rawVotes, grouping.resolve), [rawVotes, grouping]);
-  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
 
+  // The view (anime, manga or both) decides which titles show, and how marks read: in the anime view,
+  // a title you've only read counts as not seen.
+  const view = settings.view;
+  const items = useMemo(() => allItems.filter((i) => inView(i, view)), [allItems, view]);
+  const marks = useMemo(() => projectMarks(items, allMarks, view), [items, allMarks, view]);
+
+  // One ranking over everything you've seen in any form; each view shows its part of it.
   const seenIds = useMemo(
-    () => [...marks.values()].filter((m) => m.status === 'seen' && itemById.has(m.itemId)).map((m) => m.itemId),
-    [marks, itemById],
+    () => [...allMarks.values()].filter((m) => m.status === 'seen' && itemById.has(m.itemId)).map((m) => m.itemId),
+    [allMarks, itemById],
   );
 
-  const fit: Fit = useMemo(() => {
+  const fullFit: Fit = useMemo(() => {
     const f = fitModel({ ids: seenIds, anchors: {}, votes, warm: warm.current });
     warm.current = f.theta;
     return f;
-  }, [seenIds, marks, votes]);
+  }, [seenIds, votes]);
+
+  const inViewSeen = useCallback((id: string) => marks.get(id)?.status === 'seen', [marks]);
+  const fit: Fit = useMemo(() => ({ ...fullFit, order: fullFit.order.filter(inViewSeen) }), [fullFit, inViewSeen]);
 
   const rankOf = useMemo(() => new Map(fit.order.map((id, i) => [id, i + 1])), [fit]);
 
@@ -114,19 +127,52 @@ export function useApp() {
 
   const pushUndo = (e: UndoEntry) => setUndoStack((s) => [...s.slice(-99), e]);
 
+  /** Writes a mark (or removes it) and records how to undo it. */
+  const putMark = useCallback(
+    async (itemId: string, next: Mark | undefined, scope: UndoScope, pairNow: Pair | null) => {
+      const prev = rawMarks.get(itemId);
+      setMarks((m) => {
+        const n = new Map(m);
+        if (next) n.set(itemId, next);
+        else n.delete(itemId);
+        return n;
+      });
+      pushUndo({ scope, kind: 'mark', itemId, prev, pair: pairNow });
+      if (next) await store.setMark(next);
+      else await store.deleteMark(itemId);
+    },
+    [rawMarks],
+  );
+
+  /**
+   * Records an answer about a title: watched and/or read, or not. For a title with one form only the
+   * status is kept; for a title with both, the answer is merged with what was known.
+   */
+  const answer = useCallback(
+    async (itemId: string, ans: Answer, scope: UndoScope = 'sort') => {
+      const item = itemById.get(itemId);
+      if (!item) return;
+      await putMark(itemId, applyAnswer(item, allMarks.get(itemId), ans, Date.now()), scope, pair);
+    },
+    [itemById, allMarks, putMark, pair],
+  );
+
+  /** Seen or not, as the current view means it: in the anime view, "seen" means watched. */
   const markItem = useCallback(
     async (itemId: string, status: Status, scope: UndoScope = 'sort') => {
-      const prev = rawMarks.get(itemId);
-      const mark: Mark = { itemId, status, updatedAt: Date.now() };
-      setMarks((m) => new Map(m).set(itemId, mark));
-      pushUndo({ scope, kind: 'mark', itemId, prev, pair });
-      await store.setMark(mark);
+      const item = itemById.get(itemId);
+      if (item && hasBoth(item) && view !== 'both') return answer(itemId, { [view]: status === 'seen' }, scope);
+      await putMark(itemId, { itemId, status, updatedAt: Date.now() }, scope, pair);
     },
-    [rawMarks, pair],
+    [itemById, view, answer, putMark, pair],
   );
 
   const clearMark = useCallback(
-    async (itemId: string, scope: UndoScope = 'sort') => {
+    async (itemId: string, scope: UndoScope = 'sort', everything = false) => {
+      const item = itemById.get(itemId);
+      // In the anime or manga view, clearing a title with both forms clears only that form.
+      const partial = item && !everything ? clearIn(item, allMarks.get(itemId), view, Date.now()) : undefined;
+      if (partial) return putMark(itemId, partial, scope, pair);
       // Marks left on titles that were joined into this one count for it too, so clear those as well.
       const keys = [...rawMarks.keys()].filter((k) => grouping.resolve(k) === itemId);
       if (keys.length === 0) return;
@@ -135,10 +181,10 @@ export function useApp() {
         for (const k of keys) n.delete(k);
         return n;
       });
-      pushUndo({ scope, kind: 'mark', itemId, prev: rawMarks.get(itemId) ?? marks.get(itemId), pair });
+      pushUndo({ scope, kind: 'mark', itemId, prev: rawMarks.get(itemId) ?? allMarks.get(itemId), pair });
       await Promise.all(keys.map((k) => store.deleteMark(k)));
     },
-    [rawMarks, marks, grouping, pair],
+    [itemById, allMarks, view, putMark, rawMarks, grouping, pair],
   );
 
   const skipSort = useCallback(
@@ -164,12 +210,12 @@ export function useApp() {
       pushUndo({ scope: 'duel', kind: 'vote', voteId: id, pair });
       if (winner && before !== undefined) {
         const after = fitModel({ ids: seenIds, anchors: {}, votes: nextVotes, warm: warm.current });
-        const to = after.order.indexOf(winner) + 1;
+        const to = after.order.filter(inViewSeen).indexOf(winner) + 1;
         setMoved({ title: displayTitle(itemById.get(winner)!, settings), from: before, to });
       } else setMoved(null);
       setPair(null);
     },
-    [pair, rankOf, votes, seenIds, marks, itemById, settings],
+    [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings],
   );
 
   const skipPair = useCallback(() => {
@@ -231,8 +277,11 @@ export function useApp() {
    */
   const syncCatalogue = useCallback(
     async (force = false) => {
+      const gen = generation.current;
       const file = await loadCatalogueFile();
       if (!force && catalogueAt && file.generatedAt <= catalogueAt) return 0;
+      // A copy was loaded or everything deleted while the file downloaded: this merge is for data that's gone.
+      if (gen !== generation.current) return 0;
       const known = new Set(baseItems.map((i) => i.id));
       const merged = mergeCatalogue(baseItems, file.items);
       await saveItems(merged);
@@ -245,7 +294,22 @@ export function useApp() {
 
   const replaceAll = useCallback(
     async (s: Snapshot) => {
-      await store.replaceAll(s);
+      generation.current++;
+      // Bring the copy's titles up to date with the catalogue this site ships, so an older copy gets
+      // the newer titles (and manga) straight away.
+      let snapshot = s;
+      try {
+        const file = await loadCatalogueFile();
+        if (!s.meta.catalogueGeneratedAt || file.generatedAt > (s.meta.catalogueGeneratedAt as string)) {
+          const merged = mergeCatalogue(s.items, file.items);
+          const byId = new Map(s.items.map((i) => [i.id, i]));
+          for (const i of merged) byId.set(i.id, i);
+          snapshot = { ...s, items: [...byId.values()], meta: { ...s.meta, catalogueGeneratedAt: file.generatedAt } };
+        }
+      } catch {
+        // Offline: keep the copy as it is; the next launch brings the catalogue in.
+      }
+      await store.replaceAll(snapshot);
       applySnapshot(await store.loadAll());
       // A list loaded from a file is, by definition, saved in that file.
       const note: BackupNote = { at: Date.now(), size: s.marks.length + s.votes.length };
@@ -256,6 +320,7 @@ export function useApp() {
   );
 
   const resetAll = useCallback(async () => {
+    generation.current++;
     await store.clearAll();
     warm.current = undefined;
     applySnapshot({ items: [], marks: [], votes: [], settings, meta: {} });
@@ -388,6 +453,11 @@ export function useApp() {
     moved,
     canUndo: (scope: UndoScope) => undoStack.some((e) => e.scope === scope),
     markItem,
+    answer,
+    allItems,
+    allMarks,
+    view,
+    seenIds,
     clearMark,
     skipSort,
     vote,

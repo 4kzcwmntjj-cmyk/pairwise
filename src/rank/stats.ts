@@ -331,9 +331,9 @@ export interface HistoryPoint {
 
 const byTime = (votes: Vote[]) => [...votes].sort((a, b) => a.at - b.at || (a.id ?? 0) - (b.id ?? 0));
 
-/** Order of titles that have played at least one duel, best first. */
-function playedOrder(f: Fit): string[] {
-  return f.order.filter((id) => (f.duels.get(id) ?? 0) > 0);
+/** Order of titles that have played at least one duel, best first, optionally only those in `within`. */
+function playedOrder(f: Fit, within?: Set<string>): string[] {
+  return f.order.filter((id) => (f.duels.get(id) ?? 0) > 0 && (!within || within.has(id)));
 }
 
 /**
@@ -341,7 +341,7 @@ function playedOrder(f: Fit): string[] {
  * days and records where the tracked titles were. At most `points` checkpoints,
  * evenly spread over the days you voted, always ending with the latest.
  */
-export function history(votes: Vote[], seenIds: string[], track: string[], points = 12): HistoryPoint[] {
+export function history(votes: Vote[], seenIds: string[], track: string[], points = 12, within?: Set<string>): HistoryPoint[] {
   const sorted = byTime(votes);
   if (sorted.length === 0) return [];
   const dayEnds: number[] = [];
@@ -357,7 +357,7 @@ export function history(votes: Vote[], seenIds: string[], track: string[], point
   return picks.map((end) => {
     const f = fitModel({ ids: seenIds, anchors: {}, votes: sorted.slice(0, end + 1), warm });
     warm = f.theta;
-    const order = playedOrder(f);
+    const order = playedOrder(f, within);
     const ranks = new Map<string, number>();
     for (const id of track) {
       const r = order.indexOf(id);
@@ -374,13 +374,13 @@ export interface Move {
 }
 
 /** Who climbed and who fell since `since`, comparing the ranking then with now. Null if too little was played by then. */
-export function movers(votes: Vote[], seenIds: string[], since: number, count = 3, minDuelsBefore = 30) {
+export function movers(votes: Vote[], seenIds: string[], since: number, count = 3, minDuelsBefore = 30, within?: Set<string>) {
   const sorted = byTime(votes);
   const before = sorted.filter((v) => v.at <= since);
   const after = sorted.filter((v) => v.at > since);
   if (before.length < minDuelsBefore || after.length === 0) return null;
-  const then = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: before }));
-  const now = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: sorted }));
+  const then = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: before }), within);
+  const now = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: sorted }), within);
   const thenRank = new Map(then.map((id, i) => [id, i + 1]));
   const moves: Move[] = [];
   now.forEach((id, i) => {

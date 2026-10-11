@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { CATALOGUE_SIZE, MANGA_SIZE } from '../anilist/catalogue';
 import { fromExport, type Snapshot } from '../store/store';
 import type { AppState } from './useApp';
+import { ViewSwitch } from './ViewSwitch';
 
 export function SettingsScreen({ app }: { app: AppState }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,15 +60,15 @@ export function SettingsScreen({ app }: { app: AppState }) {
             </button>
           ))}
         </div>
-        <label className="check">
-          <input
-            id="include-manga"
-            type="checkbox"
-            checked={app.settings.manga}
-            onChange={(e) => app.setSettings({ ...app.settings, manga: e.target.checked })}
-          />
-          Include manga. A manga counts towards its anime's title; manga with no anime get titles of their own.
-        </label>
+      </section>
+
+      <section>
+        <h3>Anime, manga or both</h3>
+        <ViewSwitch app={app} />
+        <p>
+          One ranking underneath. The anime view shows what you've watched, the manga view what you've read, and both shows
+          everything. For a title that exists as both, Sort asks which you know. Duels only use titles in the view.
+        </p>
       </section>
 
       <section>

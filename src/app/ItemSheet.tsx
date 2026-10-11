@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import { Cover } from './Cover';
-import { anilistUrl, markWords, metaLine } from './meta';
+import { choicesFor, chosen, formUnknown } from '../rank/medium';
+import { anilistUrl, metaLine } from './meta';
 import { Regroup } from './Regroup';
 import type { AppState } from './useApp';
 
@@ -17,7 +18,8 @@ export function ItemSheet({
   onOpen: (id: string) => void;
 }) {
   const item = app.itemById.get(itemId);
-  const mark = app.marks.get(itemId);
+  // The sheet shows everything known about the title, whichever view is on.
+  const fullMark = app.allMarks.get(itemId);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -77,19 +79,21 @@ export function ItemSheet({
         </div>
 
         <div className="action-row">
-          <button className="btn" aria-pressed={mark?.status === 'seen'} onClick={() => app.markItem(itemId, 'seen')}>
-            {markWords(app.settings).seen}
-          </button>
-          <button className="btn" aria-pressed={mark?.status === 'unseen'} onClick={() => app.markItem(itemId, 'unseen')}>
-            {markWords(app.settings).unseen}
-          </button>
-          {mark && (
-            <button className="btn btn-quiet" onClick={() => app.clearMark(itemId)}>
+          {choicesFor(item, 'both').map((c) => (
+            <button key={c.label} className="btn" aria-pressed={chosen(item, fullMark, c)} onClick={() => app.answer(itemId, c.answer)}>
+              {c.label}
+            </button>
+          ))}
+          {fullMark && (
+            <button className="btn btn-quiet" onClick={() => app.clearMark(itemId, 'sort', true)}>
               Unmark
             </button>
           )}
         </div>
-        {!mark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
+        {formUnknown(item, fullMark) && (
+          <p className="hint">You marked this as seen before manga was added. Say whether you watched it, read it, or both.</p>
+        )}
+        {!fullMark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
           <p className="hint">Split off from another title. Mark whether you've seen it.</p>
         )}
         <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />

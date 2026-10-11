@@ -106,7 +106,7 @@ a {
 }
 @media (max-width: 719px) {
   .topbar {
-    justify-content: center;
+    justify-content: space-between;
   }
   .tabs {
     position: fixed;
@@ -1106,4 +1106,22 @@ a {
 }
 .entry-list .check {
   color: var(--ink);
+}
+
+/* Anime / manga / both */
+.view-switch {
+  padding: 3px;
+  align-self: center;
+}
+.view-switch button {
+  padding: 5px 11px;
+  font-size: 0.8rem;
+}
+.action-row.choices-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.action-row.choices-4 .btn {
+  padding-inline: 4px;
 }

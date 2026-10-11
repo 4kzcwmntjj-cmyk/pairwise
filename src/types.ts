@@ -46,9 +46,21 @@ export interface Item {
 
 export interface Mark {
   itemId: string;
+  /** Seen in any form (watched or read), or not. */
   status: Status;
   updatedAt: number;
+  /**
+   * For titles with both an anime and a manga: whether you've watched it and
+   * whether you've read it. Undefined means not asked. Titles with only one
+   * form, and marks made before forms were recorded, have neither.
+   */
+  anime?: boolean;
+  manga?: boolean;
 }
+
+/** Which titles the app is showing: anime, manga, or everything. */
+export type View = 'anime' | 'manga' | 'both';
+export type Medium = 'anime' | 'manga';
 
 export type Outcome = 'a' | 'b' | 'tie';
 export type DuelMode = 'place' | 'refine' | 'explore';
@@ -65,8 +77,7 @@ export interface Vote {
 export interface Settings {
   titleLanguage: 'english' | 'romaji';
   sortMode: 'grid' | 'single';
-  /** Include manga: manga-only titles appear, and Sort asks "seen or read". */
-  manga: boolean;
+  view: View;
 }
 
-export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'single', manga: true };
+export const DEFAULT_SETTINGS: Settings = { titleLanguage: 'english', sortMode: 'single', view: 'both' };

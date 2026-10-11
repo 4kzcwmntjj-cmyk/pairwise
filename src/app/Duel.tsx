@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import type { Item, Outcome } from '../types';
 import { Cover } from './Cover';
-import { metaLine } from './meta';
+import { metaLine, viewWords } from './meta';
 import type { AppState } from './useApp';
 
 export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
@@ -71,7 +71,7 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
             if (!picked) app.markItem(item.id, 'unseen', 'duel');
           }}
         >
-          Haven't seen
+          {viewWords(app.view).unseen}
         </button>
       </div>
     );

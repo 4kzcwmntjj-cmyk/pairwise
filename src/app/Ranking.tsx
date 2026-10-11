@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { isSettled as isSettledIn } from '../rank/stats';
 import type { Item, Status } from '../types';
 import { Cover } from './Cover';
-import { years } from './meta';
+import { formsOf, formUnknown, knownIn } from '../rank/medium';
+import { viewWords, years } from './meta';
 import type { AppState } from './useApp';
 
 type View = 'ranked' | 'unseen';
@@ -24,6 +25,14 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
     };
   }, [app.fit, app.marks, app.itemById]);
 
+  // For titles with both forms, in the both view: how you know them.
+  const formLabel = (item: Item) => {
+    const m = app.allMarks.get(item.id);
+    if (formUnknown(item, m)) return 'watched or read?';
+    const a = knownIn(item, m, 'anime');
+    const r = knownIn(item, m, 'manga');
+    return a && r ? 'watched and read' : a ? 'watched' : r ? 'read' : '';
+  };
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
   const q = query.trim().toLowerCase();
@@ -38,7 +47,7 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           {(
             [
               ['ranked', `Ranked (${lists.ranked.length})`],
-              ['unseen', `Haven't seen (${lists.unseen.length})`],
+              ['unseen', `${viewWords(app.view).unseen} (${lists.unseen.length})`],
             ] as const
           ).map(([v, label]) => (
             <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
@@ -86,6 +95,9 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
                           {' · '}
                           {duels === 0 ? 'no duels' : duels === 1 ? '1 duel' : `${duels} duels`}
                           {isSettled ? ', settled' : ''}
+                          {app.view === 'both' && formsOf(item).anime && formsOf(item).manga && (
+                            <>{' · '}{formLabel(item)}</>
+                          )}
                         </>
                       )}
                     </span>

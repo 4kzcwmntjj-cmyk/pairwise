@@ -1,5 +1,5 @@
 import { describeFormats } from '../anilist/group';
-import type { Item, Settings } from '../types';
+import type { Item, View } from '../types';
 
 export function years(item: Item) {
   if (!item.startYear) return '';
@@ -28,6 +28,10 @@ const FORMAT_LABEL: Record<string, string> = {
 };
 export const formatLabel = (format: string) => FORMAT_LABEL[format] ?? 'Other';
 
-/** Button wording for marking a title, which depends on whether manga is included. */
-export const markWords = (settings: Settings) =>
-  settings.manga ? { seen: 'Seen or read it', unseen: 'Neither' } : { seen: 'Seen it', unseen: "Haven't seen" };
+/** How the view talks about knowing a title. */
+export const viewWords = (view: View) =>
+  view === 'anime'
+    ? { seen: 'watched', unseen: "Haven't watched" }
+    : view === 'manga'
+      ? { seen: 'read', unseen: "Haven't read" }
+      : { seen: 'seen', unseen: "Haven't seen" };

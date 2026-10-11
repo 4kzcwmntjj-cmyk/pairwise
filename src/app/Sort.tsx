@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isMangaOnly } from '../anilist/group';
+import { choicesFor } from '../rank/medium';
 import { seenModel } from '../rank/seen';
 import type { Item } from '../types';
 import { Add } from './Add';
 import { Cover } from './Cover';
-import { markWords, metaLine, years } from './meta';
+import { metaLine, years } from './meta';
 import type { AppState } from './useApp';
 
 const PAGE = 60;
@@ -109,9 +110,11 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
   return (
     <>
       <p className="hint">
-        {app.settings.manga
-          ? "Tap once if you've seen or read it, twice if not, a third time to clear."
-          : "Tap once for seen, twice for haven't seen, a third time to clear."}{' '}
+        {app.view === 'anime'
+          ? "Tap once if you've watched it, twice if not, a third time to clear."
+          : app.view === 'manga'
+            ? "Tap once if you've read it, twice if not, a third time to clear."
+            : "Tap once if you've seen or read it, twice if not, a third time to clear."}{' '}
         Duels work out the order.
       </p>
       <div className="grid-tools">
@@ -201,7 +204,7 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
     const unmarked = app.items.filter((i) => !app.marks.has(i.id)).sort((a, b) => p(b) - p(a) || b.popularity - a.popularity);
     const order = new Map(app.skipped.map((id, i) => [id, i]));
     let fresh = unmarked.filter((i) => !skipped.has(i.id));
-    if (app.settings.manga) {
+    if (app.view === 'both') {
       const isMangaId = (id: string) => {
         const it = app.itemById.get(id);
         return !!it && isMangaOnly(it);
@@ -220,7 +223,7 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
       ...fresh,
       ...unmarked.filter((i) => skipped.has(i.id)).sort((a, b) => order.get(a.id)! - order.get(b.id)!),
     ];
-  }, [app.items, app.itemById, app.marks, app.skipped, app.settings.manga, model]);
+  }, [app.items, app.itemById, app.marks, app.skipped, app.view, model]);
 
   const recentHits = useMemo(() => {
     const recent = [...app.marks.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT);
@@ -239,8 +242,11 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
     function onKey(e: KeyboardEvent) {
       if (!item || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
       const k = e.key.toLowerCase();
-      if (k === 'y' || k === 'enter' || k === 'arrowleft') app.markItem(item.id, 'seen');
-      else if (k === 'n' || k === 'arrowright') app.markItem(item.id, 'unseen');
+      const choices = choicesFor(item, app.view);
+      const choice =
+        choices.find((c) => c.key === k) ??
+        (k === 'enter' || k === 'arrowleft' || k === 'y' ? choices[0] : k === 'arrowright' ? choices[choices.length - 1] : undefined);
+      if (choice) app.answer(item.id, choice.answer);
       else if (k === 's') app.skipSort(item.id);
       else if (k === 'backspace' || k === 'z') app.undo('sort');
       else return;
@@ -294,13 +300,17 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
         <h2 className="item-title">{title}</h2>
         <p className="item-meta">{metaLine(item)}</p>
       </div>
-      <div className="action-row">
-        <button className="btn btn-primary" onClick={() => app.markItem(item.id, 'seen')} title="Key Y">
-          {markWords(app.settings).seen}
-        </button>
-        <button className="btn" onClick={() => app.markItem(item.id, 'unseen')} title="Key N">
-          {markWords(app.settings).unseen}
-        </button>
+      <div className={`action-row choices-${choicesFor(item, app.view).length}`}>
+        {choicesFor(item, app.view).map((c, i) => (
+          <button
+            key={c.label}
+            className={i === 0 ? 'btn btn-primary' : 'btn'}
+            onClick={() => app.answer(item.id, c.answer)}
+            title={`Key ${c.key.toUpperCase()}`}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
       <div className="action-row">
         <button className="btn btn-quiet" onClick={() => app.skipSort(item.id)} title="Key S">

@@ -17,17 +17,17 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
   const q = query.trim().toLowerCase();
   const local = useMemo(() => {
     if (q.length < 2) return [];
-    return app.items
+    return app.allItems
       .filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)))
       .sort((a, b) => b.popularity - a.popularity)
       .slice(0, 20);
-  }, [q, app.items]);
+  }, [q, app.allItems]);
 
   const entryOwner = useMemo(() => {
     const m = new Map<number, Item>();
-    for (const i of app.items) for (const e of i.entryIds) m.set(e, i);
+    for (const i of app.allItems) for (const e of i.entryIds) m.set(e, i);
     return m;
-  }, [app.items]);
+  }, [app.allItems]);
 
   async function search() {
     if (!q) return;

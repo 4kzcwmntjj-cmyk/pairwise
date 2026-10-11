@@ -7,6 +7,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { Sort } from './Sort';
 import { Stats } from './Stats';
 import { useApp } from './useApp';
+import { ViewSwitch } from './ViewSwitch';
 import { Welcome } from './Welcome';
 
 type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
@@ -49,6 +50,7 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <span className="wordmark">Shōbu</span>
+        <ViewSwitch app={app} compact />
         <nav className="tabs" aria-label="Sections">
           {TABS.map(([t, label]) => (
             <button key={t} className={current === t ? 'on' : ''} aria-current={current === t ? 'page' : undefined} onClick={() => setTab(t)}>

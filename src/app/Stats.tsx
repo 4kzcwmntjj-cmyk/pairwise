@@ -36,13 +36,15 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
     () => fit.order.filter((id) => (fit.duels.get(id) ?? 0) > 0).map((id) => app.itemById.get(id)!).filter(Boolean),
     [fit, app.itemById],
   );
-  const seenIds = useMemo(() => [...marks.values()].filter((m) => m.status === 'seen').map((m) => m.itemId), [marks]);
+  // The fit runs over everything you've seen; ranks are counted within the current view.
+  const seenIds = app.seenIds;
+  const within = useMemo(() => new Set(fit.order), [fit]);
   const now = useMemo(() => Date.now(), [votes]);
 
   const over = useMemo(() => overview(votes, marks, now), [votes, marks, now]);
   const top10 = useMemo(() => ranked.slice(0, 10).map((i) => i.id), [ranked]);
-  const points = useMemo(() => history(votes, seenIds, top10), [votes, seenIds, top10]);
-  const week = useMemo(() => movers(votes, seenIds, now - 7 * 86_400_000), [votes, seenIds, now]);
+  const points = useMemo(() => history(votes, seenIds, top10, 12, within), [votes, seenIds, top10, within]);
+  const week = useMemo(() => movers(votes, seenIds, now - 7 * 86_400_000, 3, 30, within), [votes, seenIds, now, within]);
   const unlocked = enoughForTaste(ranked.length, votes.length);
   const taste = useMemo(() => {
     if (!unlocked) return null;
