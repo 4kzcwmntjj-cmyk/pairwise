@@ -1,0 +1,49 @@
+name: Refresh catalogue
+
+# Fetches the most popular anime from AniList on GitHub's servers and saves
+# them as public/catalogue.json, so the app never downloads them on a phone.
+# Runs monthly, whenever the fetching code changes, and on demand
+# (Actions tab → Refresh catalogue → Run workflow).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 1 * *'
+  push:
+    branches: [main]
+    paths:
+      - scripts/build-catalogue.ts
+      - src/anilist/**
+      - .github/workflows/catalogue.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalogue
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vite-node scripts/build-catalogue.ts
+      - name: Commit the new catalogue
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/catalogue.json
+          if git diff --cached --quiet; then
+            echo "Catalogue unchanged."
+            exit 0
+          fi
+          git commit -m "Refresh the anime catalogue from AniList"
+          git pull --rebase origin main
+          git push origin HEAD:main
