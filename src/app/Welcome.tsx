@@ -6,12 +6,14 @@ import type { AppState } from './useApp';
 
 export function Welcome({ app }: { app: AppState }) {
   const [progress, setProgress] = useState<LoadProgress | null>(null);
+  const startedAt = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setError(null);
     setProgress({ loaded: 0, total: CATALOGUE_SIZE });
+    startedAt.current = Date.now();
     try {
       const media = await fetchCatalogue(setProgress);
       if (media.length === 0) throw new Error('AniList sent back no titles. Wait a minute and try again.');
@@ -30,7 +32,14 @@ export function Welcome({ app }: { app: AppState }) {
     }
   }
 
-  const secondsLeft = progress ? Math.ceil(((progress.total - progress.loaded) / 40) * 2.1) : 0;
+  // Estimate from the rate so far once a few pages are in; before that, assume about 15 titles a second.
+  let timeLeft = '';
+  if (progress) {
+    const elapsed = (Date.now() - startedAt.current) / 1000;
+    const rate = progress.loaded >= 120 && elapsed > 0 ? progress.loaded / elapsed : 15;
+    const secs = Math.max(5, Math.round((progress.total - progress.loaded) / rate / 5) * 5);
+    timeLeft = secs >= 90 ? `About ${Math.round(secs / 60)} minutes left.` : `About ${secs} seconds left.`;
+  }
 
   return (
     <main className="welcome">
@@ -50,7 +59,7 @@ export function Welcome({ app }: { app: AppState }) {
           <p>
             {progress.waitingSeconds
               ? `AniList asked us to slow down. Resuming in ${progress.waitingSeconds} seconds.`
-              : `Loaded ${progress.loaded.toLocaleString()} of ${progress.total.toLocaleString()} titles from AniList. About ${secondsLeft} seconds left.`}
+              : `Loaded ${progress.loaded.toLocaleString()} of ${progress.total.toLocaleString()} titles from AniList. ${timeLeft}`}
           </p>
         </div>
       ) : (
@@ -58,7 +67,7 @@ export function Welcome({ app }: { app: AppState }) {
           <button className="btn btn-primary" onClick={load}>
             Load the {CATALOGUE_SIZE.toLocaleString()} most popular anime
           </button>
-          <p className="hint">This happens once and takes about a minute and a half. Seasons and films are grouped into one entry per series.</p>
+          <p className="hint">This happens once and takes two or three minutes. Keep this page open while it loads. Seasons and films are grouped into one entry per series.</p>
           <button className="btn btn-quiet" onClick={() => fileRef.current?.click()}>
             Restore from a saved file
           </button>

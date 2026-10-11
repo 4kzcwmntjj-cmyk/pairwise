@@ -14,7 +14,7 @@ export function Cover({ item, title, size = 'md' }: { item: Item; title: string;
     <div className={`cover cover-${size}`} style={{ backgroundColor: item.coverColor ?? undefined }}>
       {item.cover && !failed ? (
         <img
-          src={item.cover}
+          src={size === 'lg' ? item.coverLarge ?? item.cover : item.cover}
           alt=""
           loading={size === 'sm' ? 'lazy' : 'eager'}
           decoding="async"

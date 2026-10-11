@@ -11,7 +11,7 @@ const FIELDS = `
   startDate { year }
   popularity
   averageScore
-  coverImage { large color }
+  coverImage { large extraLarge color }
   studios(isMain: true) { nodes { name } }
   relations { edges { relationType(version: 2) node { id type } } }
 `;

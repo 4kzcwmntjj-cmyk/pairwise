@@ -31,7 +31,7 @@ describe('groupFranchises', () => {
     expect(show.startYear).toBe(2013);
     expect(show.endYear).toBe(2016);
     expect(show.popularity).toBe(2000);
-    expect(describeFormats(show.formats)).toBe('2 series, 1 film');
+    expect(describeFormats(show.formats)).toBe('2 seasons, 1 film');
   });
 
   it('bridges a missing middle season but not a missing spin-off', () => {

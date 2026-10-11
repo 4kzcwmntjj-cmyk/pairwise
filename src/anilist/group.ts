@@ -8,7 +8,7 @@ export interface RawMedia {
   startDate: { year: number | null } | null;
   popularity: number | null;
   averageScore: number | null;
-  coverImage: { large: string | null; color: string | null } | null;
+  coverImage: { large: string | null; extraLarge?: string | null; color: string | null } | null;
   studios: { nodes: { name: string }[] } | null;
   relations: { edges: { relationType: string; node: { id: number; type: string } }[] } | null;
 }
@@ -96,6 +96,7 @@ export function toItem(members: RawMedia[], oldIdByEntry = new Map<number, strin
     endYear: years.length ? Math.max(...years) : undefined,
     studio: rep.studios?.nodes[0]?.name ?? top.studios?.nodes[0]?.name,
     cover: rep.coverImage?.large ?? undefined,
+    coverLarge: rep.coverImage?.extraLarge ?? undefined,
     coverColor: rep.coverImage?.color ?? undefined,
     popularity: top.popularity ?? 0,
     averageScore: top.averageScore ?? undefined,
@@ -132,7 +133,7 @@ export function describeFormats(formats: string[]): string {
   const series = count(['TV', 'TV_SHORT', 'ONA']);
   const films = count(['MOVIE']);
   const extras = count(['OVA', 'SPECIAL', 'MUSIC']);
-  if (series) parts.push(series === 1 ? '1 series' : `${series} series`);
+  if (series) parts.push(series === 1 ? '1 season' : `${series} seasons`);
   if (films) parts.push(films === 1 ? '1 film' : `${films} films`);
   if (extras) parts.push(extras === 1 ? '1 extra' : `${extras} extras`);
   return parts.join(', ');

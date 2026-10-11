@@ -21,6 +21,8 @@ export interface Item {
   endYear?: number;
   studio?: string;
   cover?: string;
+  /** Higher-resolution cover for large cards. */
+  coverLarge?: string;
   coverColor?: string;
   /** AniList popularity of the most popular entry. */
   popularity: number;

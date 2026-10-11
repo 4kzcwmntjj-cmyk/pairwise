@@ -1,6 +1,6 @@
 const ENDPOINT = 'https://graphql.anilist.co';
-/** AniList currently allows 30 requests a minute; stay just under it. */
-const MIN_INTERVAL_MS = 2100;
+/** AniList currently allows 30 requests a minute; stay under it with room for its burst limiter. */
+const MIN_INTERVAL_MS = 2600;
 
 let lastCall = 0;
 let chain: Promise<unknown> = Promise.resolve();
