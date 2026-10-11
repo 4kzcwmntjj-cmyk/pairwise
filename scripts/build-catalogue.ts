@@ -45,9 +45,14 @@ async function main() {
   };
   writeFileSync(OUT, JSON.stringify(file));
   console.log(`Wrote ${items.length} franchises from ${media.length} entries to ${OUT}`);
+  if (process.env.GITHUB_ACTIONS) {
+    console.log(`::notice title=Catalogue built::${items.length} franchises from ${media.length} entries in ${Math.round((Date.now() - started) / 1000)}s`);
+  }
 }
 
 main().catch((e) => {
   console.error(e);
+  // Annotations show on the workflow run page and through the API.
+  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Catalogue build failed::${String((e as Error)?.message ?? e)}`);
   process.exit(1);
 });
