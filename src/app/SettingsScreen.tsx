@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
-import { CATALOGUE_SIZE, fetchCatalogue, type LoadProgress } from '../anilist/catalogue';
-import { groupFranchises } from '../anilist/group';
+import { CATALOGUE_SIZE } from '../anilist/catalogue';
 import { fromExport, toExport, type Snapshot } from '../store/store';
 import type { AppState } from './useApp';
 
@@ -8,7 +7,7 @@ export function SettingsScreen({ app }: { app: AppState }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<{ kind: 'import'; snapshot: Snapshot } | { kind: 'reset' } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [refresh, setRefresh] = useState<LoadProgress | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   function exportData() {
     const blob = new Blob([JSON.stringify(toExport(app.snapshot()))], { type: 'application/json' });
@@ -32,17 +31,14 @@ export function SettingsScreen({ app }: { app: AppState }) {
 
   async function refreshCatalogue() {
     setMessage(null);
-    setRefresh({ loaded: 0, total: CATALOGUE_SIZE });
+    setRefreshing(true);
     try {
-      const media = await fetchCatalogue(setRefresh);
-      const before = app.items.length;
-      const grouped = groupFranchises(media, app.items.filter((i) => i.source === 'anilist'));
-      await app.saveItems(grouped);
-      setMessage(`Catalogue refreshed. ${Math.max(0, grouped.length - before)} new titles.`);
+      const added = await app.syncCatalogue(true);
+      setMessage(added === 0 ? 'Catalogue is up to date.' : `Catalogue updated: ${added} new titles.`);
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
-      setRefresh(null);
+      setRefreshing(false);
     }
   }
 
@@ -123,18 +119,13 @@ export function SettingsScreen({ app }: { app: AppState }) {
       <section>
         <h3>Catalogue</h3>
         <p>
-          {app.items.length.toLocaleString()} titles. Refreshing fetches the current {CATALOGUE_SIZE.toLocaleString()} most popular
-          from AniList and adds new ones. Your sorting and duels are kept.
+          {app.items.length.toLocaleString()} titles, built from AniList's {CATALOGUE_SIZE.toLocaleString()} most popular anime
+          {app.catalogueAt ? ` on ${new Date(app.catalogueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.
+          The list is rebuilt monthly and new titles are added when you open the app. Your sorting and duels are kept.
         </p>
-        {refresh ? (
-          <p role="status">
-            Loaded {refresh.loaded.toLocaleString()} of {refresh.total.toLocaleString()}…
-          </p>
-        ) : (
-          <button className="btn" onClick={refreshCatalogue}>
-            Refresh catalogue
-          </button>
-        )}
+        <button className="btn" onClick={refreshCatalogue} disabled={refreshing}>
+          {refreshing ? 'Checking…' : 'Check for new titles'}
+        </button>
       </section>
 
       <section>

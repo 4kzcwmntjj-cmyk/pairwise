@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalStore, type Snapshot } from '../store/store';
+import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { nextPair, pairKey, type Pair } from '../rank/pairs';
 import { TIER_ANCHOR, type Item, type Mark, type Outcome, type Settings, type Status, type Tier, type Vote } from '../types';
@@ -30,6 +31,7 @@ export function useApp() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [settings, setSettingsState] = useState<Settings>({ titleLanguage: 'english' });
   const [skipped, setSkipped] = useState<string[]>([]);
+  const [catalogueAt, setCatalogueAt] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [pair, setPair] = useState<Pair | null>(null);
   const [skippedPairs, setSkippedPairs] = useState<Set<string>>(new Set());
@@ -42,6 +44,7 @@ export function useApp() {
     setVotes(s.votes);
     setSettingsState(s.settings);
     setSkipped((s.meta.skipped as string[]) ?? []);
+    setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
     setUndoStack([]);
     setPair(null);
   }, []);
@@ -189,6 +192,25 @@ export function useApp() {
     await store.putItems(next);
   }, []);
 
+  /**
+   * Brings in the catalogue shipped with the site. Without `force`, does
+   * nothing unless the shipped file is newer than the one last merged.
+   * Returns how many titles were new to this device.
+   */
+  const syncCatalogue = useCallback(
+    async (force = false) => {
+      const file = await loadCatalogueFile();
+      if (!force && catalogueAt && file.generatedAt <= catalogueAt) return 0;
+      const known = new Set(items.map((i) => i.id));
+      const merged = mergeCatalogue(items, file.items);
+      await saveItems(merged);
+      await store.setMeta('catalogueGeneratedAt', file.generatedAt);
+      setCatalogueAt(file.generatedAt);
+      return merged.filter((i) => !known.has(i.id)).length;
+    },
+    [items, catalogueAt, saveItems],
+  );
+
   const replaceAll = useCallback(
     async (s: Snapshot) => {
       await store.replaceAll(s);
@@ -204,8 +226,14 @@ export function useApp() {
   }, [applySnapshot, settings]);
 
   const snapshot = useCallback(
-    (): Snapshot => ({ items, marks: [...marks.values()], votes, settings, meta: { skipped } }),
-    [items, marks, votes, settings, skipped],
+    (): Snapshot => ({
+      items,
+      marks: [...marks.values()],
+      votes,
+      settings,
+      meta: { skipped, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+    }),
+    [items, marks, votes, settings, skipped, catalogueAt],
   );
 
   return {
@@ -230,6 +258,8 @@ export function useApp() {
     undo,
     setSettings,
     saveItems,
+    syncCatalogue,
+    catalogueAt,
     replaceAll,
     resetAll,
     snapshot,

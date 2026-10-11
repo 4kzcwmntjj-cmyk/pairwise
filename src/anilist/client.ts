@@ -1,6 +1,13 @@
 const ENDPOINT = 'https://graphql.anilist.co';
 /** AniList currently allows 30 requests a minute; stay under it with room for its burst limiter. */
-const MIN_INTERVAL_MS = 2600;
+let minIntervalMs = 2600;
+let maxAttempts = 4;
+
+/** The catalogue build script runs unattended and can afford to wait longer. */
+export function configureClient(opts: { minIntervalMs?: number; attempts?: number }) {
+  minIntervalMs = opts.minIntervalMs ?? minIntervalMs;
+  maxAttempts = opts.attempts ?? maxAttempts;
+}
 
 let lastCall = 0;
 let chain: Promise<unknown> = Promise.resolve();
@@ -19,8 +26,8 @@ export class AniListError extends Error {
 /** Runs one GraphQL query, queued so calls never exceed the rate limit. */
 export function gql<T>(query: string, variables: Record<string, unknown>, onWait?: (s: number) => void): Promise<T> {
   const run = async (): Promise<T> => {
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const gap = lastCall + MIN_INTERVAL_MS - Date.now();
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const gap = lastCall + minIntervalMs - Date.now();
       if (gap > 0) await sleep(gap);
       lastCall = Date.now();
       let res: Response;
@@ -31,12 +38,20 @@ export function gql<T>(query: string, variables: Record<string, unknown>, onWait
           body: JSON.stringify({ query, variables }),
         });
       } catch {
+        if (attempt < maxAttempts - 1) {
+          await sleep(5000);
+          continue;
+        }
         throw new AniListError('Could not reach AniList. Check your connection and try again.', 'network');
       }
       if (res.status === 429) {
         const wait = Number(res.headers.get('Retry-After')) || 60;
         onWait?.(wait);
         await sleep(wait * 1000 + 500);
+        continue;
+      }
+      if (res.status >= 500 && attempt < maxAttempts - 1) {
+        await sleep(10000);
         continue;
       }
       const body = await res.json().catch(() => null);

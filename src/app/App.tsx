@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Add } from './Add';
 import { Duel } from './Duel';
 import { ItemSheet } from './ItemSheet';
@@ -23,8 +23,17 @@ export function App() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Pick the opening screen once, when data first loads; after that only the person changes tabs.
   const hasItems = app.items.length > 0;
+
+  // Bring in a newer catalogue, if the site has one, once per launch.
+  const synced = useRef(false);
+  useEffect(() => {
+    if (!app.ready || !hasItems || synced.current) return;
+    synced.current = true;
+    app.syncCatalogue().catch(() => undefined);
+  });
+
+  // Pick the opening screen once, when data first loads; after that only the person changes tabs.
   useEffect(() => {
     if (app.ready && hasItems && tab === null) setTab(seen >= 2 ? 'duel' : 'sort');
   }, [app.ready, hasItems, tab, seen]);
