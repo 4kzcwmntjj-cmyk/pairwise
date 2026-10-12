@@ -1519,3 +1519,13 @@ main.sort {
   text-align: center;
   margin: 0;
 }
+.share-preview-details {
+  max-height: 28vh;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+.share-preview-details ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  text-align: left;
+}

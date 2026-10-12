@@ -17,7 +17,7 @@ interface Props {
   /** File name without extension. */
   filename: string;
   /** Draws the picture. Called again when the option changes or Try again is pressed. `note` is shown as a warning. */
-  make: (option: string) => Promise<{ blob: Blob; note?: string }>;
+  make: (option: string) => Promise<{ blob: Blob; note?: string; details?: string[] }>;
   options?: ShareOption[];
   onClose: () => void;
 }
@@ -28,6 +28,7 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [details, setDetails] = useState<string[] | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const makeRef = useRef(make);
@@ -45,15 +46,17 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
     setBlob(null);
     setError(null);
     setNote(null);
+    setDetails(null);
     setStatus(null);
     makeRef
       .current(option)
-      .then(({ blob: b, note: n }) => {
+      .then(({ blob: b, note: n, details: d }) => {
         if (cancelled) return;
         made = URL.createObjectURL(b);
         setBlob(b);
         setUrl(made);
         setNote(n ?? null);
+        setDetails(d ?? null);
       })
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
@@ -138,6 +141,16 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
       <p className="hint share-preview-note" role="status">
         {status ?? 'You can also press and hold the picture, or take a screenshot.'}
       </p>
+      {details && (
+        <details className="hint share-preview-details">
+          <summary>Details</summary>
+          <ul>
+            {details.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /** Draws the top of your list as a picture to send to someone. */
 
-import { loadCovers, type Drawable } from './coverLoader';
+import { decodeAsImage, loadCovers, type Drawable } from './coverLoader';
 
 export interface ShareRow {
   rank: number;
@@ -67,7 +67,10 @@ function drawCover(ctx: CanvasRenderingContext2D, img: Drawable, x: number, y: n
   ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
 
-function coverBox(ctx: CanvasRenderingContext2D, row: ShareRow, img: Cover, x: number, y: number, w: number, h: number, r: number) {
+type Box = { x: number; y: number; w: number; h: number };
+
+function coverBox(ctx: CanvasRenderingContext2D, row: ShareRow, img: Cover, x: number, y: number, w: number, h: number, r: number, boxes?: Box[], i?: number) {
+  if (boxes && i !== undefined) boxes[i] = { x, y, w, h };
   ctx.save();
   round(ctx, x, y, w, h, r);
   ctx.clip();
@@ -108,7 +111,7 @@ const CELL_W = Math.floor((SHARE_WIDTH - PAD * 2 - 3 * 20) / 4);
 const CELL_COVER_H = Math.round((CELL_W * 3) / 2);
 const GRID_CELL_H = CELL_COVER_H + 12 + 2 * 26;
 
-function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[]) {
+function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], boxes: Box[]) {
   const measure = (s: string) => ctx.measureText(s).width;
   rows.forEach((row, i) => {
     let x: number, y: number, w: number, h: number, titleSize: number, lineH: number, lines: number;
@@ -130,7 +133,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
       lineH = 26;
       lines = 2;
     }
-    coverBox(ctx, row, covers[i], x, y, w, h, 14);
+    coverBox(ctx, row, covers[i], x, y, w, h, 14, boxes, i);
     badge(ctx, row.rank, x + 10, y + 10, i < 3 ? 56 : 44, i < 3);
 
     ctx.fillStyle = INK;
@@ -148,7 +151,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
   });
 }
 
-function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], height: number) {
+function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], height: number, boxes: Box[]) {
   const top = 168;
   const bottom = height - 96;
   const gap = 12;
@@ -170,7 +173,7 @@ function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     ctx.textAlign = 'left';
 
     const cx = PAD + 112;
-    coverBox(ctx, row, covers[i], cx, y + 6, coverW, coverH, 10);
+    coverBox(ctx, row, covers[i], cx, y + 6, coverW, coverH, 10, boxes, i);
 
     const tx = cx + coverW + 28;
     const tw = SHARE_WIDTH - PAD - 28 - tx;
@@ -193,8 +196,22 @@ function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
 
 export interface ShareResult {
   blob: Blob;
-  /** Rows that had a cover address but no cover could be loaded. */
+  /** Rows that had a cover address but no cover ended up in the picture. */
   missing: number;
+  /** One line per row saying how its cover went. */
+  details: string[];
+}
+
+/** True when the box holds one flat colour, i.e. no picture was drawn into it. */
+function isFlat(ctx: CanvasRenderingContext2D, b: Box): boolean {
+  const first = ctx.getImageData(Math.round(b.x + b.w * 0.5), Math.round(b.y + b.h * 0.5), 1, 1).data;
+  for (let fy = 1; fy <= 5; fy++) {
+    for (let fx = 1; fx <= 5; fx++) {
+      const d = ctx.getImageData(Math.round(b.x + (b.w * fx) / 6), Math.round(b.y + (b.h * fy) / 6), 1, 1).data;
+      if (Math.abs(d[0] - first[0]) + Math.abs(d[1] - first[1]) + Math.abs(d[2] - first[2]) > 12) return false;
+    }
+  }
+  return true;
 }
 
 export async function renderTop(rows: ShareRow[], heading: string, layout: ShareLayout = 'grid'): Promise<ShareResult> {
@@ -203,8 +220,9 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   } catch {
     // Fall back to the system fonts.
   }
-  const covers = await loadCovers(rows.map((r) => r.cover));
-  const missing = rows.filter((r, i) => r.cover && !covers[i]).length;
+  const results = await loadCovers(rows.map((r) => r.cover));
+  const covers: Cover[] = results.map((r) => r.img);
+  const details = rows.map((r, i) => `${r.rank}. ${r.title}: ${results[i].how}`);
 
   const height = shareHeight(layout, rows.length);
   const canvas = document.createElement('canvas');
@@ -219,8 +237,31 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   ctx.font = `600 52px ${DISPLAY}`;
   ctx.fillText(heading, PAD, 112);
 
-  if (layout === 'grid') drawGrid(ctx, rows, covers);
-  else drawList(ctx, rows, covers, height);
+  const boxes: Box[] = [];
+  if (layout === 'grid') drawGrid(ctx, rows, covers, boxes);
+  else drawList(ctx, rows, covers, height, boxes);
+
+  // A cover can decode yet draw as nothing; check, and redraw through an <img> if so.
+  let missing = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row.cover) continue;
+    const box = boxes[i];
+    if (covers[i] && box && !isFlat(ctx, box)) continue;
+    if (covers[i] && box) {
+      details[i] += '; drew blank';
+      const alt = await decodeAsImage(row.cover);
+      if (alt) {
+        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, layout === 'grid' ? 14 : 10);
+        if (!isFlat(ctx, box)) {
+          details[i] += '; fixed by redrawing from an image element';
+          continue;
+        }
+        details[i] += '; still blank';
+      }
+    }
+    missing++;
+  }
 
   ctx.fillStyle = MUTED;
   ctx.font = `600 26px ${DISPLAY}`;
@@ -233,7 +274,7 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => {
       for (const c of covers) (c as ImageBitmap | null)?.close?.();
-      if (b) resolve({ blob: b, missing });
+      if (b) resolve({ blob: b, missing, details });
       else reject(new Error('Could not draw the picture.'));
     }, 'image/png'),
   );
