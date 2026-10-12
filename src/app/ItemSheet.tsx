@@ -47,6 +47,7 @@ export function ItemSheet({
   const duels = app.fit.duels.get(itemId) ?? 0;
   const look = app.look(item);
   const url = look.url;
+  const hidden = item.entryIds.some((e) => app.dismissed.includes(String(e)));
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -78,8 +79,8 @@ export function ItemSheet({
           </div>
         </div>
 
-        {choicesFor(item, 'both').length === 4 && <p className="sheet-label">Which have you seen?</p>}
-        <div className="action-row">
+        <h3 className="sheet-label">{choicesFor(item, 'both').length === 4 ? 'Which have you seen?' : 'Have you seen it?'}</h3>
+        <div className="action-row start">
           {choicesFor(item, 'both').map((c) => (
             <button key={c.label} className="btn" aria-pressed={chosen(item, fullMark, c)} onClick={() => app.answer(itemId, c.answer)}>
               {c.label}
@@ -98,6 +99,26 @@ export function ItemSheet({
           <p className="hint">Split off from another title. Mark whether you've seen it.</p>
         )}
         <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />
+        {fullMark?.status !== 'seen' && item.source === 'anilist' && (
+          <section className="sheet-section">
+            <h3 className="sheet-label">For you</h3>
+            {hidden ? (
+              <div className="action-row start">
+                <span className="hint">Hidden from your suggestions.</span>
+                <button className="btn btn-quiet btn-small" onClick={() => app.dismiss(itemId, false)}>
+                  Show again
+                </button>
+              </div>
+            ) : (
+              <div className="action-row start">
+                <button className="btn btn-quiet btn-small" onClick={() => app.dismiss(itemId, true)}>
+                  Not interested
+                </button>
+                <span className="hint">Keeps it out of your suggestions.</span>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

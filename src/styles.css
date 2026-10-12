@@ -1339,3 +1339,80 @@ main.sort {
 .quick-check .form-list {
   gap: 12px;
 }
+
+/* Opening a title's card from wherever it appears */
+.title-link {
+  cursor: pointer;
+}
+.title-link:hover,
+.title-link:focus-visible {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.info-mark,
+.info-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  color: var(--muted);
+  font: italic 700 0.68em/1 Georgia, 'Times New Roman', serif;
+}
+.info-mark {
+  margin-left: 0.35em;
+  vertical-align: 0.12em;
+}
+.grid-item {
+  position: relative;
+}
+/* Sits over the cover's lower right corner; the cover is 2:3 and as wide as the cell. */
+.grid-info-area {
+  position: absolute;
+  inset: 0 0 auto 0;
+  aspect-ratio: 2 / 3;
+  pointer-events: none;
+}
+.grid-item .info-button {
+  display: grid;
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 26px;
+  height: 26px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 0;
+}
+.sheet h3.sheet-label {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+}
+.contents-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+.contents-list li {
+  display: grid;
+  grid-template-columns: 2.6em 4.6em 1fr;
+  gap: 8px;
+}
+.contents-format {
+  white-space: nowrap;
+}
+.contents-year,
+.contents-format {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

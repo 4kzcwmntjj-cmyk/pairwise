@@ -4,6 +4,7 @@ import { choicesFor, formUnknown } from '../rank/medium';
 import type { Item } from '../types';
 import { Add } from './Add';
 import { Cover } from './Cover';
+import { TitleLink } from './TitleLink';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
@@ -83,7 +84,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
       {mode === 'grid' ? (
         <SortGrid app={app} onFind={onFind} onOpen={onOpen} show={show} setShow={setShow} />
       ) : (
-        <SortSingle app={app} onDone={onDone} onFind={onFind} onBrowse={() => browse('unsorted')} />
+        <SortSingle app={app} onDone={onDone} onFind={onFind} onBrowse={() => browse('unsorted')} onOpen={onOpen} />
       )}
     </main>
   );
@@ -249,6 +250,11 @@ function SortGrid({
                   <span className="grid-title">{title}</span>
                   <span className="grid-year">{app.look(item).years}</span>
                 </button>
+                <span className="grid-info-area">
+                  <button className="info-button" onClick={() => onOpen(item.id)} aria-label={`Details for ${title}`} title="Details">
+                    i
+                  </button>
+                </span>
               </li>
             );
           })}
@@ -283,7 +289,19 @@ const LIKELY_AT_LEAST = 0.15;
  * order of how likely you are to have seen them, learned from your answers
  * so far (see rank/seen.ts), so the ones you've seen surface early.
  */
-function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: () => void; onFind: () => void; onBrowse: () => void }) {
+function SortSingle({
+  app,
+  onDone,
+  onFind,
+  onBrowse,
+  onOpen,
+}: {
+  app: AppState;
+  onDone: () => void;
+  onFind: () => void;
+  onBrowse: () => void;
+  onOpen: (id: string) => void;
+}) {
   const [keepGoing, setKeepGoing] = useState(false);
   const model = app.seenGuess;
   const queue = useMemo(() => {
@@ -391,7 +409,7 @@ function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: 
       )}
       <div className="sort-card" key={item.id}>
         <Cover look={app.look(item)} title={title} size="lg" />
-        <h2 className="item-title">{title}</h2>
+        <TitleLink title={title} onOpen={() => onOpen(item.id)} />
         <p className="item-meta">{app.look(item).meta}</p>
       </div>
       {choicesFor(item, app.view).length === 4 && <p className="sort-question">Which have you seen?</p>}

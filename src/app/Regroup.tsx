@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Item } from '../types';
 import { Cover } from './Cover';
 import { isManga } from '../anilist/group';
-import { formatLabel } from './meta';
+import { formatLabel, shortFormat } from './meta';
 import type { AppState } from './useApp';
 
 type Mode = null | 'split' | 'join';
@@ -14,6 +14,8 @@ export function Regroup({ app, item, onOpen }: { app: AppState; item: Item; onOp
 
   return (
     <section className="regroup">
+      {mode === null && <h3 className="sheet-label">What's in it</h3>}
+      {mode === null && <Contents app={app} item={item} />}
       {mode === null && (
         <div className="action-row start">
           {canSplit && (
@@ -29,6 +31,41 @@ export function Regroup({ app, item, onOpen }: { app: AppState; item: Item; onOp
       {mode === 'split' && <Split app={app} item={item} onOpen={onOpen} onClose={() => setMode(null)} />}
       {mode === 'join' && <Join app={app} item={item} onClose={() => setMode(null)} />}
     </section>
+  );
+}
+
+/** The seasons, films and manga grouped under this title, oldest first. Long lists start folded. */
+function Contents({ app, item }: { app: AppState; item: Item }) {
+  const [all, setAll] = useState(false);
+  const entries = useMemo(
+    () => [...(item.entries ?? [])].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.id - b.id),
+    [item.entries],
+  );
+  if (entries.length === 0) return null;
+  if (entries.length === 1) {
+    return <p className="hint">One entry: {formatLabel(entries[0].format).toLowerCase()}{entries[0].year ? `, ${entries[0].year}` : ''}.</p>;
+  }
+  const FOLD = 6;
+  const shown = all ? entries : entries.slice(0, FOLD);
+  const name = (e: (typeof entries)[number]) =>
+    app.settings.titleLanguage === 'romaji' ? (e.titleRomaji ?? e.titleEnglish) : (e.titleEnglish ?? e.titleRomaji);
+  return (
+    <>
+      <ul className="contents-list">
+        {shown.map((e) => (
+          <li key={e.id}>
+            <span className="contents-year">{e.year ?? ''}</span>
+            <span className="contents-format">{shortFormat(e.format)}</span>
+            <span>{name(e)}</span>
+          </li>
+        ))}
+      </ul>
+      {entries.length > FOLD && (
+        <button className="btn-link inline" onClick={() => setAll(!all)}>
+          {all ? 'Show fewer' : `Show all ${entries.length}`}
+        </button>
+      )}
+    </>
   );
 }
 

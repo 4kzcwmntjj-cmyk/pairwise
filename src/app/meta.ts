@@ -14,6 +14,21 @@ const FORMAT_LABEL: Record<string, string> = {
 };
 export const formatLabel = (format: string) => FORMAT_LABEL[format] ?? 'Other';
 
+const SHORT_FORMAT: Record<string, string> = {
+  TV: 'Series',
+  TV_SHORT: 'Shorts',
+  ONA: 'Web',
+  MOVIE: 'Film',
+  OVA: 'OVA',
+  SPECIAL: 'Special',
+  MUSIC: 'Music',
+  MANGA: 'Manga',
+  ONE_SHOT: 'One-shot',
+  NOVEL: 'Novel',
+};
+/** One word, for lists where the anime/manga split is clear from context. */
+export const shortFormat = (format: string) => SHORT_FORMAT[format] ?? 'Other';
+
 /** How the view talks about knowing a title. */
 export const viewWords = (view: View) =>
   view === 'anime'

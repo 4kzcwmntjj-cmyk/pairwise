@@ -55,3 +55,7 @@ Duel shows one short tip at a time, below the buttons, the first time something 
 ## Share your top 10
 
 Ranking has a Share top 10 button (shown from three ranked titles). It draws a 1080×1350 picture of your top ten in the current view with canvas (`src/app/shareImage.ts`): rank, cover, title, years and studio. On phones it opens the share sheet; elsewhere it downloads a PNG. Covers load with CORS; any that fail to load are drawn as a block in the cover's colour.
+
+## The title card
+
+Every per-title edit lives on one card (`src/app/ItemSheet.tsx`): duel record, seen / anime / manga, what the title groups (entries with years and formats, folded after six), Split up and Join, and Not interested for For you (unseen titles only). It opens from the title name in Duel and Quick sort (`TitleLink`, with a small i), the i button on each cover in Browse, and rows in Ranking, For you and Stats.

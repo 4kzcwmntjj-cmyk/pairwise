@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import type { Item, Outcome } from '../types';
 import { Cover } from './Cover';
+import { TitleLink } from './TitleLink';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
@@ -114,7 +115,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           <Cover look={app.look(item)} title={title} size="lg" />
           <span className={`contender-rank${isNew ? ' is-new' : ''}`}>{isNew ? 'New' : `#${app.rankOf.get(item.id)}`}</span>
         </button>
-        <h2 className="item-title">{title}</h2>
+        <TitleLink title={title} onOpen={() => onOpen(item.id)} />
         <p className="item-meta">{app.look(item).meta}</p>
         <button
           className="btn btn-quiet btn-small"

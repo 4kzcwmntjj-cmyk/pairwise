@@ -165,7 +165,8 @@ export function choicesFor(item: Pick<Item, 'formats'>, view: View): Choice[] {
 
 /** Whether a mark matches a choice, for showing which button is on. */
 export function chosen(item: Pick<Item, 'formats'>, mark: Mark | undefined, choice: Choice): boolean {
-  if (!mark) return false;
+  // A plain "seen" from before forms were asked doesn't say which; no answer is chosen yet.
+  if (!mark || formUnknown(item, mark)) return false;
   return (Object.keys(choice.answer) as Medium[]).every((m) => knownIn(item, mark, m) === choice.answer[m]);
 }
 

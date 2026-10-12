@@ -50,8 +50,13 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <h3>3. Ranking and Stats</h3>
         <p>
           Ranking is the full list, with each title's duel count. A title is marked settled once more duels are unlikely
-          to move it far; until then its position is a best guess. Tap a title to see its details, change whether you've
-          seen it, or fix how it's grouped.
+          to move it far; until then its position is a best guess.
+        </p>
+        <p>
+          Every title has one card with everything about it: your record, whether you've seen it (and which, anime or
+          manga), what the title groups together, Split up and Join, and Not interested for suggestions. Open it by tapping
+          the title's name in Duel or Quick sort, the i on a cover in Browse, or the title anywhere in Ranking, For you and
+          Stats.
         </p>
         <p>
           Stats shows how your top 10 has moved over time, how settled your list is, where your taste leans, and where you
