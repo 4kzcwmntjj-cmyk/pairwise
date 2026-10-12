@@ -319,6 +319,15 @@ export function useApp() {
     return applyAnswer(item, allMarks.get(item.id), { anime: true, manga: true }, at);
   };
 
+  /** The vote to record, with the side of each title the cards showed. */
+  const voteFor = (p: Pair, outcome: Outcome): Vote => {
+    const side = (id: string) => {
+      const it = itemById.get(id);
+      return it ? sideFor(it, view, allMarks.get(id)) : undefined;
+    };
+    return { a: p.a, b: p.b, outcome, mode: p.mode, at: Date.now(), sideA: side(p.a), sideB: side(p.b) };
+  };
+
   const vote = useCallback(
     async (outcome: Outcome) => {
       if (!pair) return;
@@ -332,7 +341,7 @@ export function useApp() {
           return n;
         });
         await Promise.all(newMarks.map((mk) => store.setMark(mk)));
-        const v: Vote = { a: pair.a, b: pair.b, outcome, mode: pair.mode, at: Date.now() };
+        const v = voteFor(pair, outcome);
         const id = await store.addVote(v);
         const saved = { ...v, id };
         const nextVotes = [...votes, saved];
@@ -359,7 +368,7 @@ export function useApp() {
       }
       const winner = outcome === 'a' ? pair.a : outcome === 'b' ? pair.b : null;
       const before = winner ? rankOf.get(winner) : undefined;
-      const v: Vote = { a: pair.a, b: pair.b, outcome, mode: pair.mode, at: Date.now() };
+      const v = voteFor(pair, outcome);
       const id = await store.addVote(v);
       const saved = { ...v, id };
       const nextVotes = [...votes, saved];

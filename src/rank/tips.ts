@@ -44,9 +44,6 @@ export const MIN_RANKED_FOR_FORYOU = 20;
 export const MIN_RANKED_FOR_STATS = 30;
 export const MIN_DUELS_FOR_STATS = 100;
 
-const parts = (t: { anime: number; manga: number }) =>
-  t.anime && t.manga ? `: ${t.anime} anime and ${t.manga} manga` : '';
-
 /** The tip to show now, or null. */
 export function pickTip(state: TipState, ctx: TipContext): Tip | null {
   if (state.off || ctx.duels < FIRST_TIP_AFTER) return null;
@@ -57,7 +54,7 @@ export function pickTip(state: TipState, ctx: TipContext): Tip | null {
   if (big && fresh('split')) {
     return {
       id: 'split',
-      text: `${big.title} groups ${big.entries} entries${parts(big)}. If you'd rather rank some of them on their own, you can split it up.`,
+      text: `${big.title} groups ${big.entries} entries. If you'd rather rank some of them on their own, you can split it up.`,
       open: { itemId: big.id, label: `Open ${big.title}` },
     };
   }

@@ -1,5 +1,5 @@
 import { describeFormats, isManga, representative } from '../anilist/group';
-import type { Entry, Item, Mark, View } from '../types';
+import type { Entry, Item, Mark, Side, View } from '../types';
 import { formsOf, hasBoth, knownIn } from './medium';
 
 /**
@@ -10,7 +10,7 @@ import { formsOf, hasBoth, knownIn } from './medium';
  * both view whichever you've watched or read. When you know both, or haven't
  * said yet, the card shows the anime and mentions the manga.
  */
-export type Side = 'anime' | 'manga' | 'both';
+export type { Side };
 
 export interface Look {
   side: Side;

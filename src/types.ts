@@ -60,6 +60,8 @@ export interface Mark {
 
 /** Which titles the app is showing: anime, manga, or everything. */
 export type View = 'anime' | 'manga' | 'both';
+/** Which side of a title a card showed: its anime, its manga, or both. */
+export type Side = 'anime' | 'manga' | 'both';
 export type Medium = 'anime' | 'manga';
 
 export type Outcome = 'a' | 'b' | 'tie';
@@ -73,6 +75,9 @@ export interface Vote {
   outcome: Outcome;
   mode: DuelMode;
   at: number;
+  /** Which side of each title was showing. Absent on duels from before this was recorded. */
+  sideA?: Side;
+  sideB?: Side;
 }
 
 export interface Settings {
