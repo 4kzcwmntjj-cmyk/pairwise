@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { isSettled as isSettledIn } from '../rank/stats';
 import { Cover } from './Cover';
-import { renderTop, type ShareLayout } from './shareImage';
+import { renderTop } from './shareImage';
 import { SharePreview } from './SharePreview';
 import type { AppState } from './useApp';
 
@@ -16,14 +16,14 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
   const noun = app.view === 'both' ? 'anime and manga' : app.view;
-  async function drawTop(layout: string) {
+  async function drawTop() {
     const rows = top.flatMap((id, i) => {
       const item = app.itemById.get(id);
       if (!item) return [];
       const look = app.look(item);
       return [{ rank: i + 1, title: app.title(item), meta: look.short, cover: look.coverLarge ?? look.cover, color: look.coverColor }];
     });
-    const { blob, missing, details } = await renderTop(rows, `My top ${rows.length} ${noun}`, layout as ShareLayout);
+    const { blob, missing, details } = await renderTop(rows, `My top ${rows.length} ${noun}`);
     return { blob, note: missing ? `${missing} of ${rows.length} covers didn't load.` : undefined, details };
   }
   const q = query.trim().toLowerCase();
@@ -96,10 +96,6 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           title={`My top ${top.length} ${noun}`}
           filename={`shobu-top-${top.length}`}
           make={drawTop}
-          options={[
-            { id: 'grid', label: 'Covers' },
-            { id: 'list', label: 'List' },
-          ]}
           onClose={() => setPreviewing(false)}
         />
       )}

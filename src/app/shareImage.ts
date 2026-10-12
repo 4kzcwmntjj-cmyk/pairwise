@@ -12,7 +12,6 @@ export interface ShareRow {
 }
 
 export const SHARE_WIDTH = 1080;
-export type ShareLayout = 'grid' | 'list';
 
 const BG = '#15142a';
 const SURFACE = '#1f1e3a';
@@ -95,9 +94,8 @@ function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, s
   ctx.textAlign = 'left';
 }
 
-/** Height of the picture for a layout and row count. */
-export function shareHeight(layout: ShareLayout, count: number): number {
-  if (layout === 'list') return 1350;
+/** Height of the picture for a row count. */
+export function shareHeight(count: number): number {
   const rest = Math.max(count - 3, 0);
   return rest ? GRID_TOP_END + 30 + rest * (ROW_H + ROW_GAP) + 86 : GRID_TOP_END + 96;
 }
@@ -164,49 +162,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
   });
 }
 
-function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], height: number, boxes: Box[]) {
-  const top = 168;
-  const bottom = height - 96;
-  const gap = 12;
-  const rowH = Math.floor((bottom - top - gap * (rows.length - 1)) / Math.max(rows.length, 1));
-  const capped = Math.min(rowH, 112);
-  const coverH = capped - 12;
-  const coverW = Math.round((coverH * 2) / 3);
-
-  rows.forEach((row, i) => {
-    const y = top + i * (capped + gap);
-    ctx.fillStyle = SURFACE;
-    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, capped, 20);
-    ctx.fill();
-
-    ctx.fillStyle = i < 3 ? ACCENT : MUTED;
-    ctx.font = `600 ${i < 3 ? 40 : 34}px ${DISPLAY}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(String(row.rank), PAD + 56, y + capped / 2 + 14);
-    ctx.textAlign = 'left';
-
-    const cx = PAD + 112;
-    coverBox(ctx, row, covers[i], cx, y + 6, coverW, coverH, 10, boxes, i);
-
-    const tx = cx + coverW + 28;
-    const tw = SHARE_WIDTH - PAD - 28 - tx;
-    ctx.fillStyle = INK;
-    ctx.font = `600 30px ${BODY}`;
-    const lines = wrapLines((s) => ctx.measureText(s).width, row.title, tw, 2);
-    const block = lines.length * 36 + (row.meta ? 34 : 0);
-    let ty = y + (capped - block) / 2 + 28;
-    for (const l of lines) {
-      ctx.fillText(l, tx, ty);
-      ty += 36;
-    }
-    if (row.meta) {
-      ctx.fillStyle = MUTED;
-      ctx.font = `24px ${BODY}`;
-      ctx.fillText(wrapLines((s) => ctx.measureText(s).width, row.meta, tw, 1)[0], tx, ty - 2);
-    }
-  });
-}
-
 export interface ShareResult {
   blob: Blob;
   /** Rows that had a cover address but no cover ended up in the picture. */
@@ -227,7 +182,7 @@ function isFlat(ctx: CanvasRenderingContext2D, b: Box): boolean {
   return true;
 }
 
-export async function renderTop(rows: ShareRow[], heading: string, layout: ShareLayout = 'grid'): Promise<ShareResult> {
+export async function renderTop(rows: ShareRow[], heading: string): Promise<ShareResult> {
   try {
     await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
   } catch {
@@ -237,7 +192,7 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   const covers: Cover[] = results.map((r) => r.img);
   const details = rows.map((r, i) => `${r.rank}. ${r.title}: ${results[i].how}`);
 
-  const height = shareHeight(layout, rows.length);
+  const height = shareHeight(rows.length);
   const canvas = document.createElement('canvas');
   canvas.width = SHARE_WIDTH;
   canvas.height = height;
@@ -251,8 +206,7 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   ctx.fillText(heading, PAD, 112);
 
   const boxes: Box[] = [];
-  if (layout === 'grid') drawGrid(ctx, rows, covers, boxes);
-  else drawList(ctx, rows, covers, height, boxes);
+  drawGrid(ctx, rows, covers, boxes);
 
   // A cover can decode yet draw as nothing; check, and redraw through an <img> if so.
   let missing = 0;
@@ -265,7 +219,7 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
       details[i] += '; drew blank';
       const alt = await decodeAsImage(row.cover);
       if (alt) {
-        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, layout === 'grid' ? 14 : 10);
+        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, 14);
         if (!isFlat(ctx, box)) {
           details[i] += '; fixed by redrawing from an image element';
           continue;
