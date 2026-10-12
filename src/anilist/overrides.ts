@@ -1,5 +1,5 @@
-import type { Entry, Item, Mark, Vote } from '../types';
-import { isMangaOnly, summarise } from './group';
+import type { Entry, Item, Mark, Side, Vote } from '../types';
+import { isManga, isMangaOnly, summarise } from './group';
 
 /**
  * Your own corrections to how the catalogue groups entries into franchises.
@@ -37,18 +37,43 @@ export type GroupOp =
       id: string;
       at: number;
       label?: string;
+    }
+  | {
+      /**
+       * Rank a title's anime and manga apart. Every manga entry of the title holding `of` (an anime
+       * entry) moves to the title `id`; the anime keeps the original id. Duels on the original follow
+       * the side the card showed: manga duels go to the manga part, the rest stay with the anime.
+       *
+       * Ranking them together again sets `together` rather than deleting the operation, so the manga
+       * part's id points back at the title and its duels count there.
+       */
+      kind: 'forms';
+      of: number;
+      id: string;
+      at: number;
+      together?: boolean;
+      label?: string;
     };
 
 export interface Grouping {
   items: Item[];
   /** Maps an id that no longer exists to the title that took its place. Ids that exist map to themselves. */
   resolve: (id: string) => string;
+  /**
+   * Like `resolve`, for one side of a duel: a duel fought on a title's manga side goes to its manga part
+   * when the anime and manga are ranked apart.
+   */
+  resolveSide: (id: string, side?: Side) => string;
+  /** For titles ranked apart: the anime part's id to the manga part's, and back. */
+  apart: Map<string, string>;
 }
+
+const noApart = new Map<string, string>();
 
 const MAX_RECS = 12;
 
 export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
-  if (ops.length === 0) return { items: base, resolve: (id) => id };
+  if (ops.length === 0) return { items: base, resolve: (id) => id, resolveSide: (id) => id, apart: noApart };
 
   const baseById = new Map(base.map((i) => [i.id, i]));
   const entryData = new Map<number, Entry>();
@@ -67,6 +92,8 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
   }
 
   const alias = new Map<string, string>();
+  /** Titles ranked apart: the id the anime kept, to the manga part's id. */
+  const mangaOf = new Map<string, string>();
   const splitIds = new Set(ops.flatMap((o) => (o.kind === 'split' ? [o.id] : [])));
   const retire = (g: Group, into: string) => {
     groups.delete(g.id);
@@ -83,6 +110,27 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
         owner.set(e, keep);
       }
       retire(other, keep.id);
+    } else if (op.kind === 'forms') {
+      const from = owner.get(op.of);
+      if (!from || from.id === op.id) continue;
+      if (op.together) {
+        // Ranked together again: the manga part's duels and marks count for the title.
+        if (!groups.has(op.id)) alias.set(op.id, from.id);
+        continue;
+      }
+      const moving = [...from.entries].filter((e) => {
+        const d = entryData.get(e);
+        return d !== undefined && isManga(d.format);
+      });
+      if (moving.length === 0 || moving.length === from.entries.size || groups.has(op.id)) continue;
+      const target: Group = { id: op.id, entries: new Set(moving) };
+      groups.set(op.id, target);
+      alias.delete(op.id);
+      for (const e of moving) {
+        from.entries.delete(e);
+        owner.set(e, target);
+      }
+      mangaOf.set(from.id, op.id);
     } else {
       const moving = op.entryIds.filter((e) => owner.has(e));
       if (moving.length === 0) continue;
@@ -108,6 +156,25 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
     for (let i = 0; i < 100 && alias.has(x); i++) x = alias.get(x)!;
     return x;
   };
+  const resolveSide = (id: string, side?: Side) => {
+    if (side !== 'manga' || mangaOf.size === 0) return resolve(id);
+    // Follow the id through joins; the first title on the way that was ranked apart takes the duel on its manga part.
+    let x = id;
+    for (let i = 0; i < 100; i++) {
+      const m = mangaOf.get(x);
+      if (m !== undefined) return resolve(m);
+      const next = alias.get(x);
+      if (next === undefined) break;
+      x = next;
+    }
+    return resolve(id);
+  };
+  const apart = new Map<string, string>();
+  for (const [a, m] of mangaOf) {
+    if (!groups.has(a) || !groups.has(m)) continue;
+    apart.set(a, m);
+    apart.set(m, a);
+  }
 
   const items: Item[] = [];
   for (const g of groups.values()) {
@@ -176,20 +243,28 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
   // Splitting the manga out of a franchise leaves two titles with one name; mark the manga one.
   const titles = new Map<string, number>();
   for (const i of out) titles.set(i.title, (titles.get(i.title) ?? 0) + 1);
+  const tagged = (i: Item, form: string) => {
+    const tag = (t?: string) => (t ? `${t} (${form})` : t);
+    return { ...i, title: `${i.title} (${form})`, titleEnglish: tag(i.titleEnglish), titleRomaji: tag(i.titleRomaji) };
+  };
   const named = out.map((i) => {
+    // Titles ranked apart are always named by form.
+    if (apart.has(i.id)) return tagged(i, mangaOf.has(i.id) ? 'anime' : 'manga');
     if (!splitIds.has(i.id) || !isMangaOnly(i) || (titles.get(i.title) ?? 0) < 2) return i;
-    const tag = (t?: string) => (t ? `${t} (manga)` : t);
-    return { ...i, title: `${i.title} (manga)`, titleEnglish: tag(i.titleEnglish), titleRomaji: tag(i.titleRomaji) };
+    return tagged(i, 'manga');
   });
-  return { items: named, resolve };
+  return { items: named, resolve, resolveSide, apart };
 }
 
-/** Votes with ids mapped to current titles. A duel between two titles that are now one is set aside. */
-export function resolveVotes(votes: Vote[], resolve: (id: string) => string): Vote[] {
+/**
+ * Votes with ids mapped to current titles. A duel between two titles that are now one is set aside.
+ * Given the side each card showed, a duel on a title's manga goes to its manga part when the two are ranked apart.
+ */
+export function resolveVotes(votes: Vote[], resolve: (id: string, side?: Side) => string): Vote[] {
   const out: Vote[] = [];
   for (const v of votes) {
-    const a = resolve(v.a);
-    const b = resolve(v.b);
+    const a = resolve(v.a, v.sideA);
+    const b = resolve(v.b, v.sideB);
     if (a === b) continue;
     out.push(a === v.a && b === v.b ? v : { ...v, a, b });
   }

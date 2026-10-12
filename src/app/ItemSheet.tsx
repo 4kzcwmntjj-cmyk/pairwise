@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import { Cover } from './Cover';
 import { choicesFor, chosen, formUnknown } from '../rank/medium';
@@ -98,6 +98,7 @@ export function ItemSheet({
         {!fullMark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
           <p className="hint">Split off from another title. Mark whether you've seen it.</p>
         )}
+        <FormsApart app={app} itemId={itemId} onOpen={onOpen} />
         <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />
         {fullMark?.status !== 'seen' && item.source === 'anilist' && (
           <section className="sheet-section">
@@ -121,5 +122,51 @@ export function ItemSheet({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Ranking a title's anime and manga apart, for adaptations that differ in quality. Offered only once
+ * you've said you know both.
+ */
+function FormsApart({ app, itemId, onOpen }: { app: AppState; itemId: string; onOpen: (id: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const otherId = app.apart.get(itemId);
+  const other = otherId ? app.itemById.get(otherId) : undefined;
+  if (!other && !app.canRankApart(itemId)) return null;
+  const run = async (f: () => Promise<string | undefined>, follow: boolean) => {
+    setBusy(true);
+    const to = await f();
+    setBusy(false);
+    // Ranked together from the manga part's card: that title is gone, so show the whole one.
+    if (follow && to && to !== itemId) onOpen(to);
+  };
+  return (
+    <section className="sheet-section">
+      <h3 className="sheet-label">Anime and manga</h3>
+      {other ? (
+        <>
+          <p className="hint">Ranked apart from {app.title(other)}.</p>
+          <div className="action-row start">
+            <button className="btn btn-quiet btn-small" onClick={() => onOpen(other.id)}>
+              Open {app.title(other)}
+            </button>
+            <button className="btn btn-quiet btn-small" disabled={busy} onClick={() => run(() => app.rankTogether(itemId), true)}>
+              Rank together again
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="hint">
+            For when one is much better than the other. Each gets its own place in the ranking. Past duels where the card
+            showed the manga go to the manga; the rest stay with the anime.
+          </p>
+          <button className="btn btn-quiet btn-small" disabled={busy} onClick={() => run(() => app.rankApart(itemId), false)}>
+            Rank anime and manga apart
+          </button>
+        </>
+      )}
+    </section>
   );
 }

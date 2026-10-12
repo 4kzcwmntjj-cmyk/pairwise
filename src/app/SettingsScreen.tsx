@@ -141,7 +141,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
         )}
       </section>
 
-      {app.groupOps.length > 0 && (
+      {app.groupOps.some((op) => op.kind !== 'forms' || app.apart.has(op.id)) && (
         <section>
           <h3>Your grouping changes</h3>
           <p>
@@ -149,11 +149,11 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
             they were, with their own duels.
           </p>
           <ul className="op-list">
-            {[...app.groupOps].reverse().map((op) => (
+            {[...app.groupOps].reverse().filter((op) => op.kind !== 'forms' || app.apart.has(op.id)).map((op) => (
               <li key={`${op.kind}${op.at}`}>
                 <span>
-                  {op.kind === 'join' ? 'Joined ' : 'Split '}
-                  {op.label ?? (op.kind === 'join' ? 'two titles' : 'part of a title')}
+                  {op.kind === 'join' ? 'Joined ' : op.kind === 'forms' ? 'Ranked anime and manga apart: ' : 'Split '}
+                  {op.label ?? (op.kind === 'join' ? 'two titles' : op.kind === 'forms' ? 'a title' : 'part of a title')}
                   <span className="hint"> · {new Date(op.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                 </span>
                 <button className="btn btn-quiet btn-small" onClick={() => app.removeGroupOp(op)}>

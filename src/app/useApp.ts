@@ -5,7 +5,7 @@ import { backupIsDue, snoozed, type BackupNote } from './backup';
 import { useInstall } from './install';
 import { askPersistence, checkPersisted, PERSIST_AFTER, type Persistence } from './storage';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
-import { storylinesOf } from '../anilist/group';
+import { isManga, storylinesOf } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
@@ -122,7 +122,7 @@ export function useApp() {
   const grouping = useMemo(() => applyGroupOps(baseItems, groupOps), [baseItems, groupOps]);
   const allItems = grouping.items;
   const allMarks = useMemo(() => resolveMarks(rawMarks.values(), grouping.resolve), [rawMarks, grouping]);
-  const votes = useMemo(() => resolveVotes(rawVotes, grouping.resolve), [rawVotes, grouping]);
+  const votes = useMemo(() => resolveVotes(rawVotes, grouping.resolveSide), [rawVotes, grouping]);
   const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
 
   // The view (anime, manga or both) decides which titles show, and how marks read: in the anime view,
@@ -647,7 +647,7 @@ export function useApp() {
     const moving = groups.flat();
     if (!item || moving.length === 0 || moving.length >= item.entryIds.length || groups.some((g) => g.length === 0)) return [];
     const parentMark = allMarks.get(itemId);
-    const taken = new Set(groupOps.flatMap((o) => (o.kind === 'split' ? [o.id] : [])));
+    const taken = new Set(groupOps.flatMap((o) => (o.kind !== 'join' ? [o.id] : [])));
     const ops: GroupOp[] = [];
     const ids: string[] = [];
     const now = Date.now();
@@ -677,8 +677,77 @@ export function useApp() {
     return ids;
   };
 
+  /** Whether a title can be ranked as anime and manga apart: it has both, and you know both. */
+  const canRankApart = (itemId: string) => {
+    const item = itemById.get(itemId);
+    if (!item || !hasBoth(item) || grouping.apart.has(itemId)) return false;
+    const entries = item.entries ?? [];
+    if (!entries.some((e) => isManga(e.format)) || !entries.some((e) => !isManga(e.format))) return false;
+    // Said in so many words: a plain "seen" from before forms were asked doesn't count.
+    const mark = allMarks.get(itemId);
+    return mark?.anime === true && mark?.manga === true;
+  };
+
+  /**
+   * Makes a title two: its anime keeps the id, its manga becomes a title of its own, marked read. Past duels
+   * follow the side the card showed. Doing it again after ranking them together reuses the same operation,
+   * so the manga part gets its own duels back.
+   */
+  const rankApart = async (itemId: string) => {
+    const item = itemById.get(itemId);
+    if (!item || !canRankApart(itemId)) return undefined;
+    const anime = (item.entries ?? []).filter((e) => !isManga(e.format));
+    const now = Date.now();
+    const old = groupOps.find((o) => o.kind === 'forms' && item.entryIds.includes(o.of));
+    let op: GroupOp;
+    let next: GroupOp[];
+    if (old && old.kind === 'forms') {
+      op = { ...old, together: false, at: now };
+      next = groupOps.map((o) => (o === old ? op : o));
+    } else {
+      const of = Math.min(...anime.map((e) => e.id));
+      const taken = (x: string) => itemById.has(x) || groupOps.some((o) => o.kind !== 'join' && o.id === x);
+      let id = `f-${of}`;
+      for (let n = 2; taken(id); n++) id = `f-${of}-${n}`;
+      op = { kind: 'forms', of, id, at: now, label: displayTitle(item, settings) };
+      next = [...groupOps, op];
+    }
+    await writeMark(op.id, { itemId: op.id, status: 'seen', updatedAt: now });
+    setMoved(null);
+    await saveOps(next);
+    return op.id;
+  };
+
+  /** Puts a title ranked apart back together. Its mark says what you said about each part. */
+  const rankTogether = async (itemId: string) => {
+    const other = grouping.apart.get(itemId);
+    const op = groupOps.find((o) => o.kind === 'forms' && !o.together && (o.id === itemId || o.id === other));
+    if (!other || !op || op.kind !== 'forms') return undefined;
+    const animeId = op.id === itemId ? other : itemId;
+    const animeItem = itemById.get(animeId);
+    const mangaItem = itemById.get(op.id);
+    const now = Date.now();
+    await saveOps(groupOps.map((o) => (o === op ? { ...op, together: true, at: now } : o)));
+    if (animeItem && mangaItem) {
+      const watched = knownIn(animeItem, allMarks.get(animeId), 'anime');
+      const read = knownIn(mangaItem, allMarks.get(op.id), 'manga');
+      const whole = { id: animeId, formats: [...animeItem.formats, ...mangaItem.formats] };
+      const ans: Answer = {};
+      if (watched !== undefined) ans.anime = watched;
+      if (read !== undefined) ans.manga = read;
+      if (watched !== undefined || read !== undefined) await writeMark(animeId, applyAnswer(whole, undefined, ans, now));
+    }
+    setMoved(null);
+    return animeId;
+  };
+
   /** Takes a grouping change back out. A joined title gets its old mark back. */
   async function removeGroupOp(op: GroupOp) {
+    if (op.kind === 'forms') {
+      const m = grouping.apart.get(op.id);
+      if (m) await rankTogether(op.id);
+      return;
+    }
     const next = groupOps.filter((o) => o !== op && !(o.at === op.at && o.kind === op.kind && (o.kind !== 'split' || o.id === (op as { id?: string }).id)));
     await saveOps(next);
     if (op.kind === 'join') {
@@ -743,6 +812,10 @@ export function useApp() {
     joinItems,
     splitItem,
     removeGroupOp,
+    apart: grouping.apart,
+    canRankApart,
+    rankApart,
+    rankTogether,
   };
 }
 

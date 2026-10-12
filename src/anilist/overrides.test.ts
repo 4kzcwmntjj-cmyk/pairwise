@@ -104,6 +104,73 @@ describe('splitting the manga out', () => {
   });
 });
 
+describe('ranking anime and manga apart', () => {
+  // Berserk: the 1997 and 2016 anime, and the manga.
+  const berserk = item('al-60', [entry(60, 'Berserk', 'TV', 1997, 900), entry(61, 'Berserk', 'TV', 2016, 500), { ...entry(62, 'Berserk', 'MANGA', 1989, 950), genres: [] }]);
+  const rival = item('al-9', [entry(9, 'Steins;Gate')]);
+  const apart: GroupOp = { kind: 'forms', of: 60, id: 'f-60', at: 1 };
+  const votes: Vote[] = [
+    { a: 'al-60', b: 'al-9', outcome: 'a', mode: 'refine', at: 1, sideA: 'manga', sideB: 'both' },
+    { a: 'al-9', b: 'al-60', outcome: 'a', mode: 'refine', at: 2, sideA: 'both', sideB: 'anime' },
+    { a: 'al-60', b: 'al-9', outcome: 'b', mode: 'refine', at: 3, sideA: 'both', sideB: 'both' },
+    { a: 'al-60', b: 'al-9', outcome: 'tie', mode: 'refine', at: 4 },
+  ];
+
+  it('makes two titles named by form, the anime keeping the id', () => {
+    const g = applyGroupOps([berserk, rival], [apart]);
+    const anime = g.items.find((i) => i.id === 'al-60')!;
+    const manga = g.items.find((i) => i.id === 'f-60')!;
+    expect(anime.entryIds).toEqual([60, 61]);
+    expect(manga.entryIds).toEqual([62]);
+    expect(anime.title).toBe('Berserk (anime)');
+    expect(manga.title).toBe('Berserk (manga)');
+    expect(g.apart.get('al-60')).toBe('f-60');
+    expect(g.apart.get('f-60')).toBe('al-60');
+  });
+
+  it('sends duels fought on the manga side to the manga, and the rest to the anime', () => {
+    const g = applyGroupOps([berserk, rival], [apart]);
+    const r = resolveVotes(votes, g.resolveSide);
+    expect(r.map((v) => [v.a, v.b])).toEqual([
+      ['f-60', 'al-9'],
+      ['al-9', 'al-60'],
+      ['al-60', 'al-9'],
+      ['al-60', 'al-9'],
+    ]);
+  });
+
+  it('puts the manga back when ranked together again, its duels with it', () => {
+    const g = applyGroupOps([berserk, rival], [{ ...apart, together: true }]);
+    expect(g.items.find((i) => i.id === 'al-60')!.entryIds).toEqual([60, 61, 62]);
+    expect(g.items.find((i) => i.id === 'al-60')!.title).toBe('Berserk');
+    expect(g.apart.size).toBe(0);
+    expect(g.resolve('f-60')).toBe('al-60');
+    // A duel recorded on the manga part while apart now counts for the whole title.
+    const r = resolveVotes([...votes, { a: 'f-60', b: 'al-9', outcome: 'a', mode: 'refine', at: 5, sideA: 'both', sideB: 'both' }], g.resolveSide);
+    expect(r.every((v) => v.a === 'al-60' || v.b === 'al-60')).toBe(true);
+    expect(r).toHaveLength(5);
+  });
+
+  it('picks up manga added to the franchise by a later catalogue', () => {
+    const rebuilt = item('al-60', [...berserk.entries!, { ...entry(63, 'Berserk Prototype', 'ONE_SHOT', 1988, 100), genres: [] }]);
+    const g = applyGroupOps([rebuilt, rival], [apart]);
+    expect(g.items.find((i) => i.id === 'f-60')!.entryIds).toEqual([62, 63]);
+  });
+
+  it('follows the title through a later join', () => {
+    const extraBerserk = item('al-70', [entry(70, 'Berserk Recollections', 'SPECIAL', 2017, 50)]);
+    const g = applyGroupOps([berserk, rival, extraBerserk], [{ kind: 'join', keep: 60, other: 70, at: 0 }, apart]);
+    const r = resolveVotes([{ a: 'al-70', b: 'al-9', outcome: 'a', mode: 'refine', at: 1, sideA: 'manga' }], g.resolveSide);
+    expect(r[0].a).toBe('f-60');
+  });
+
+  it('does nothing for a title without both forms', () => {
+    const g = applyGroupOps([rival], [{ kind: 'forms', of: 9, id: 'f-9', at: 1 }]);
+    expect(g.items.map((i) => i.id)).toEqual(['al-9']);
+    expect(g.apart.size).toBe(0);
+  });
+});
+
 describe('resolveVotes and resolveMarks', () => {
   const resolve = (id: string) => (id === 'b' ? 'a' : id);
   it('moves votes to the surviving title and sets aside duels between the joined pair', () => {
