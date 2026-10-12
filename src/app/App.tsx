@@ -14,8 +14,8 @@ import { Welcome } from './Welcome';
 type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
 const TABS: [Tab, string][] = [
   ['duel', 'Duel'],
-  ['sort', 'Library'],
   ['ranking', 'Ranking'],
+  ['sort', 'Library'],
   ['stats', 'Stats'],
   ['foryou', 'For you'],
   ['settings', 'Settings'],

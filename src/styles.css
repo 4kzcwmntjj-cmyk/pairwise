@@ -1451,3 +1451,71 @@ main.sort {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Share preview: full-screen picture with Share and Save below it. */
+.share-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(var(--top-gap) + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.share-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.share-preview-head h2 {
+  font-size: 1rem;
+}
+.share-preview-options {
+  display: flex;
+  gap: 6px;
+}
+.share-preview-options button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.share-preview-options button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.share-preview-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.share-preview-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  /* Lets a long-press on iPhone offer Save to Photos. */
+  -webkit-touch-callout: default;
+  user-select: auto;
+}
+.share-preview-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.share-preview-actions .btn {
+  flex: 1;
+  max-width: 220px;
+}
+.share-preview-note {
+  text-align: center;
+  margin: 0;
+}

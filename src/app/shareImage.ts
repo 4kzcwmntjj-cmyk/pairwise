@@ -1,5 +1,7 @@
 /** Draws the top of your list as a picture to send to someone. */
 
+import { loadCover } from './coverLoader';
+
 export interface ShareRow {
   rank: number;
   title: string;
@@ -10,7 +12,7 @@ export interface ShareRow {
 }
 
 export const SHARE_WIDTH = 1080;
-export const SHARE_HEIGHT = 1350;
+export type ShareLayout = 'grid' | 'list';
 
 const BG = '#15142a';
 const SURFACE = '#1f1e3a';
@@ -18,23 +20,11 @@ const INK = '#f2f1fb';
 const MUTED = '#a3a1c2';
 const ACCENT = '#8f93ff';
 
-function loadCover(src: string | undefined): Promise<HTMLImageElement | null> {
-  if (!src) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    const timer = window.setTimeout(() => resolve(null), 8000);
-    img.onload = () => {
-      window.clearTimeout(timer);
-      resolve(img);
-    };
-    img.onerror = () => {
-      window.clearTimeout(timer);
-      resolve(null);
-    };
-    img.src = src;
-  });
-}
+const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
+const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+const PAD = 64;
+
+type Cover = ImageBitmap | null;
 
 /** Breaks text into at most `maxLines` lines that fit `width`, ending the last with an ellipsis if cut. */
 export function wrapLines(measure: (s: string) => number, text: string, width: number, maxLines: number): string[] {
@@ -69,31 +59,98 @@ function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
   ctx.roundRect(x, y, w, h, r);
 }
 
-export async function renderTop(rows: ShareRow[], heading: string): Promise<Blob> {
-  const display = '"Unbounded", "Arial Black", system-ui, sans-serif';
-  const body = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-  try {
-    await Promise.all([document.fonts.load(`600 40px ${display}`), document.fonts.load(`24px ${body}`)]);
-  } catch {
-    // Fall back to the system fonts.
+/** Draws `img` into the box, cropping the overflow instead of stretching. */
+function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const sw = w / scale;
+  const sh = h / scale;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
+}
+
+function coverBox(ctx: CanvasRenderingContext2D, row: ShareRow, img: Cover, x: number, y: number, w: number, h: number, r: number) {
+  ctx.save();
+  round(ctx, x, y, w, h, r);
+  ctx.clip();
+  if (img) drawCover(ctx, img, x, y, w, h);
+  else {
+    ctx.fillStyle = row.color ?? '#353459';
+    ctx.fillRect(x, y, w, h);
   }
-  const covers = await Promise.all(rows.map((r) => loadCover(r.cover)));
+  ctx.restore();
+}
 
-  const canvas = document.createElement('canvas');
-  canvas.width = SHARE_WIDTH;
-  canvas.height = SHARE_HEIGHT;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
+function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, size: number, hot: boolean) {
+  ctx.fillStyle = hot ? ACCENT : BG;
+  ctx.globalAlpha = hot ? 1 : 0.85;
+  round(ctx, x, y, size, size, size / 3);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = hot ? BG : INK;
+  ctx.font = `600 ${Math.round(size * 0.52)}px ${DISPLAY}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(String(n), x + size / 2, y + size / 2 + size * 0.19);
+  ctx.textAlign = 'left';
+}
 
-  const pad = 64;
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = INK;
-  ctx.font = `600 52px ${display}`;
-  ctx.fillText(heading, pad, 112);
+/** Height of the picture for a layout and row count. */
+export function shareHeight(layout: ShareLayout, count: number): number {
+  if (layout === 'list') return 1350;
+  const rest = Math.max(count - 3, 0);
+  const rows = Math.ceil(rest / 4);
+  return rows ? GRID_TOP_END + 30 + rows * (GRID_CELL_H + 16) + 96 : GRID_TOP_END + 96;
+}
 
+const GRID_TOP = 168;
+const TOP_W = Math.floor((SHARE_WIDTH - PAD * 2 - 48) / 3);
+const TOP_H = Math.round((TOP_W * 3) / 2);
+const GRID_TOP_END = GRID_TOP + TOP_H + 14 + 2 * 32 + 30 + 20;
+const CELL_W = Math.floor((SHARE_WIDTH - PAD * 2 - 3 * 20) / 4);
+const CELL_COVER_H = Math.round((CELL_W * 3) / 2);
+const GRID_CELL_H = CELL_COVER_H + 12 + 2 * 26;
+
+function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[]) {
+  const measure = (s: string) => ctx.measureText(s).width;
+  rows.forEach((row, i) => {
+    let x: number, y: number, w: number, h: number, titleSize: number, lineH: number, lines: number;
+    if (i < 3) {
+      x = PAD + i * (TOP_W + 24);
+      y = GRID_TOP;
+      w = TOP_W;
+      h = TOP_H;
+      titleSize = 28;
+      lineH = 32;
+      lines = 2;
+    } else {
+      const k = i - 3;
+      x = PAD + (k % 4) * (CELL_W + 20);
+      y = GRID_TOP_END + 30 + Math.floor(k / 4) * (GRID_CELL_H + 16);
+      w = CELL_W;
+      h = CELL_COVER_H;
+      titleSize = 22;
+      lineH = 26;
+      lines = 2;
+    }
+    coverBox(ctx, row, covers[i], x, y, w, h, 14);
+    badge(ctx, row.rank, x + 10, y + 10, i < 3 ? 56 : 44, i < 3);
+
+    ctx.fillStyle = INK;
+    ctx.font = `600 ${titleSize}px ${BODY}`;
+    let ty = y + h + 12 + titleSize;
+    for (const l of wrapLines(measure, row.title, w, lines)) {
+      ctx.fillText(l, x, ty);
+      ty += lineH;
+    }
+    if (i < 3 && row.meta) {
+      ctx.fillStyle = MUTED;
+      ctx.font = `22px ${BODY}`;
+      ctx.fillText(wrapLines(measure, row.meta, w, 1)[0], x, y + h + 20 + 2 * lineH + 22);
+    }
+  });
+}
+
+function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], height: number) {
   const top = 168;
-  const bottom = SHARE_HEIGHT - 96;
+  const bottom = height - 96;
   const gap = 12;
   const rowH = Math.floor((bottom - top - gap * (rows.length - 1)) / Math.max(rows.length, 1));
   const capped = Math.min(rowH, 112);
@@ -103,32 +160,22 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Blob
   rows.forEach((row, i) => {
     const y = top + i * (capped + gap);
     ctx.fillStyle = SURFACE;
-    round(ctx, pad, y, SHARE_WIDTH - pad * 2, capped, 20);
+    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, capped, 20);
     ctx.fill();
 
     ctx.fillStyle = i < 3 ? ACCENT : MUTED;
-    ctx.font = `600 ${i < 3 ? 40 : 34}px ${display}`;
+    ctx.font = `600 ${i < 3 ? 40 : 34}px ${DISPLAY}`;
     ctx.textAlign = 'center';
-    ctx.fillText(String(row.rank), pad + 56, y + capped / 2 + 14);
+    ctx.fillText(String(row.rank), PAD + 56, y + capped / 2 + 14);
     ctx.textAlign = 'left';
 
-    const cx = pad + 112;
-    const cy = y + 6;
-    ctx.save();
-    round(ctx, cx, cy, coverW, coverH, 10);
-    ctx.clip();
-    const img = covers[i];
-    if (img) ctx.drawImage(img, cx, cy, coverW, coverH);
-    else {
-      ctx.fillStyle = row.color ?? '#353459';
-      ctx.fillRect(cx, cy, coverW, coverH);
-    }
-    ctx.restore();
+    const cx = PAD + 112;
+    coverBox(ctx, row, covers[i], cx, y + 6, coverW, coverH, 10);
 
     const tx = cx + coverW + 28;
-    const tw = SHARE_WIDTH - pad - 28 - tx;
+    const tw = SHARE_WIDTH - PAD - 28 - tx;
     ctx.fillStyle = INK;
-    ctx.font = `600 30px ${body}`;
+    ctx.font = `600 30px ${BODY}`;
     const lines = wrapLines((s) => ctx.measureText(s).width, row.title, tw, 2);
     const block = lines.length * 36 + (row.meta ? 34 : 0);
     let ty = y + (capped - block) / 2 + 28;
@@ -138,16 +185,43 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Blob
     }
     if (row.meta) {
       ctx.fillStyle = MUTED;
-      ctx.font = `24px ${body}`;
+      ctx.font = `24px ${BODY}`;
       ctx.fillText(wrapLines((s) => ctx.measureText(s).width, row.meta, tw, 1)[0], tx, ty - 2);
     }
   });
+}
+
+export async function renderTop(rows: ShareRow[], heading: string, layout: ShareLayout = 'grid'): Promise<Blob> {
+  try {
+    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
+  } catch {
+    // Fall back to the system fonts.
+  }
+  const covers = await Promise.all(rows.map((r) => loadCover(r.cover)));
+
+  const height = shareHeight(layout, rows.length);
+  const canvas = document.createElement('canvas');
+  canvas.width = SHARE_WIDTH;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, SHARE_WIDTH, height);
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = INK;
+  ctx.font = `600 52px ${DISPLAY}`;
+  ctx.fillText(heading, PAD, 112);
+
+  if (layout === 'grid') drawGrid(ctx, rows, covers);
+  else drawList(ctx, rows, covers, height);
 
   ctx.fillStyle = MUTED;
-  ctx.font = `600 26px ${display}`;
+  ctx.font = `600 26px ${DISPLAY}`;
   ctx.textAlign = 'right';
-  ctx.fillText('Shōbu', SHARE_WIDTH - pad, SHARE_HEIGHT - 44);
+  ctx.fillText('Shōbu', SHARE_WIDTH - PAD, height - 44);
   ctx.textAlign = 'left';
+
+  for (const c of covers) c?.close();
 
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the picture.'))), 'image/png'),
