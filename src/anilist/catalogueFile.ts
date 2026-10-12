@@ -1,4 +1,5 @@
 import type { Item } from '../types';
+import { franchiseTags } from './group';
 
 export const CATALOGUE_FORMAT = 'pairwise-catalogue';
 
@@ -24,7 +25,18 @@ export async function loadCatalogueFile(): Promise<CatalogueFile> {
   if (!res.ok || body?.format !== CATALOGUE_FORMAT || !Array.isArray(body.items)) {
     throw new Error('The title list could not be read. Try again later.');
   }
+  withTags(body.items);
   return body;
+}
+
+/** Fills in each title's tags from its entries; the file leaves them out to save space. */
+export function withTags(items: Item[]): Item[] {
+  for (const item of items) {
+    if (item.tags || !item.entries) continue;
+    const tags = franchiseTags(item.entries);
+    if (tags.length) item.tags = tags;
+  }
+  return items;
 }
 
 /**

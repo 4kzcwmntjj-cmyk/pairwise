@@ -208,6 +208,7 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
       const first = parents[0] ?? baseById.get(baseOfEntry.get(entryIds[0])!)!;
       const years = parents.flatMap((p) => [p.startYear, p.endYear]).filter((y): y is number => y !== undefined);
       const genres = [...new Set(parents.flatMap((p) => p.genres ?? []))].slice(0, 6);
+      const tags = [...new Set(parents.flatMap((p) => p.tags ?? []))].slice(0, 8);
       item = {
         ...first,
         id,
@@ -217,6 +218,7 @@ export function applyGroupOps(base: Item[], ops: GroupOp[]): Grouping {
         endYear: years.length ? Math.max(...years) : first.endYear,
         popularity: Math.max(...parents.map((p) => p.popularity), first.popularity),
         ...(genres.length ? { genres } : {}),
+        ...(tags.length ? { tags } : {}),
       };
       delete item.entries;
     }

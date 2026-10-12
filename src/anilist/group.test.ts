@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addEntry, describeFormats, franchiseFor, groupFranchises, storylinesOf, type BridgeCut, type RawMedia } from './group';
+import { addEntry, describeFormats, franchiseFor, groupFranchises, storylinesOf, tagsOf, type BridgeCut, type RawMedia } from './group';
 
 function media(id: number, title: string, opts: Partial<RawMedia> & { year?: number; rel?: [string, number][] } = {}): RawMedia {
   return {
@@ -249,5 +249,50 @@ describe('storylines', () => {
     ]);
     expect(items[0].entries!.some((e) => e.story !== undefined)).toBe(false);
     expect(storylinesOf(items[0].entries)).toEqual([]);
+  });
+});
+
+describe('tags', () => {
+  const tag = (name: string, rank: number, more: Partial<NonNullable<RawMedia['tags']>[number]> = {}) => ({
+    name,
+    rank,
+    category: 'Theme-Other',
+    isGeneralSpoiler: false,
+    isMediaSpoiler: false,
+    isAdult: false,
+    ...more,
+  });
+
+  it('keeps strong, spoiler-free, non-adult tags, strongest first, at most six', () => {
+    const m = {
+      tags: [
+        tag('Weak', 40),
+        tag('Time Skip', 70),
+        tag('Revenge', 93),
+        tag('Twist', 90, { isMediaSpoiler: true }),
+        tag('Other twist', 90, { isGeneralSpoiler: true }),
+        tag('CGI', 95, { category: 'Technical' }),
+        tag('Adult', 95, { isAdult: true }),
+        tag('Nudity', 95),
+        tag('A', 61),
+        tag('B', 62),
+        tag('C', 63),
+        tag('D', 64),
+        tag('E', 65),
+      ],
+    };
+    expect(tagsOf(m)).toEqual(['Revenge', 'Time Skip', 'E', 'D', 'C', 'B']);
+  });
+
+  it('puts franchise tags in the order of the entries that carry them, weighted by popularity', () => {
+    const items = groupFranchises([
+      { ...media(1, 'Show', { popularity: 10000, rel: [['SEQUEL', 2]] }), tags: [tag('Tragedy', 90), tag('War', 80)] },
+      { ...media(2, 'Show S2', { popularity: 8100, year: 2012, rel: [['PREQUEL', 1]] }), tags: [tag('War', 90), tag('Time Skip', 85)] },
+      { ...media(3, 'Show OVA', { format: 'OVA', popularity: 100, rel: [['PARENT', 1]] }), tags: [tag('Beach', 90)] },
+    ]);
+    const show = items[0];
+    expect(show.entries!.find((e) => e.id === 1)!.tags).toEqual(['Tragedy', 'War']);
+    // War is on both seasons; Tragedy and Time Skip on one each; Beach is on a small OVA only.
+    expect(show.tags).toEqual(['War', 'Tragedy', 'Time Skip']);
   });
 });

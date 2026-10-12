@@ -47,7 +47,8 @@ async function main() {
   // The raw AniList answers, kept as a workflow artifact (not committed) so grouping can be checked offline.
   writeFileSync('raw-media.json.gz', gzipSync(JSON.stringify(media)));
   // Keep the ids of franchises from the previous file so saved marks and votes still match.
-  const items = groupFranchises(media, previous);
+  // Franchise tags are left out of the file (about 400 KB) and worked out from the entries on load.
+  const items = groupFranchises(media, previous).map(({ tags: _tags, ...item }) => item);
   const file: CatalogueFile = {
     format: CATALOGUE_FORMAT,
     version: 1,

@@ -68,10 +68,12 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
     const it = app.itemById.get(id);
     return it ? `${app.title(it)} (#${app.rankOf.get(id)})` : '';
   };
-  const reasonOf = ({ because, genres }: Recommendation) =>
+  const reasonOf = ({ because, genres, tags }: Recommendation) =>
     because.length
       ? `Because you rank ${because.slice(0, 2).sort((x, y) => (app.rankOf.get(x) ?? 0) - (app.rankOf.get(y) ?? 0)).map(name).join(' and ')} highly`
-      : `Genres you rank well: ${genres.slice(0, 3).join(', ')}`;
+      : tags.length
+        ? `Tags you rank well: ${tags.slice(0, 3).join(', ')}`
+        : `Genres you rank well: ${genres.slice(0, 3).join(', ')}`;
 
   return (
     <main className="screen for-you">
@@ -115,7 +117,7 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
         <h3 className="row-heading">More suggestions</h3>
         <p className="hint">
           Titles you haven't logged as seen, from AniList users' recommendations for the shows you rank highest, and the
-          genres you rank well. They sharpen as your ranking settles.
+          genres and tags you rank well. They sharpen as your ranking settles.
         </p>
         {shown.length === 0 ? (
           <p className="empty-list">No suggestions yet. Rank a few more titles.</p>

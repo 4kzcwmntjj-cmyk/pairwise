@@ -12,6 +12,8 @@ export interface Entry {
   cover?: string;
   studio?: string;
   genres?: string[];
+  /** AniList tags (themes, settings, cast), strongest first; spoilers and adult tags left out. */
+  tags?: string[];
   /** Which storyline of its franchise the entry belongs to (an entry id). Only set when there are two or more. */
   story?: number;
 }
@@ -40,6 +42,8 @@ export interface Item {
   averageScore?: number;
   /** AniList genres across the franchise, most common first. */
   genres?: string[];
+  /** AniList tags across the franchise, strongest first (see franchiseTags). Absent in catalogues before 13 Oct 2026. */
+  tags?: string[];
   /** AniList user recommendations from this title: [item id, total rating], strongest first. */
   recs?: [string, number][];
   /** The entries that make up the franchise, when known (catalogues built before October 2026 lack them). */

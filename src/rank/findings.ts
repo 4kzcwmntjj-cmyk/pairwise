@@ -38,6 +38,59 @@ export const GENRE_TYPES: Record<string, string> = {
   Thriller: 'The Thrill Seeker',
 };
 
+/**
+ * Names for tag types: AniList tags specific enough to say something about taste. Other tags never
+ * name a type, but any of them can show as the tag lean.
+ */
+export const TAG_TYPES: Record<string, string> = {
+  'Anti-Hero': 'The Rebel',
+  'Coming of Age': 'The Late Bloomer',
+  Crime: 'The Crime Buff',
+  Cyberpunk: 'The Netrunner',
+  'Cute Girls Doing Cute Things': 'The Softie',
+  'Death Game': 'The Contestant',
+  'Family Life': 'The Homebody',
+  Food: 'The Foodie',
+  'Found Family': 'The Kindred Spirit',
+  Gore: 'The Strong Stomach',
+  Historical: 'The History Buff',
+  Isekai: 'The World-Hopper',
+  Iyashikei: 'The Unwinder',
+  'Martial Arts': 'The Fighter',
+  Philosophy: 'The Philosopher',
+  Politics: 'The Power Broker',
+  'Post-Apocalyptic': 'The Wastelander',
+  'Primarily Adult Cast': 'The Grown-Up',
+  Rehabilitation: 'The Healer',
+  Revenge: 'The Avenger',
+  Space: 'The Stargazer',
+  'Super Power': 'The Powerhouse',
+  'Surreal Comedy': 'The Absurdist',
+  Survival: 'The Survivor',
+  Swordplay: 'The Swordsman',
+  'Time Manipulation': 'The Time Traveller',
+  'Video Games': 'The Gamer',
+  War: 'The Strategist',
+  Work: 'The Nine-to-Fiver',
+};
+
+/** Tags about who is in the cast, or the magazine's audience: true of a list, but not a theme. */
+export const NOT_THEMES = new Set([
+  'Male Protagonist',
+  'Female Protagonist',
+  'Ensemble Cast',
+  'Primarily Teen Cast',
+  'Primarily Adult Cast',
+  'Primarily Female Cast',
+  'Primarily Male Cast',
+  'Primarily Child Cast',
+  'Shounen',
+  'Seinen',
+  'Shoujo',
+  'Josei',
+  'Kids',
+]);
+
 export interface Archetype {
   id: string;
   name: string;
@@ -56,6 +109,8 @@ export interface Traits {
   agreement: number | null;
   era: { median: number | null; old: number; recent: number; of: number };
   genre: { name: string; count: number; typical: number; of: number } | null;
+  /** The theme tag most over-represented in your top 20, when one stands out (3+ titles). */
+  tag: { name: string; count: number; typical: number; of: number } | null;
   studio: { name: string; count: number; of: number } | null;
   tieShare: number;
 }
@@ -219,6 +274,37 @@ export function pickType(input: TypeInput): TypeFinding {
       });
   }
 
+  // Tags: one test per named tag; at least 5 titles. The trait line can name any theme tag (3+ titles).
+  const tagNames = Object.keys(TAG_TYPES);
+  for (const t of tagNames) {
+    const has = (i: Item) => !!i.tags?.includes(t);
+    const hits = wide.filter(has);
+    if (hits.length < 5) continue;
+    const p = baseRate(catalogue, has);
+    if (p === 0) continue;
+    candidates.push({
+      id: `tag:${t}`,
+      name: TAG_TYPES[t],
+      sentence: `${hits.length} of your top ${nw} are tagged ${t}.`,
+      typical: typicalText(nw, nw * p),
+      strength: surprise(nw, p, hits.length, tagNames.length),
+      ids: ids(hits),
+    });
+  }
+  let tagTrait: Traits['tag'] = null;
+  let bestTag = 0;
+  const wideTags = new Map<string, number>();
+  for (const i of wide) for (const t of i.tags ?? []) if (!NOT_THEMES.has(t)) wideTags.set(t, (wideTags.get(t) ?? 0) + 1);
+  for (const [t, count] of wideTags) {
+    if (count < 3) continue;
+    const p = baseRate(catalogue, (i) => !!i.tags?.includes(t));
+    const s = surprise(nw, p, count, wideTags.size);
+    if (s > bestTag) {
+      bestTag = s;
+      tagTrait = { name: t, count, typical: nw * p, of: nw };
+    }
+  }
+
   // Studio: one test per studio in your top 20; at least 3 titles.
   const studios = new Map<string, Item[]>();
   for (const i of wide) if (i.studio) studios.set(i.studio, [...(studios.get(i.studio) ?? []), i]);
@@ -267,7 +353,7 @@ export function pickType(input: TypeInput): TypeFinding {
       : {
           id: 'all',
           name: 'The All-Rounder',
-          sentence: `No era, genre or studio stands out in your top ${nw}.`,
+          sentence: `No era, genre, theme or studio stands out in your top ${nw}.`,
           strength: 0,
           ids: [],
         };
@@ -280,6 +366,7 @@ export function pickType(input: TypeInput): TypeFinding {
       agreement: r,
       era: { median: median(top.flatMap((i) => (i.startYear ? [i.startYear] : []))), old: old.length, recent: recent.length, of: n },
       genre: genreTrait,
+      tag: tagTrait,
       studio: studioTrait,
       tieShare: input.tieShare,
     },
@@ -437,3 +524,33 @@ export const eraLean = (ranked: Item[], top = GENRE_TOP) =>
 
 /** Studio most over-represented in your top 20 (at least 2 titles). */
 export const studioLean = (ranked: Item[], top = GENRE_TOP) => lean(ranked, (i) => i.studio, 2, top);
+
+// ------------------------------------------------------------------ themes
+
+export interface ThemeLean {
+  name: string;
+  /** Titles in your top N with this tag, best first. */
+  ids: string[];
+  of: number;
+  /** Share of your whole ranked list with this tag, 0 to 1. */
+  listShare: number;
+}
+
+/**
+ * Theme tags most over-represented in your top 20 compared with your whole list: at least 3 titles,
+ * and at least MIN_EXCESS more than the list's own share would give. Up to `count`, biggest excess first.
+ */
+export function themeLeans(ranked: Item[], top = GENRE_TOP, count = 3): ThemeLean[] {
+  const head = ranked.slice(0, top);
+  if (head.length < 10) return [];
+  const total = new Map<string, number>();
+  for (const i of ranked) for (const t of i.tags ?? []) total.set(t, (total.get(t) ?? 0) + 1);
+  const groups = new Map<string, string[]>();
+  for (const i of head) for (const t of i.tags ?? []) if (!NOT_THEMES.has(t)) groups.set(t, [...(groups.get(t) ?? []), i.id]);
+  return [...groups]
+    .map(([name, ids]) => ({ name, ids, excess: ids.length - (head.length * (total.get(name) ?? 0)) / ranked.length }))
+    .filter((g) => g.ids.length >= 3 && g.excess >= MIN_EXCESS)
+    .sort((a, b) => b.excess - a.excess || b.ids.length - a.ids.length || a.name.localeCompare(b.name))
+    .slice(0, count)
+    .map((g) => ({ name: g.name, ids: g.ids, of: head.length, listShare: (total.get(g.name) ?? 0) / ranked.length }));
+}

@@ -4,7 +4,7 @@
  * picture to share, so the two always say the same thing.
  */
 
-import { blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, type TypeFinding } from '../rank/findings';
+import { blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, themeLeans, type TypeFinding } from '../rank/findings';
 import type { CrowdView } from '../rank/stats';
 import type { Item, Mark, Vote } from '../types';
 
@@ -55,12 +55,16 @@ export const ordinal = (n: number) => {
   return `${n}${suffix}`;
 };
 
+/** "A", "A and B", "A, B and C". */
+const listOf = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
 export function typeFacts(t: TypeFinding): { label: string; value: string }[] {
-  const { mainstream, agreement, era, genre, studio, tieShare } = t.traits;
+  const { mainstream, agreement, era, genre, tag, studio, tieShare } = t.traits;
   const facts = [{ label: 'Mainstream', value: `${mainstream.count} of top ${mainstream.of} in the 100 most popular` }];
   facts.push({ label: 'Agrees with AniList', value: agreement === null ? 'Too few scores' : `${Math.round(agreement * 100)}%` });
   if (era.median) facts.push({ label: 'Era', value: `Top ${era.of} started ${era.median} (median)` });
   if (genre) facts.push({ label: 'Genre lean', value: `${genre.name}, ${genre.count} of top ${genre.of} (typical ${Math.max(Math.round(genre.typical), 0)})` });
+  if (tag) facts.push({ label: 'Theme lean', value: `${tag.name}, ${tag.count} of top ${tag.of} (typical ${Math.max(Math.round(tag.typical), 0)})` });
   if (studio) facts.push({ label: 'Studio', value: `${studio.name}, ${studio.count} of top ${studio.of}` });
   facts.push({ label: 'Too close to call', value: `${Math.round(tieShare * 100)}% of duels` });
   return facts;
@@ -155,6 +159,25 @@ export function buildCards(input: CardInput): CardSpec[] {
       lines: [`${era.ids.length} of your top ${era.of} started in the ${era.name}. Across your whole list, ${Math.round(era.listShare * 100)}% did.`],
       covers: ranked5(era.ids),
     });
+
+  const themes = themeLeans(ranked);
+  if (themes.length) {
+    const names = themes.map((t) => t.name);
+    const headline = listOf(names);
+    const covers: string[] = [];
+    for (const t of themes) for (const id of t.ids) if (!covers.includes(id)) covers.push(id);
+    covers.sort((a, b) => rankOf.get(a)! - rankOf.get(b)!);
+    cards.push({
+      id: 'themes',
+      kicker: themes.length > 1 ? 'Your themes' : 'Your theme',
+      headline,
+      lines: [
+        `${listOf(themes.map((t) => `${t.name} ${t.ids.length}`))} of your top ${themes[0].of}.`,
+        `Across your whole list: ${listOf(themes.map((t) => `${t.name} ${Math.round(t.listShare * 100)}%`))}.`,
+      ],
+      covers: ranked5(covers),
+    });
+  }
 
   const studio = studioLean(ranked);
   if (studio)

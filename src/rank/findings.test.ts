@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
-import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, QUALIFY } from './findings';
+import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, QUALIFY } from './findings';
 import { crowdView } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
@@ -163,5 +163,34 @@ describe('era and studio', () => {
     const ranked = Array.from({ length: 40 }, (_, i) => item(`e${i}`, { startYear: 2000 + (i % 20), studio: `S${i % 10}` }));
     expect(eraLean(ranked)).toBeNull();
     expect(studioLean(ranked)).toBeNull();
+  });
+});
+
+describe('tags', () => {
+  // Revenge on every 25th catalogue title, so about 4% of a typical list.
+  const tagged = catalogue.map((i, k) => ({ ...i, tags: k % 25 === 0 ? ['Revenge', 'Male Protagonist'] : ['Male Protagonist'] }));
+  const revenge = tagged.filter((i) => i.tags.includes('Revenge'));
+  const plain = (n: number) => neutral(n, (i) => i.id === 'x').map((i) => tagged.find((t) => t.id === i.id)!).filter((i) => !i.tags.includes('Revenge'));
+
+  it('names a tag type when a named tag fills the top 20', () => {
+    const ranked = [...spread(revenge, 8), ...plain(30)];
+    const t = pickType({ ...base, catalogue: tagged, ranked });
+    expect(t.type.name).toBe('The Avenger');
+    expect(t.type.sentence).toBe('8 of your top 20 are tagged Revenge.');
+    expect(t.traits.tag?.name).toBe('Revenge');
+  });
+
+  it('leaves cast tags out of the theme lean', () => {
+    const ranked = plain(30);
+    const t = pickType({ ...base, catalogue: tagged, ranked });
+    expect(t.traits.tag).toBeNull();
+  });
+
+  it('finds themes over-represented in the top 20 against the whole list', () => {
+    const ranked = [...spread(revenge, 5), ...plain(35), ...spread(revenge.slice(12), 1)];
+    const leans = themeLeans(ranked);
+    expect(leans.map((l) => l.name)).toEqual(['Revenge']);
+    expect(leans[0].ids).toHaveLength(5);
+    expect(themeLeans(plain(40))).toEqual([]);
   });
 });

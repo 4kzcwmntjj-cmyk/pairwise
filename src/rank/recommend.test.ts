@@ -53,6 +53,29 @@ describe('recommend', () => {
     expect(recs[0].genres).toEqual(['Drama']);
   });
 
+  it('uses tags as well as genres, and names tags held by two or more ranked titles', () => {
+    const fit4 = fit({
+      ids: ['a', 'b', 'c', 'd'],
+      anchors: {},
+      votes: [
+        ...Array(4).fill({ a: 'a', b: 'c', outcome: 'a' }),
+        ...Array(4).fill({ a: 'b', b: 'c', outcome: 'a' }),
+        ...Array(4).fill({ a: 'c', b: 'd', outcome: 'a' }),
+      ],
+    });
+    const items = [
+      item('a', { genres: ['Drama'], tags: ['Revenge'] }),
+      item('b', { genres: ['Drama'], tags: ['Revenge'] }),
+      item('c', { genres: ['Drama'], tags: ['Iyashikei'] }),
+      item('d', { genres: ['Drama'], tags: ['Iyashikei'] }),
+      item('t1', { genres: ['Drama'], tags: ['Revenge'] }),
+      item('t2', { genres: ['Drama'], tags: ['Iyashikei'] }),
+    ];
+    const recs = recommend(items, fit4, seen(['a', 'b', 'c', 'd']));
+    expect(recs.map((r) => r.item.id)).toEqual(['t1']);
+    expect(recs[0].tags).toEqual(['Revenge']);
+  });
+
   it('never suggests a title you have marked seen', () => {
     const items = [item('loved', { recs: [['middle', 99]] }), item('middle'), item('disliked')];
     const recs = recommend(items, f, seen(['loved', 'middle', 'disliked']));

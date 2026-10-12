@@ -14,7 +14,7 @@ const item = (id: string, extra: Partial<Item> = {}): Item => ({
   ...extra,
 });
 const mark = (id: string, extra: Partial<Mark> = {}): [string, Mark] => [id, { itemId: id, status: 'seen', updatedAt: 0, ...extra }];
-const rec = (it: Item, score: number, links = score): Recommendation => ({ item: it, score, links, because: [], genres: [] });
+const rec = (it: Item, score: number, links = score): Recommendation => ({ item: it, score, links, because: [], genres: [], tags: [] });
 const never = () => false;
 
 describe('hiddenGems', () => {

@@ -407,8 +407,68 @@ export function groupFranchises(media: RawMedia[], existing: Item[] = [], onCut?
   return items.sort((a, b) => b.popularity - a.popularity);
 }
 
+/** Tags kept per entry: AniList's rank (share of voters who agree) at least this, at most MAX_ENTRY_TAGS. */
+export const TAG_MIN_RANK = 60;
+export const MAX_ENTRY_TAGS = 6;
+export const MAX_ITEM_TAGS = 8;
+/** Tag categories left out: sexual content, and technical ones (CGI, Full Color) that say nothing about taste. */
+const DROP_TAG_CATEGORIES = new Set(['Sexual Content', 'Technical']);
+/** Tags left out by name: content warnings that would read badly as a reason or a type, and Heterosexual (near-universal). */
+export const DROP_TAGS = new Set([
+  'Nudity',
+  'Suicide',
+  'Bullying',
+  'Torture',
+  'Drugs',
+  'Slavery',
+  'Cannibalism',
+  'Psychosexual',
+  'Ero Guro',
+  'Incest',
+  'Heterosexual',
+]);
+
+/** An entry's tags, strongest first, without spoilers, adult tags and the ones dropped above. */
+export function tagsOf(m: Pick<RawMedia, 'tags'>): string[] {
+  return [...(m.tags ?? [])]
+    .filter(
+      (t) =>
+        !t.isAdult &&
+        !t.isMediaSpoiler &&
+        !t.isGeneralSpoiler &&
+        (t.rank ?? 0) >= TAG_MIN_RANK &&
+        !DROP_TAG_CATEGORIES.has(t.category ?? '') &&
+        !DROP_TAGS.has(t.name),
+    )
+    .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0))
+    .slice(0, MAX_ENTRY_TAGS)
+    .map((t) => t.name);
+}
+
+/**
+ * A franchise's tags from its entries: each entry votes for its tags with the square root of its
+ * popularity, so the main series counts for more than a stray OVA. A tag needs entries holding at
+ * least a quarter of the votes when the franchise has several entries.
+ */
+export function franchiseTags(entries: Entry[]): string[] {
+  const weight = new Map<string, number>();
+  let total = 0;
+  for (const e of entries) {
+    if (!e.tags?.length) continue;
+    const w = Math.sqrt(Math.max(e.popularity, 1));
+    total += w;
+    e.tags.forEach((t, i) => weight.set(t, (weight.get(t) ?? 0) + w * (1 - i * 0.05)));
+  }
+  return [...weight.entries()]
+    .filter(([, w]) => w >= total * 0.25)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_ITEM_TAGS)
+    .map(([t]) => t);
+}
+
 export function entryOf(m: RawMedia, story?: number): Entry {
   const genres = m.genres ?? [];
+  const tags = tagsOf(m);
   return {
     ...(story !== undefined ? { story } : {}),
     id: m.id,
@@ -421,6 +481,7 @@ export function entryOf(m: RawMedia, story?: number): Entry {
     cover: m.coverImage?.large ?? undefined,
     studio: m.studios?.nodes[0]?.name,
     ...(genres.length ? { genres } : {}),
+    ...(tags.length ? { tags } : {}),
   };
 }
 
@@ -442,6 +503,7 @@ export function summarise(entries: Entry[]): Omit<Item, 'id' | 'recs'> {
   const genreCount = new Map<string, number>();
   for (const e of entries) for (const g of e.genres ?? []) genreCount.set(g, (genreCount.get(g) ?? 0) + 1);
   const genres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
+  const tags = franchiseTags(entries);
   return {
     category: 'anime',
     source: 'anilist',
@@ -457,6 +519,7 @@ export function summarise(entries: Entry[]): Omit<Item, 'id' | 'recs'> {
     popularity: top.popularity,
     averageScore: top.averageScore,
     ...(genres.length ? { genres } : {}),
+    ...(tags.length ? { tags } : {}),
     entries,
   };
 }

@@ -320,6 +320,13 @@ a {
   font-size: 0.85rem;
 }
 
+.item-tags {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* Welcome */
 .welcome {
   max-width: 520px;

@@ -1,3 +1,4 @@
+import { NOT_THEMES } from '../rank/findings';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   MIN_DUELS_FOR_TASTE,
@@ -61,6 +62,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
     const pick = (keys: (i: Item) => string[], min: number) => extremes(tasteBy(ranked, keys, min));
     return {
       genres: pick((i) => i.genres ?? [], 5),
+      tags: pick((i) => (i.tags ?? []).filter((t) => !NOT_THEMES.has(t)), 5),
       studios: pick((i) => (i.studio ? [i.studio] : []), 3),
       decades: pick(decadeOf, 4),
     };
@@ -186,6 +188,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
             {taste ? (
               <>
                 <TasteBlock heading="Genres" data={taste.genres} />
+                <TasteBlock heading="Themes (AniList tags)" data={taste.tags} />
                 <TasteBlock heading="Studios" data={taste.studios} />
                 <TasteBlock heading="Decades" data={taste.decades} />
               </>
