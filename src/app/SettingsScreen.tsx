@@ -76,7 +76,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
         <ViewSwitch app={app} />
         <p>
           One ranking underneath. The anime view shows what you've watched, the manga view what you've read, and both shows
-          everything. For a title that exists as both, Sort asks which you know. Duels only use titles in the view.
+          everything. For a title that exists as both, the Library asks which you know. Duels only use titles in the view.
         </p>
       </section>
 

@@ -63,7 +63,8 @@ export type View = 'anime' | 'manga' | 'both';
 export type Medium = 'anime' | 'manga';
 
 export type Outcome = 'a' | 'b' | 'tie';
-export type DuelMode = 'place' | 'refine' | 'explore';
+/** 'new' brings in a title you hadn't sorted yet. */
+export type DuelMode = 'place' | 'refine' | 'explore' | 'new';
 
 export interface Vote {
   id?: number;

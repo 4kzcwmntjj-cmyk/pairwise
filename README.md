@@ -33,3 +33,11 @@ Settings and the welcome screen link to a short in-app guide (`src/app/HowItWork
 ## How a title is shown
 
 `src/rank/look.ts` picks the side of a title to show (`sideFor`) and builds its cover, years and description from that side's entries (`lookOf`). Anime and manga views show their side; the both view shows the side you know, or the anime with the manga noted when you know both or haven't said. Stats read years, studio and AniList score from the shown side (`withLook`).
+
+## Newcomer duels and the Library
+
+Duel now brings in unsorted titles you've probably seen (`newcomer` pairs in `src/rank/pairs.ts`), using the same "probably seen" model as the quick sort (chance at least 0.4). A newcomer meets a title from the middle of your list; picking either side marks it seen and its next duels place it. "Haven't seen" (or N) marks it not seen. How often newcomers come follows the last 12 outcomes (`newcomerShare`, stored as `newcomerLog` in meta): from about one duel in seven up to about one in two. In the both view, a newcomer that is both anime and manga is marked seen and the duel screen asks whether you watched or read it; "Later" leaves it as "watched or read?". Undo removes the vote and the mark together.
+
+Refinement leaves a pair alone once it has met twice, until 120 days after its last duel. In a simulated 80-title list this cut late duels between top-10 titles from about 30% to almost none.
+
+The Sort tab is now the Library: quick sort (one at a time, likeliest first) for starting a list, Browse (cover grid narrowed by status, decade and year), Search AniList, and a queue for titles still waiting on "watched or read?". The quick sort's long-shot notice also shows when the next title's chance of having been seen is under 15%.

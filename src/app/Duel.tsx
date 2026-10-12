@@ -5,7 +5,7 @@ import { Cover } from './Cover';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
-export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
+export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void }) {
   const [picked, setPicked] = useState<Outcome | null>(null);
   const pair = app.pair;
   const a = pair ? app.itemById.get(pair.a) : undefined;
@@ -30,6 +30,7 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
       else if (e.key.toLowerCase() === 's') app.skipPair();
+      else if (e.key.toLowerCase() === 'n' && pair?.newcomer && !picked) app.newcomerUnseen(pair.newcomer);
       else if (e.key === 'Backspace' || e.key.toLowerCase() === 'z') app.undo('duel');
       else return;
       e.preventDefault();
@@ -43,33 +44,35 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
     return (
       <main className="screen empty">
         <h2>Nothing to compare yet</h2>
-        <p>Mark at least two titles as seen in Sort, and duels start here.</p>
-        <button className="btn btn-primary" onClick={onSort}>
-          Go to Sort
+        <p>Mark at least two titles as seen in the Library, and duels start here.</p>
+        <button className="btn btn-primary" onClick={onLibrary}>
+          Go to the Library
         </button>
       </main>
     );
   }
 
   const placing = app.fit.order.filter((id) => (app.fit.duels.get(id) ?? 0) < PLACED_AFTER).length;
-  const unsorted = app.items.length - app.marks.size;
-
   const side = (item: Item, outcome: 'a' | 'b') => {
     const title = app.title(item);
+    const isNew = pair?.newcomer === item.id;
     const state = picked === outcome ? 'won' : picked && picked !== 'tie' ? 'lost' : picked === 'tie' ? 'tied' : '';
     return (
       <div className={`contender ${state}`}>
         <button className="contender-pick" onClick={() => choose(outcome)} aria-label={`Pick ${title}`}>
           <Cover look={app.look(item)} title={title} size="lg" />
-          <span className="contender-rank">#{app.rankOf.get(item.id)}</span>
+          <span className={`contender-rank${isNew ? ' is-new' : ''}`}>{isNew ? 'New' : `#${app.rankOf.get(item.id)}`}</span>
         </button>
         <h2 className="item-title">{title}</h2>
         <p className="item-meta">{app.look(item).meta}</p>
         <button
           className="btn btn-quiet btn-small"
           onClick={() => {
-            if (!picked) app.markItem(item.id, 'unseen', 'duel');
+            if (picked) return;
+            if (isNew) app.newcomerUnseen(item.id);
+            else app.markItem(item.id, 'unseen', 'duel');
           }}
+          title={isNew ? 'Key N' : undefined}
         >
           {viewWords(app.view).unseen}
         </button>
@@ -84,6 +87,11 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
         {placing > 0 ? `, ${placing} still being placed` : ''}
       </p>
       <p className="duel-question">Which do you prefer?</p>
+      {pair?.newcomer && (
+        <p className="hint newcomer-hint">
+          {app.title(app.itemById.get(pair.newcomer)!)} isn't on your list yet. Pick as usual if you know it.
+        </p>
+      )}
       <div className="arena" key={`${pair!.a}|${pair!.b}`}>
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
@@ -102,23 +110,36 @@ export function Duel({ app, onSort }: { app: AppState; onSort: () => void }) {
           Undo
         </button>
       </div>
+      {app.formAsk && app.itemById.get(app.formAsk) && (
+        <div className="notice form-ask" role="status">
+          <p>Did you watch {app.title(app.itemById.get(app.formAsk)!)}, read it, or both?</p>
+          <div className="action-row start">
+            <button className="btn btn-small" onClick={() => app.answerForm({ anime: true, manga: false })}>
+              Watched
+            </button>
+            <button className="btn btn-small" onClick={() => app.answerForm({ anime: false, manga: true })}>
+              Read
+            </button>
+            <button className="btn btn-small" onClick={() => app.answerForm({ anime: true, manga: true })}>
+              Both
+            </button>
+            <button className="btn btn-quiet btn-small" onClick={() => app.answerForm(null)}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
       <p className="moved" aria-live="polite">
         {app.moved &&
-          (app.moved.to < app.moved.from
+          (app.moved.isNew
+            ? `${app.moved.title} joins your list at #${app.moved.to}.`
+            : app.moved.to < app.moved.from
             ? `${app.moved.title} moved up to #${app.moved.to} (was #${app.moved.from}).`
             : app.moved.to > app.moved.from
               ? `${app.moved.title} moved down to #${app.moved.to}.`
               : `${app.moved.title} stays at #${app.moved.to}.`)}
       </p>
-      {unsorted > 0 && (
-        <p className="hint">
-          {unsorted.toLocaleString()} titles not sorted yet.{' '}
-          <button className="btn-link inline" onClick={onSort}>
-            Sort more
-          </button>
-        </p>
-      )}
-      <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo</p>
+      <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{pair?.newcomer ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
 }

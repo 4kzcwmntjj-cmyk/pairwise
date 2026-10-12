@@ -14,26 +14,30 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
       </p>
 
       <section>
-        <h3>1. Sort</h3>
+        <h3>1. Duel</h3>
         <p>
-          Sort shows one title at a time and asks if you know it. Answer for the ones you've watched or read; skip the rest.
-          Titles you know go into your ranking, and the rest stay out of your duels. Titles come roughly in order of how
-          likely you are to have seen them, and the guess improves as you answer. On a keyboard: Enter or Y for the first
-          choice, S to skip, Z or Backspace to undo.
+          Duel shows two titles and asks which you prefer. A tie is allowed. Left and right arrows pick, the down arrow
+          ties, S skips the pair and Z undoes. Early duels place a new title roughly; later ones settle neighbours that are
+          still close. Each duel moves the ranking straight away.
         </p>
         <p>
-          Some titles exist as both anime and manga, such as Death Note. For those, Sort asks which you know: watched, read,
-          both or neither. A card for a title is one franchise, so the answer is about the whole thing, not one season.
+          Some duels bring in a title marked New: one you haven't sorted but probably know. If you know it, pick as usual;
+          it joins your list and its next couple of duels place it. If not, press Haven't seen under it (or N). The fewer
+          you know, the less often they come. Two titles that have met twice aren't asked again for a few months, so the
+          top of your list doesn't keep replaying the same close calls.
         </p>
       </section>
 
       <section>
-        <h3>2. Duel</h3>
+        <h3>2. Library</h3>
         <p>
-          Duel shows two titles you know and asks which you prefer. A tie is allowed. Left and right arrows pick, the down
-          arrow ties, S skips the pair and Z undoes. Early duels place new titles roughly; later ones settle neighbours that
-          are still close. Each duel moves the ranking straight away, and the app tells you when a pick shifts a title a
-          long way.
+          The Library holds every title. Quick sort shows one at a time, likeliest first, and asks if you know it; it's the
+          fastest way to start a list. Browse shows covers you can narrow by decade and year, which helps you remember what
+          you've seen once the obvious ones are done. Search AniList finds anything older or less popular.
+        </p>
+        <p>
+          Some titles exist as both anime and manga, such as Death Note. For those, the Library asks which you know:
+          watched, read, both or neither. A card is one franchise, so the answer is about the whole thing, not one season.
         </p>
       </section>
 

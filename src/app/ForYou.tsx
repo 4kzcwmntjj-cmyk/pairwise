@@ -21,9 +21,9 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
     return (
       <main className="screen empty">
         <h2>Nothing to go on yet</h2>
-        <p>Mark a few titles as seen and do some duels. Suggestions come from the shows you rank highest.</p>
+        <p>Mark a few titles as seen in the Library and do some duels. Suggestions come from the shows you rank highest.</p>
         <button className="btn btn-primary" onClick={onSort}>
-          Go to Sort
+          Go to the Library
         </button>
       </main>
     );

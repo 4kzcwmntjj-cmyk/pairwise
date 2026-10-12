@@ -14,7 +14,7 @@ import { Welcome } from './Welcome';
 type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
 const TABS: [Tab, string][] = [
   ['duel', 'Duel'],
-  ['sort', 'Sort'],
+  ['sort', 'Library'],
   ['ranking', 'Ranking'],
   ['stats', 'Stats'],
   ['foryou', 'For you'],
@@ -80,7 +80,7 @@ export function App() {
           </div>
         </div>
       )}
-      {current === 'duel' && <Duel app={app} onSort={() => setTab('sort')} />}
+      {current === 'duel' && <Duel app={app} onLibrary={() => setTab('sort')} />}
       {current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onOpen={setOpenId} />}
       {current === 'stats' && <Stats app={app} onOpen={setOpenId} />}
       {current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}

@@ -1,19 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isMangaOnly } from '../anilist/group';
-import { choicesFor } from '../rank/medium';
-import { seenModel } from '../rank/seen';
+import { choicesFor, formUnknown } from '../rank/medium';
 import type { Item } from '../types';
 import { Add } from './Add';
 import { Cover } from './Cover';
+import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
 const PAGE = 60;
+
+/** Which titles the browse grid shows. */
+type Show = 'open' | 'unsorted' | 'seen' | 'unseen' | 'form';
 
 export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => void; onOpen: (id: string) => void }) {
   const [finding, setFinding] = useState(false);
   const onFind = () => setFinding(true);
   const seen = useMemo(() => [...app.marks.values()].filter((m) => m.status === 'seen').length, [app.marks]);
   const mode = app.settings.sortMode;
+  const [show, setShow] = useState<Show>('open');
+  // Titles marked seen before manga came in, which still need watched or read.
+  const formless = useMemo(
+    () => (app.view === 'both' ? app.items.filter((i) => formUnknown(i, app.allMarks.get(i.id))).length : 0),
+    [app.items, app.allMarks, app.view],
+  );
+  const browse = (s: Show) => {
+    setShow(s);
+    if (mode !== 'grid') app.setSettings({ ...app.settings, sortMode: 'grid' });
+  };
   if (finding) {
     return (
       <main className="screen sort">
@@ -29,11 +42,11 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
   return (
     <main className="screen sort">
       <div className="sort-head">
-        <div className="segmented" role="radiogroup" aria-label="How to sort">
+        <div className="segmented" role="radiogroup" aria-label="Library view">
           {(
             [
-              ['single', 'One at a time'],
-              ['grid', 'Tap what you’ve seen'],
+              ['single', 'Quick sort'],
+              ['grid', 'Browse'],
             ] as const
           ).map(([v, label]) => (
             <button
@@ -49,7 +62,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
         </div>
         <div className="action-row start">
           <button className="btn btn-small" onClick={onFind}>
-            Search
+            Search AniList
           </button>
           {seen >= 2 && (
             <button className="btn btn-primary btn-small" onClick={onDone}>
@@ -58,34 +71,80 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
           )}
         </div>
       </div>
-      {mode === 'grid' ? <SortGrid app={app} onFind={onFind} /> : <SortSingle app={app} onDone={onDone} onFind={onFind} />}
+      {formless > 0 && !(mode === 'grid' && show === 'form') && (
+        <p className="hint">
+          {formless === 1 ? '1 title is' : `${formless.toLocaleString()} titles are`} marked seen without saying whether you
+          watched or read.{' '}
+          <button className="btn-link inline" onClick={() => browse('form')}>
+            Go through them
+          </button>
+        </p>
+      )}
+      {mode === 'grid' ? (
+        <SortGrid app={app} onFind={onFind} onOpen={onOpen} show={show} setShow={setShow} />
+      ) : (
+        <SortSingle app={app} onDone={onDone} onFind={onFind} onBrowse={() => browse('unsorted')} />
+      )}
     </main>
   );
 }
 
-/** Every title as a cover grid, most popular first. Tap marks it seen; tap again to undo. */
-function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
+/**
+ * Every title as a cover grid, most popular first, narrowed by status, decade and year. Browsing by year
+ * helps you remember what you've seen, which the quick sort can't guess once the obvious titles are done.
+ * Tap marks it seen; tap again to undo.
+ */
+function SortGrid({
+  app,
+  onFind,
+  onOpen,
+  show,
+  setShow,
+}: {
+  app: AppState;
+  onFind: () => void;
+  onOpen: (id: string) => void;
+  show: Show;
+  setShow: (s: Show) => void;
+}) {
   const [query, setQuery] = useState('');
-  const [hideUnseen, setHideUnseen] = useState(true);
-  const [hideSeen, setHideSeen] = useState(false);
+  const [decade, setDecade] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
   const [limit, setLimit] = useState(PAGE);
   // Titles tapped since the filters last changed stay on screen, so a tap never makes a tile vanish under your finger.
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const sentinel = useRef<HTMLDivElement>(null);
 
   const q = query.trim().toLowerCase();
+  const yearOf = (i: Item) => app.look(i).startYear;
+  const decades = useMemo(() => {
+    const ds = new Set<number>();
+    for (const i of app.items) {
+      const y = yearOf(i);
+      if (y) ds.add(Math.floor(y / 10) * 10);
+    }
+    return [...ds].sort((a, b) => b - a);
+  }, [app.items, app.look]);
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
     if (q) items = items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
-    if (hideUnseen) items = items.filter((i) => touched.has(i.id) || app.marks.get(i.id)?.status !== 'unseen');
-    if (hideSeen) items = items.filter((i) => touched.has(i.id) || app.marks.get(i.id)?.status !== 'seen');
-    return items;
-  }, [app.items, app.marks, q, hideUnseen, hideSeen, touched]);
+    if (decade !== null) items = items.filter((i) => Math.floor((yearOf(i) ?? 0) / 10) * 10 === decade);
+    if (year !== null) items = items.filter((i) => yearOf(i) === year);
+    const status = (i: Item) => app.marks.get(i.id)?.status;
+    const keep: Record<Show, (i: Item) => boolean> = {
+      open: (i) => status(i) !== 'unseen',
+      unsorted: (i) => !status(i),
+      seen: (i) => status(i) === 'seen',
+      unseen: (i) => status(i) === 'unseen',
+      form: (i) => formUnknown(i, app.allMarks.get(i.id)),
+    };
+    return items.filter((i) => touched.has(i.id) || keep[show](i));
+  }, [app.items, app.marks, app.allMarks, app.look, q, decade, year, show, touched]);
 
   useEffect(() => {
     setLimit(PAGE);
     setTouched(new Set());
-  }, [q, hideUnseen, hideSeen]);
+  }, [q, decade, year, show]);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -97,8 +156,9 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
     return () => io.disconnect();
   }, [list.length]);
 
-  // One tap: seen. Two: haven't seen. Three: back to unmarked.
+  // One tap: seen. Two: haven't seen. Three: back to unmarked. Titles waiting for watched or read open instead.
   const cycle = (item: Item) => {
+    if (show === 'form') return onOpen(item.id);
     setTouched((t) => new Set(t).add(item.id));
     const status = app.marks.get(item.id)?.status;
     if (!status) app.markItem(item.id, 'seen');
@@ -125,20 +185,47 @@ function SortGrid({ app, onFind }: { app: AppState; onFind: () => void }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="checks">
-          <label className="check">
-            <input id="hide-unseen" type="checkbox" checked={hideUnseen} onChange={(e) => setHideUnseen(e.target.checked)} />
-            Hide titles marked haven't seen
-          </label>
-          <label className="check">
-            <input id="hide-seen" type="checkbox" checked={hideSeen} onChange={(e) => setHideSeen(e.target.checked)} />
-            Hide titles marked seen
-          </label>
+        <div className="grid-filters">
+          <select id="grid-show" aria-label="Show" value={show} onChange={(e) => setShow(e.target.value as Show)}>
+            <option value="open">Not sorted and seen</option>
+            <option value="unsorted">Not sorted</option>
+            <option value="seen">Seen</option>
+            <option value="unseen">{viewWords(app.view).unseen}</option>
+            {app.view === 'both' && <option value="form">Watched or read?</option>}
+          </select>
+          <select
+            id="grid-decade"
+            aria-label="Decade"
+            value={decade ?? ''}
+            onChange={(e) => {
+              setDecade(e.target.value ? Number(e.target.value) : null);
+              setYear(null);
+            }}
+          >
+            <option value="">Any year</option>
+            {decades.map((d) => (
+              <option key={d} value={d}>
+                {d}s
+              </option>
+            ))}
+          </select>
+          {decade !== null && (
+            <select id="grid-year" aria-label="Year" value={year ?? ''} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">All of the {decade}s</option>
+              {Array.from({ length: 10 }, (_, k) => decade + 9 - k)
+                .filter((y) => y <= new Date().getFullYear())
+                .map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+            </select>
+          )}
         </div>
       </div>
       {list.length === 0 ? (
         <p className="empty-list">
-          Nothing matches "{query.trim()}" in the catalogue.{' '}
+          {q ? `Nothing matches "${query.trim()}" here.` : 'Nothing here with these filters.'}{' '}
           <button className="btn-link inline" onClick={onFind}>
             Search AniList
           </button>
@@ -188,15 +275,17 @@ const MANGA_LEARNED = 8;
 const RECENT = 25;
 const RECENT_HITS_AT_MOST = 2;
 const SORTED_AT_LEAST = 60;
+/** Below this chance of having seen the next title, the quick sort is digging through long shots. */
+const LIKELY_AT_LEAST = 0.15;
 
 /**
  * One title at a time: seen it, haven't seen, or ask later. Titles come in
  * order of how likely you are to have seen them, learned from your answers
  * so far (see rank/seen.ts), so the ones you've seen surface early.
  */
-function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void; onFind: () => void }) {
+function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: () => void; onFind: () => void; onBrowse: () => void }) {
   const [keepGoing, setKeepGoing] = useState(false);
-  const model = useMemo(() => seenModel(app.items, app.marks), [app.items, app.marks]);
+  const model = app.seenGuess;
   const queue = useMemo(() => {
     const skipped = new Set(app.skipped);
     const p = (i: Item) => model.probability.get(i.id) ?? 0;
@@ -228,7 +317,11 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
     const recent = [...app.marks.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT);
     return recent.filter((m) => m.status === 'seen').length;
   }, [app.marks]);
-  const longShots = !keepGoing && app.marks.size >= SORTED_AT_LEAST && recentHits <= RECENT_HITS_AT_MOST;
+  // Long shots: your recent answers say so, or the model expects the next title to be one you haven't seen.
+  const topChance = queue[0] ? model.probability.get(queue[0].id) ?? 0 : 0;
+  const longShots =
+    !keepGoing && app.marks.size >= SORTED_AT_LEAST && (recentHits <= RECENT_HITS_AT_MOST || topChance < LIKELY_AT_LEAST);
+  const likelyLeft = Math.round(model.expectedRemaining);
 
   const item = queue[0];
   const next = queue[1];
@@ -274,15 +367,19 @@ function SortSingle({ app, onDone, onFind }: { app: AppState; onDone: () => void
       <p className="progress-line">
         {app.marks.size.toLocaleString()} of {app.items.length.toLocaleString()} sorted
       </p>
+      {app.fit.order.length >= 2 && !longShots && (
+        <p className="hint">You don't need to sort everything here: duels bring in titles you've probably seen as they go.</p>
+      )}
       {longShots && (
         <div className="notice" role="status">
           <p>
-            {recentHits === 0 ? 'None' : `Only ${recentHits}`} of your last {RECENT} were titles you've seen, so what's left is
-            mostly long shots. Search for anything specific you've seen, or keep going.
+            What's left here is mostly long shots: the app expects about {likelyLeft.toLocaleString()} titles you've seen among
+            the {(app.items.length - app.marks.size).toLocaleString()} unsorted ones. Browsing by year is a quicker way to find
+            them, and duels bring in the likely ones as they go.
           </p>
           <div className="action-row start">
-            <button className="btn btn-primary btn-small" onClick={onFind}>
-              Find a title
+            <button className="btn btn-primary btn-small" onClick={onBrowse}>
+              Browse by year
             </button>
             {app.fit.order.length >= 2 && (
               <button className="btn btn-small" onClick={onDone}>

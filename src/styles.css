@@ -1158,3 +1158,34 @@ a {
   max-width: 680px;
   margin: 0 auto;
 }
+
+/* Newcomer duels */
+.contender-rank.is-new {
+  background: var(--accent);
+}
+.newcomer-hint {
+  text-align: center;
+  margin-top: -4px;
+}
+.form-ask {
+  margin: 12px auto 0;
+  max-width: 560px;
+}
+
+/* Library browse filters */
+.grid-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.grid-filters select {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}

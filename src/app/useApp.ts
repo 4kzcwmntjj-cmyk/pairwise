@@ -3,7 +3,8 @@ import { LocalStore, toExport, type Snapshot } from '../store/store';
 import { saveCopy } from './saveCopy';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
-import { nextPair, pairKey, type Pair } from '../rank/pairs';
+import { newcomerShare, nextPair, pairKey, type Newcomer, type Pair } from '../rank/pairs';
+import { seenModel } from '../rank/seen';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
 import { applyAnswer, clearIn, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
@@ -29,13 +30,20 @@ type UndoEntry = { scope: UndoScope } & (
   | { kind: 'vote'; voteId: number; pair: Pair }
   | { kind: 'mark'; itemId: string; prev?: Mark; pair?: Pair | null }
   | { kind: 'skip'; itemId: string }
+  /** A newcomer duel: the vote and the mark that came with it, undone together. */
+  | { kind: 'newcomer'; voteId: number; itemId: string; pair: Pair }
 );
 
 export interface Moved {
   title: string;
   from: number;
   to: number;
+  /** A title that just joined your list from a newcomer duel. */
+  isNew?: boolean;
 }
+
+/** Newcomer outcomes kept for working out how often to bring one in. */
+const NEWCOMER_LOG = 20;
 
 export function displayTitle(item: Item, settings: Settings) {
   return settings.titleLanguage === 'romaji'
@@ -59,6 +67,12 @@ export function useApp() {
   const [pair, setPair] = useState<Pair | null>(null);
   const [skippedPairs, setSkippedPairs] = useState<Set<string>>(new Set());
   const [moved, setMoved] = useState<Moved | null>(null);
+  /** Whether each recent newcomer was a title you'd seen. */
+  const [newcomerLog, setNewcomerLog] = useState<boolean[]>([]);
+  /** Newcomers skipped this session. */
+  const [passed, setPassed] = useState<Set<string>>(new Set());
+  /** A newcomer picked in the both view, whose form (watched or read) is still to be asked. */
+  const [formAsk, setFormAsk] = useState<string | null>(null);
   const warm = useRef<Map<string, number> | undefined>(undefined);
   /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
   const generation = useRef(0);
@@ -77,6 +91,7 @@ export function useApp() {
     setSettingsState({ ...rest, view });
     setSkipped((s.meta.skipped as string[]) ?? []);
     setDismissed((s.meta.dismissed as string[]) ?? []);
+    setNewcomerLog((s.meta.newcomerLog as boolean[]) ?? []);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
     setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
@@ -123,12 +138,43 @@ export function useApp() {
 
   const rankOf = useMemo(() => new Map(fit.order.map((id, i) => [id, i + 1])), [fit]);
 
+  /** The chance you've seen each unsorted title in this view. Sort's queue and newcomer duels both use it. */
+  const seenGuess = useMemo(() => seenModel(items, marks), [items, marks]);
+
+  /** Unsorted titles you've probably seen, likeliest first: candidates for newcomer duels. */
+  const newcomers: Newcomer[] = useMemo(() => {
+    const later = new Set(skipped);
+    return [...seenGuess.probability.entries()]
+      .filter(([id]) => !marks.has(id) && !later.has(id) && !passed.has(id))
+      .map(([id, p]) => ({ id, p }))
+      .sort((x, y) => y.p - x.p)
+      .slice(0, 20);
+  }, [seenGuess, marks, skipped, passed]);
+
   // Keep a valid duel ready.
+  const isValid = useCallback(
+    (p: Pair | null) =>
+      !!p &&
+      (p.newcomer
+        ? !marks.has(p.newcomer) && itemById.has(p.newcomer) && rankOf.has(p.newcomer === p.a ? p.b : p.a)
+        : rankOf.has(p.a) && rankOf.has(p.b)),
+    [marks, itemById, rankOf],
+  );
   useEffect(() => {
-    if (!ready) return;
-    const valid = pair && rankOf.has(pair.a) && rankOf.has(pair.b);
-    if (!valid) setPair(nextPair({ fit, recent: votes, skipped: skippedPairs }));
-  }, [ready, pair, fit, rankOf, votes, skippedPairs]);
+    if (!ready || isValid(pair)) return;
+    setPair(
+      nextPair({ fit, recent: votes, skipped: skippedPairs, newcomers, newcomerShare: newcomerShare(newcomerLog) }),
+    );
+  }, [ready, pair, isValid, fit, votes, skippedPairs, newcomers, newcomerLog]);
+
+  const logNewcomer = useCallback(
+    async (hit: boolean) => {
+      const next = [...newcomerLog, hit].slice(-NEWCOMER_LOG);
+      setNewcomerLog(next);
+      await store.setMeta('newcomerLog', next);
+    },
+    [newcomerLog],
+  );
 
   const pushUndo = (e: UndoEntry) => setUndoStack((s) => [...s.slice(-99), e]);
 
@@ -202,9 +248,38 @@ export function useApp() {
     [skipped],
   );
 
+  /** The mark for a newcomer you picked in a duel: seen, in the form the view means. */
+  const newcomerMark = (item: Item): Mark => {
+    const at = Date.now();
+    if (view !== 'both') return applyAnswer(item, allMarks.get(item.id), { [view]: true }, at);
+    // In the both view a title with both forms could be either; ask afterwards.
+    if (hasBoth(item)) return { itemId: item.id, status: 'seen', updatedAt: at };
+    return applyAnswer(item, allMarks.get(item.id), { anime: true, manga: true }, at);
+  };
+
   const vote = useCallback(
     async (outcome: Outcome) => {
       if (!pair) return;
+      if (pair.newcomer) {
+        const item = itemById.get(pair.newcomer);
+        if (!item) return;
+        const mark = newcomerMark(item);
+        setMarks((m) => new Map(m).set(mark.itemId, mark));
+        await store.setMark(mark);
+        const v: Vote = { a: pair.a, b: pair.b, outcome, mode: pair.mode, at: Date.now() };
+        const id = await store.addVote(v);
+        const saved = { ...v, id };
+        const nextVotes = [...votes, saved];
+        setVotes((vs) => [...vs, saved]);
+        pushUndo({ scope: 'duel', kind: 'newcomer', voteId: id, itemId: item.id, pair });
+        logNewcomer(true);
+        const after = fitModel({ ids: [...seenIds, item.id], anchors: {}, votes: nextVotes, warm: warm.current });
+        const to = after.order.filter((x) => x === item.id || inViewSeen(x)).indexOf(item.id) + 1;
+        setMoved({ title: displayTitle(item, settings), from: to, to, isNew: true });
+        setFormAsk(view === 'both' && hasBoth(item) ? item.id : null);
+        setPair(null);
+        return;
+      }
       const winner = outcome === 'a' ? pair.a : outcome === 'b' ? pair.b : null;
       const before = winner ? rankOf.get(winner) : undefined;
       const v: Vote = { a: pair.a, b: pair.b, outcome, mode: pair.mode, at: Date.now() };
@@ -220,11 +295,31 @@ export function useApp() {
       } else setMoved(null);
       setPair(null);
     },
-    [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings],
+    [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings, view, allMarks, logNewcomer],
+  );
+
+  /** "Haven't seen" on the newcomer side of a duel. */
+  const newcomerUnseen = useCallback(
+    async (itemId: string) => {
+      logNewcomer(false);
+      await markItem(itemId, 'unseen', 'duel');
+    },
+    [logNewcomer, markItem],
+  );
+
+  /** Answer the watched-or-read question that follows a newcomer picked in the both view. */
+  const answerForm = useCallback(
+    async (ans: Answer | null) => {
+      const id = formAsk;
+      setFormAsk(null);
+      if (id && ans) await answer(id, ans, 'duel');
+    },
+    [formAsk, answer],
   );
 
   const skipPair = useCallback(() => {
     if (!pair) return;
+    if (pair.newcomer) setPassed((s) => new Set(s).add(pair.newcomer!));
     setSkippedPairs((s) => new Set(s).add(pairKey(pair.a, pair.b)));
     setMoved(null);
     setPair(null);
@@ -240,6 +335,17 @@ export function useApp() {
       setVotes((vs) => vs.filter((v) => v.id !== last.voteId));
       setPair(last.pair);
       await store.deleteVote(last.voteId);
+    } else if (last.kind === 'newcomer') {
+      setVotes((vs) => vs.filter((v) => v.id !== last.voteId));
+      setMarks((m) => {
+        const n = new Map(m);
+        n.delete(last.itemId);
+        return n;
+      });
+      setFormAsk(null);
+      setPair(last.pair);
+      await store.deleteVote(last.voteId);
+      await store.deleteMark(last.itemId);
     } else if (last.kind === 'mark') {
       if (last.prev) {
         const prev = last.prev;
@@ -349,9 +455,9 @@ export function useApp() {
       marks: [...rawMarks.values()],
       votes: rawVotes,
       settings,
-      meta: { skipped, dismissed, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+      meta: { skipped, dismissed, newcomerLog, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
     }),
-    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, groupOps, catalogueAt],
+    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, groupOps, catalogueAt],
   );
 
   const size = rawMarks.size + rawVotes.length;
@@ -501,6 +607,10 @@ export function useApp() {
     seenIds,
     clearMark,
     skipSort,
+    seenGuess,
+    newcomerUnseen,
+    formAsk,
+    answerForm,
     dismissed,
     dismiss,
     vote,
