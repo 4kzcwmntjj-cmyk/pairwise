@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEWCOMER_MIN_P, newcomerShare, nextPair } from './pairs';
+import { NEWCOMER_MIN_P, newcomerShare, nextPair, replaceSide } from './pairs';
 import { fit, type FitVote } from './solver';
 
 function seeded(seed: number) {
@@ -26,7 +26,8 @@ describe('newcomer duels', () => {
       const p = nextPair({ fit: placed, recent: [], newcomers: [{ id: 'new', p: 0.9 }], newcomerShare: 1, random: rnd, now })!;
       expect(p.mode).toBe('new');
       expect(p.fresh).toEqual(['new']);
-      const other = p.a === 'new' ? p.b : p.a;
+      expect(p.b).toBe('new'); // always on the right
+      const other = p.a;
       const rank = placed.order.indexOf(other);
       expect(rank).toBeGreaterThanOrEqual(3);
       expect(rank).toBeLessThanOrEqual(6);
@@ -131,5 +132,51 @@ describe('simulated long session', () => {
     const share = top10Pairs.reduce((a, b) => a + b, 0) / top10Pairs.length;
     // Before pairs settled after two meetings, this was about 0.3 in the same simulation.
     expect(share).toBeLessThan(0.15);
+  });
+});
+
+describe('a title ranked in another view', () => {
+  it('counts as new in a view where it is not listed', () => {
+    // 'both' was ranked through anime duels, so the full fit knows it; the manga view's list doesn't include it.
+    const full = fit({ ids: [...ids, 'both'], anchors: {}, votes: [...chain, { a: 'both', b: 't3', outcome: 'a' }] });
+    const mangaView = { ...full, order: full.order.filter((id) => id !== 'both') };
+    const p = nextPair({ fit: mangaView, recent: [], newcomers: [{ id: 'both', p: 0.9 }], newcomerShare: 1, random: seeded(6), now })!;
+    expect(p.fresh).toEqual(['both']);
+  });
+});
+
+describe("haven't seen in a duel", () => {
+  it('keeps the other new title in its place when both were new', () => {
+    const empty = fit({ ids: [], anchors: {}, votes: [] });
+    const cands = ['n1', 'n2', 'n3'].map((id) => ({ id, p: 0.8 }));
+    const p = replaceSide({ fit: empty, recent: [], newcomers: cands }, { a: 'n1', b: 'n2', mode: 'new', fresh: ['n1', 'n2'] }, 'n2')!;
+    expect(p.a).toBe('n1');
+    expect(p.b).toBe('n3');
+    expect(p.fresh).toEqual(['n1', 'n3']);
+  });
+
+  it('brings the next newcomer in on the right when the new one is unseen', () => {
+    const p = replaceSide(
+      { fit: placed, recent: [], newcomers: [{ id: 'gone', p: 0.9 }, { id: 'next', p: 0.7 }] },
+      { a: 't4', b: 'gone', mode: 'new', fresh: ['gone'] },
+      'gone',
+    )!;
+    expect(p).toMatchObject({ a: 't4', b: 'next', fresh: ['next'] });
+  });
+
+  it('gives a ranked title its nearest neighbour when its opponent is unseen', () => {
+    const p = replaceSide({ fit: placed, recent: [] }, { a: 't4', b: 't7', mode: 'refine' }, 't7')!;
+    expect(p.a).toBe('t4');
+    expect(['t3', 't5']).toContain(p.b);
+    expect(p.fresh).toBeUndefined();
+  });
+
+  it('keeps a new title and finds it a mid-list opponent when the ranked side is unseen', () => {
+    const p = replaceSide({ fit: placed, recent: [], random: seeded(8) }, { a: 't2', b: 'nn', mode: 'new', fresh: ['nn'] }, 't2')!;
+    expect(p.b).toBe('nn');
+    expect(p.fresh).toEqual(['nn']);
+    const r = placed.order.indexOf(p.a);
+    expect(r).toBeGreaterThanOrEqual(3);
+    expect(r).toBeLessThanOrEqual(6);
   });
 });

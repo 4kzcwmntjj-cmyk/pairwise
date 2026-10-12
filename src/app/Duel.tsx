@@ -41,7 +41,7 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
       else if (e.key.toLowerCase() === 's') app.skipPair();
-      else if (e.key.toLowerCase() === 'n' && fresh.length === 1 && !picked) app.newcomerUnseen(fresh[0]);
+      else if (e.key.toLowerCase() === 'n' && fresh.length === 1 && !picked) app.notSeenInDuel(fresh[0]);
       else if (e.key === 'Backspace' || e.key.toLowerCase() === 'z') app.undo('duel');
       else return;
       e.preventDefault();
@@ -79,9 +79,7 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
         <button
           className="btn btn-quiet btn-small"
           onClick={() => {
-            if (picked) return;
-            if (isNew) app.newcomerUnseen(item.id);
-            else app.markItem(item.id, 'unseen', 'duel');
+            if (!picked) app.notSeenInDuel(item.id);
           }}
           title={isNew ? 'Key N' : undefined}
         >

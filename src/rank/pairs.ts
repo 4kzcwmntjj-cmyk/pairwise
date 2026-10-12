@@ -81,14 +81,16 @@ export function nextPair(ctx: PairContext): Pair | null {
   const { fit } = ctx;
   const rnd = ctx.random ?? Math.random;
   const ids = fit.order;
-  const pool = (ctx.newcomers ?? []).filter((c) => !fit.theta.has(c.id));
+  // New means not on the list in this view. A title ranked as an anime is still new in the manga view.
+  const listed = new Set(ids);
+  const pool = (ctx.newcomers ?? []).filter((c) => !listed.has(c.id));
 
   // Cold start: nothing or one title on your list. Duel the likeliest titles you haven't sorted.
   if (ids.length < 2) {
     const top = pool.slice(0, 6);
     if (ids.length === 1) {
       const c = top[Math.floor(rnd() * Math.min(3, top.length))];
-      return c ? { ...pickSides(rnd, c.id, ids[0], 'new'), fresh: [c.id] } : null;
+      return c ? { a: ids[0], b: c.id, mode: 'new', fresh: [c.id] } : null;
     }
     if (top.length < 2) return null;
     const i = Math.floor(rnd() * Math.min(4, top.length));
@@ -123,7 +125,8 @@ export function nextPair(ctx: PairContext): Pair | null {
     const middle = from.slice(lo, hi).filter((id) => !blocked(c.id, id));
     if (middle.length === 0) return null;
     const opponent = middle[Math.floor(rnd() * middle.length)];
-    return { ...shuffle(c.id, opponent, 'new'), fresh: [c.id] };
+    // New titles always on the right, so you know where to look for them and their "Haven't seen".
+    return { a: opponent, b: c.id, mode: 'new', fresh: [c.id] };
   };
 
   // 1. Newcomer. Comes before placement, so a backlog of titles being placed doesn't shut newcomers out.
@@ -213,4 +216,53 @@ export function nextPair(ctx: PairContext): Pair | null {
 
 function pickSides(rnd: () => number, x: string, y: string, mode: DuelMode): Pair {
   return rnd() < 0.5 ? { a: x, b: y, mode } : { a: y, b: x, mode };
+}
+
+/**
+ * After "Haven't seen" on one side of a duel: keep the other side where it is and find it a new partner.
+ * A kept new title stays new; a kept ranked title gets the next likely newcomer if the removed side was new,
+ * otherwise its nearest neighbour in the list. Null if there is nobody suitable.
+ */
+export function replaceSide(ctx: PairContext, pair: Pair, removed: string): Pair | null {
+  const { fit } = ctx;
+  const ids = fit.order;
+  const keep = pair.a === removed ? pair.b : pair.a;
+  const keepFresh = !!pair.fresh?.includes(keep);
+  const removedFresh = !!pair.fresh?.includes(removed);
+  const listed = new Set(ids);
+  const candidates = (ctx.newcomers ?? []).filter((c) => c.id !== removed && c.id !== keep && !listed.has(c.id));
+  const recent = new Set(ctx.recent.slice(-RECENT_PAIRS).map((v) => pairKey(v.a, v.b)));
+  const ok = (x: string) => x !== keep && x !== removed && !recent.has(pairKey(x, keep)) && !(ctx.skipped?.has(pairKey(x, keep)) ?? false);
+  // The replacement goes into the slot that was emptied.
+  const place = (other: string, fresh: string[]): Pair => {
+    const p: Pair = pair.a === removed ? { a: other, b: keep, mode: 'new' } : { a: keep, b: other, mode: 'new' };
+    if (fresh.length === 0) p.mode = 'refine';
+    if (fresh.length) p.fresh = fresh;
+    return p;
+  };
+
+  if (keepFresh) {
+    if (ids.length < 2) {
+      // Early on, a new title meets another new title.
+      const c = candidates[0];
+      return c ? place(c.id, [keep, c.id]) : ids[0] && ok(ids[0]) ? place(ids[0], [keep]) : null;
+    }
+    const lo = Math.floor(ids.length * 0.3);
+    const hi = Math.max(lo + 1, Math.ceil(ids.length * 0.7));
+    const middle = ids.slice(lo, hi).filter(ok);
+    const other = middle[Math.floor((ctx.random ?? Math.random)() * middle.length)];
+    return other ? place(other, [keep]) : null;
+  }
+
+  if (removedFresh) {
+    const c = candidates.find((x) => x.p >= NEWCOMER_MIN_P);
+    if (c) return place(c.id, [c.id]);
+  }
+  // A ranked title stays; its nearest neighbour in the list replaces the one you haven't seen.
+  const at = ids.indexOf(keep);
+  const byDistance = ids
+    .map((id, i) => [id, Math.abs(i - at)] as const)
+    .filter(([id]) => ok(id))
+    .sort((x, y) => x[1] - y[1]);
+  return byDistance.length ? place(byDistance[0][0], []) : null;
 }

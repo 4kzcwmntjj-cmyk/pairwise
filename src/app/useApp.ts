@@ -3,7 +3,7 @@ import { LocalStore, toExport, type Snapshot } from '../store/store';
 import { saveCopy } from './saveCopy';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
-import { newcomerShare, nextPair, pairKey, type Newcomer, type Pair } from '../rank/pairs';
+import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
@@ -313,13 +313,20 @@ export function useApp() {
     [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings, view, allMarks, logNewcomer],
   );
 
-  /** "Haven't seen" on the newcomer side of a duel. */
-  const newcomerUnseen = useCallback(
+  /**
+   * "Haven't seen" on one side of a duel. The other side stays where it is and gets a new partner, so a title
+   * you could answer about doesn't disappear with the one you couldn't.
+   */
+  const notSeenInDuel = useCallback(
     async (itemId: string) => {
-      logNewcomer(false);
+      if (!pair) return;
+      if (pair.fresh?.includes(itemId)) logNewcomer(false);
+      // Set the next duel first; the mark below records this one for undo.
+      setPair(replaceSide({ fit, recent: votes, skipped: skippedPairs, newcomers }, pair, itemId));
+      setMoved(null);
       await markItem(itemId, 'unseen', 'duel');
     },
-    [logNewcomer, markItem],
+    [pair, fit, votes, skippedPairs, newcomers, logNewcomer, markItem],
   );
 
   /**
@@ -636,7 +643,7 @@ export function useApp() {
     clearMark,
     skipSort,
     seenGuess,
-    newcomerUnseen,
+    notSeenInDuel,
     formPending,
     answerForm,
     dismissed,
