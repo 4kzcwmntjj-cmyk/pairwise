@@ -23,6 +23,7 @@ const FIELDS = `
   studios(isMain: true) { nodes { name } }
   relations { edges { relationType(version: 2) node { id type } } }
   genres
+  tags { name rank category isGeneralSpoiler isMediaSpoiler isAdult }
   recommendations(perPage: 8, sort: RATING_DESC) { nodes { rating mediaRecommendation { id type } } }
 `;
 

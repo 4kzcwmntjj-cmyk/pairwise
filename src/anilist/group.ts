@@ -15,6 +15,8 @@ export interface RawMedia {
   studios: { nodes: { name: string }[] } | null;
   relations: { edges: { relationType: string; node: { id: number; type: string } }[] } | null;
   genres?: string[] | null;
+  /** AniList tags: rank is the share of voters (0–100) who agree the tag fits. */
+  tags?: { name: string; rank: number | null; category: string | null; isGeneralSpoiler: boolean | null; isMediaSpoiler: boolean | null; isAdult: boolean | null }[] | null;
   recommendations?: { nodes: { rating: number | null; mediaRecommendation: { id: number; type: string } | null }[] } | null;
 }
 
