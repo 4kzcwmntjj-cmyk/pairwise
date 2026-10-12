@@ -156,8 +156,8 @@ export function choicesFor(item: Pick<Item, 'formats'>, view: View): Choice[] {
     ];
   }
   return [
-    { label: 'Watched', answer: { anime: true, manga: false }, key: 'w' },
-    { label: 'Read', answer: { anime: false, manga: true }, key: 'r' },
+    { label: 'Anime', answer: { anime: true, manga: false }, key: 'a' },
+    { label: 'Manga', answer: { anime: false, manga: true }, key: 'm' },
     { label: 'Both', answer: { anime: true, manga: true }, key: 'b' },
     { label: 'Neither', answer: { anime: false, manga: false }, key: 'n' },
   ];

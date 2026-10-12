@@ -78,6 +78,7 @@ export function ItemSheet({
           </div>
         </div>
 
+        {choicesFor(item, 'both').length === 4 && <p className="sheet-label">Which have you seen?</p>}
         <div className="action-row">
           {choicesFor(item, 'both').map((c) => (
             <button key={c.label} className="btn" aria-pressed={chosen(item, fullMark, c)} onClick={() => app.answer(itemId, c.answer)}>
@@ -91,7 +92,7 @@ export function ItemSheet({
           )}
         </div>
         {formUnknown(item, fullMark) && (
-          <p className="hint">You marked this as seen before manga was added. Say whether you watched it, read it, or both.</p>
+          <p className="hint">You marked this as seen before manga was added. Say whether it was the anime, the manga, or both.</p>
         )}
         {!fullMark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
           <p className="hint">Split off from another title. Mark whether you've seen it.</p>

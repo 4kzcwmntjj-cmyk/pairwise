@@ -5,7 +5,7 @@ import { Cover } from './Cover';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
-/** Titles waiting for "watched or read?" before Duel asks about them together. */
+/** Titles waiting for "anime or manga?" before Duel asks about them together. */
 const FORM_BATCH = 4;
 
 export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void }) {
@@ -93,22 +93,7 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
 
   return (
     <main className="screen duel">
-      <p className="progress-line">
-        {app.votes.length.toLocaleString()} duels
-        {placing > 0 ? `, ${placing} still being placed` : ''}
-      </p>
       <p className="duel-question">Which do you prefer?</p>
-      <div className="newcomer-slot">
-      {fresh.length === 2 ? (
-        <p className="hint newcomer-hint">
-          {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
-        </p>
-      ) : fresh.length === 1 ? (
-        <p className="hint newcomer-hint">
-          New to your list. Pick as usual if you know it.
-        </p>
-      ) : null}
-      </div>
       <div className="arena" key={`${pair!.a}|${pair!.b}`}>
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
@@ -127,6 +112,15 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
           Undo
         </button>
       </div>
+      {fresh.length === 2 ? (
+        <p className="hint newcomer-hint">
+          {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
+        </p>
+      ) : fresh.length === 1 ? (
+        <p className="hint newcomer-hint">
+          New to your list. Pick as usual if you know it.
+        </p>
+      ) : null}
       <p className="moved" aria-live="polite">
         {app.moved &&
           (app.moved.isNew
@@ -139,9 +133,13 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
               ? `${app.moved.title} moved down to #${app.moved.to}.`
               : `${app.moved.title} stays at #${app.moved.to}.`)}
       </p>
+      <p className="progress-line">
+        {app.votes.length.toLocaleString()} duels
+        {placing > 0 ? `, ${placing} still being placed` : ''}
+      </p>
       {formOpen && pending > 0 && (
         <div className="notice form-ask" role="status">
-          <p>These have both an anime and a manga. Which did you know?</p>
+          <p>These are both anime and manga. Which have you seen?</p>
           <ul className="form-list">
             {app.formPending.map((id) => {
               const it = app.itemById.get(id);
@@ -151,10 +149,10 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
                   <span>{app.title(it)}</span>
                   <span className="form-choices">
                     <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: false })}>
-                      Watched
+                      Anime
                     </button>
                     <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: false, manga: true })}>
-                      Read
+                      Manga
                     </button>
                     <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: true })}>
                       Both

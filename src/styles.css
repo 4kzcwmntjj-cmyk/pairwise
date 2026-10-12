@@ -1253,3 +1253,36 @@ a {
     bottom: 16px;
   }
 }
+
+/* Duel fits a phone screen: the covers shrink with the screen height so the cards, "Haven't seen" and the
+   buttons all sit above the tab bar. The 375px covers everything else on the screen, tab bar included. */
+.duel {
+  gap: 12px;
+}
+.duel .contender-pick {
+  width: min(100%, 260px, calc((100vh - 375px) * 2 / 3));
+  width: min(100%, 260px, calc((100svh - 375px) * 2 / 3));
+  min-width: 96px;
+}
+.duel .contender .item-meta {
+  height: 2.7em;
+  -webkit-line-clamp: 2;
+}
+
+/* Quick sort fits a phone screen the same way: the cover shrinks with the screen height. */
+main.sort {
+  gap: 10px;
+}
+.sort-card .cover-lg {
+  width: min(56vw, 220px, calc((100vh - 420px) * 2 / 3));
+  width: min(56vw, 220px, calc((100svh - 420px) * 2 / 3));
+  min-width: 80px;
+}
+.sort-card .item-meta {
+  line-height: 1.35;
+  max-height: 2.7em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}

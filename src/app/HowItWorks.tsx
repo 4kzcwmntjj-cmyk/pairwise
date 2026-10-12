@@ -29,7 +29,7 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         </p>
         <p>
           In the both view, a new title that is both an anime and a manga could be either. Every few picks, Duel asks
-          about those together: watched, read or both. Later leaves them for the Library.
+          about those together: anime, manga or both. Later leaves them for the Library.
         </p>
       </section>
 
@@ -41,8 +41,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           you've seen once the obvious ones are done. Search AniList finds anything older or less popular.
         </p>
         <p>
-          Some titles exist as both anime and manga, such as Death Note. For those, the Library asks which you know:
-          watched, read, both or neither. A card is one franchise, so the answer is about the whole thing, not one season.
+          Some titles exist as both anime and manga, such as Death Note. For those, the Library asks which you've seen:
+          the anime, the manga, both or neither. A card is one franchise, so the answer is about the whole thing, not one season.
         </p>
       </section>
 

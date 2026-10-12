@@ -77,7 +77,7 @@ describe('clearIn', () => {
 
 describe('choicesFor', () => {
   it('asks which form for a title with both, in the both view', () => {
-    expect(choicesFor(mixed, 'both').map((c) => c.label)).toEqual(['Watched', 'Read', 'Both', 'Neither']);
+    expect(choicesFor(mixed, 'both').map((c) => c.label)).toEqual(['Anime', 'Manga', 'Both', 'Neither']);
     expect(choicesFor(mixed, 'manga').map((c) => c.label)).toEqual(['Read it', "Haven't read"]);
     expect(choicesFor(anime, 'both').map((c) => c.label)).toEqual(['Watched it', "Haven't watched"]);
   });
@@ -85,7 +85,7 @@ describe('choicesFor', () => {
   it('marks the matching choice as on', () => {
     const m = applyAnswer(mixed, undefined, { anime: false, manga: true }, 2);
     const on = choicesFor(mixed, 'both').filter((c) => chosen(mixed, m, c)).map((c) => c.label);
-    expect(on).toEqual(['Read']);
+    expect(on).toEqual(['Manga']);
   });
 
   it('reads a title split down to one form by that form only', () => {

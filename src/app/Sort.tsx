@@ -73,8 +73,8 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
       </div>
       {formless > 0 && !(mode === 'grid' && show === 'form') && (
         <p className="hint">
-          {formless === 1 ? '1 title is' : `${formless.toLocaleString()} titles are`} marked seen without saying whether you
-          watched or read.{' '}
+          {formless === 1 ? '1 title is' : `${formless.toLocaleString()} titles are`} marked seen without saying whether it was
+          the anime or the manga.{' '}
           <button className="btn-link inline" onClick={() => browse('form')}>
             Go through them
           </button>
@@ -191,7 +191,7 @@ function SortGrid({
             <option value="unsorted">Not sorted</option>
             <option value="seen">Seen</option>
             <option value="unseen">{viewWords(app.view).unseen}</option>
-            {app.view === 'both' && <option value="form">Watched or read?</option>}
+            {app.view === 'both' && <option value="form">Anime or manga?</option>}
           </select>
           <select
             id="grid-decade"
@@ -364,9 +364,6 @@ function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: 
   const title = app.title(item);
   return (
     <>
-      <p className="progress-line">
-        {app.marks.size.toLocaleString()} of {app.items.length.toLocaleString()} sorted
-      </p>
       {app.fit.order.length >= 2 && !longShots && (
         <p className="hint">You don't need to sort everything here: duels bring in titles you've probably seen as they go.</p>
       )}
@@ -397,6 +394,7 @@ function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: 
         <h2 className="item-title">{title}</h2>
         <p className="item-meta">{app.look(item).meta}</p>
       </div>
+      {choicesFor(item, app.view).length === 4 && <p className="sort-question">Which have you seen?</p>}
       <div className={`action-row choices-${choicesFor(item, app.view).length}`}>
         {choicesFor(item, app.view).map((c, i) => (
           <button
@@ -417,6 +415,9 @@ function SortSingle({ app, onDone, onFind, onBrowse }: { app: AppState; onDone: 
           Undo
         </button>
       </div>
+      <p className="progress-line">
+        {app.marks.size.toLocaleString()} of {app.items.length.toLocaleString()} sorted
+      </p>
     </>
   );
 }

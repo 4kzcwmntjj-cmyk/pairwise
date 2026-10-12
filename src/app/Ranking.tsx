@@ -29,8 +29,8 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
   // this covers the cases it can't.
   const formLabel = (item: Item) => {
     const m = app.allMarks.get(item.id);
-    if (formUnknown(item, m)) return 'watched or read?';
-    return knownIn(item, m, 'anime') && knownIn(item, m, 'manga') ? 'watched and read' : '';
+    if (formUnknown(item, m)) return 'anime or manga?';
+    return knownIn(item, m, 'anime') && knownIn(item, m, 'manga') ? 'anime and manga' : '';
   };
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
