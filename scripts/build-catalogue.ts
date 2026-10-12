@@ -7,6 +7,7 @@
  * Run locally with: npx vite-node scripts/build-catalogue.ts
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { CATALOGUE_SIZE, MANGA_SIZE, fetchCatalogue, type Medium } from '../src/anilist/catalogue';
 import { configureClient } from '../src/anilist/client';
 import { groupFranchises } from '../src/anilist/group';
@@ -43,6 +44,8 @@ async function main() {
   const anime = await fetchAll('ANIME', CATALOGUE_SIZE);
   const manga = await fetchAll('MANGA', MANGA_SIZE);
   const media = [...anime, ...manga];
+  // The raw AniList answers, kept as a workflow artifact (not committed) so grouping can be checked offline.
+  writeFileSync('raw-media.json.gz', gzipSync(JSON.stringify(media)));
   // Keep the ids of franchises from the previous file so saved marks and votes still match.
   const items = groupFranchises(media, previous);
   const file: CatalogueFile = {

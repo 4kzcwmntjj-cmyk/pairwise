@@ -13,6 +13,8 @@ const FIELDS = `
   id
   title { romaji english }
   format
+  episodes
+  duration
   seasonYear
   startDate { year }
   popularity

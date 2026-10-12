@@ -39,6 +39,14 @@ jobs:
       - run: npm ci
       - name: Fetch from AniList (one retry after a pause)
         run: npx vite-node scripts/build-catalogue.ts || (sleep 180 && npx vite-node scripts/build-catalogue.ts)
+      - name: Keep the raw AniList data for offline checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-media
+          path: raw-media.json.gz
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Commit the new catalogue
         run: |
           git config user.name "github-actions[bot]"

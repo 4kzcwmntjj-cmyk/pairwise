@@ -4,6 +4,9 @@ export interface RawMedia {
   id: number;
   title: { romaji: string | null; english: string | null };
   format: string | null;
+  /** Episode count and minutes per episode, when AniList knows them. */
+  episodes?: number | null;
+  duration?: number | null;
   seasonYear: number | null;
   startDate: { year: number | null } | null;
   popularity: number | null;
