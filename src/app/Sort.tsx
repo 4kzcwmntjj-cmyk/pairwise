@@ -346,7 +346,7 @@ function SortSingle({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!item || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+      if (!item || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || document.querySelector('[aria-modal="true"]')) return;
       const k = e.key.toLowerCase();
       const choices = choicesFor(item, app.view);
       const choice =

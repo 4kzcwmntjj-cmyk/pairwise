@@ -37,7 +37,8 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || (formOpen && pending > 0)) return;
+      // Not while a title card is open over the duel, or the quick check is up.
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || (formOpen && pending > 0) || document.querySelector('[aria-modal="true"]')) return;
       if (e.key === 'ArrowLeft') choose('a');
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
@@ -197,7 +198,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
               : `${app.moved.title} stays at #${app.moved.to}.`)}
       </p>
       <p className="progress-line">
-        {app.votes.length.toLocaleString()} duels
+        {app.votes.length.toLocaleString()} {app.votes.length === 1 ? 'duel' : 'duels'}
         {placing > 0 ? `, ${placing} still being placed` : ''}
       </p>
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>

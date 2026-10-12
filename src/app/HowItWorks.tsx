@@ -42,7 +42,7 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           there, it offers to search AniList, which finds anything older or less popular.
         </p>
         <p>
-          Some titles exist as both anime and manga, such as Death Note. For those, the Library asks which you've seen:
+          Some titles exist as both anime and manga, such as Death Note. For those, Quick sort, Duel's quick check and the title's card ask which you've seen:
           the anime, the manga, both or neither. A card is one franchise, so the answer is about the whole thing, not one season.
         </p>
       </section>
