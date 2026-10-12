@@ -4,6 +4,8 @@ import type { Fit } from './solver';
 export interface Recommendation {
   item: Item;
   score: number;
+  /** The part of the score that comes from recommendation links (negative when titles you rank low point here). */
+  links: number;
   /** Seen titles whose AniList recommendations point here, strongest first. */
   because: string[];
   /** Genres this title shares with the ones you rank highly. */
@@ -73,6 +75,7 @@ export function recommend(items: Item[], fit: Fit, marks: Map<string, Mark>, lim
     out.push({
       item,
       score,
+      links,
       because: (sources.get(item.id) ?? []).sort((a, b) => b[1] - a[1]).map(([id]) => id),
       genres: gs.filter((g) => affinity(g) > 0.05).sort((a, b) => affinity(b) - affinity(a)),
     });

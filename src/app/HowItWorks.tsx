@@ -103,8 +103,11 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <h3>6. For you</h3>
         <p>
           Suggestions come from AniList users' recommendations for the titles you rank highest, plus genres you rank well.
-          Press Not interested on any you don't want and it won't come back. Hidden ones can be restored at the bottom of
-          the page.
+          Tonight's pick is one of the best of them, the same all day until you press Another; Share makes a picture of
+          it. Below are rows: one for each of your top three ("Because you rank … highly"), Hidden gems (strongly
+          recommended from your list, but not among the 300 most popular titles), and Read the manga (titles you've
+          watched, ruled out reading and rank in the top third). A title shows in one row only. Press Not interested, or
+          the × on a cover, and it won't come back. Hidden ones can be restored at the bottom of the page.
         </p>
       </section>
 
