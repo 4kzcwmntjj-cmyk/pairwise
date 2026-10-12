@@ -14,7 +14,18 @@
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --radius: 10px;
   --nav-h: 60px;
+  /* Room above the top bar. Saved to the iPhone home screen, the page runs under the status bar, and iOS blurs
+     a band a little deeper than the status bar itself, so the top bar sits further down there. */
+  --top-gap: 14px;
+  /* Screen height the safe areas take (status bar, home indicator), plus the extra top gap. Duel and Quick sort
+     subtract it so they still fit when the app runs from the home screen. */
+  --safe-y: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--top-gap) - 14px);
   color-scheme: light;
+}
+@media (display-mode: standalone) {
+  :root {
+    --top-gap: 26px;
+  }
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -79,7 +90,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-block: calc(14px + env(safe-area-inset-top, 0px)) 14px;
+  padding-block: calc(var(--top-gap) + env(safe-area-inset-top, 0px)) 14px;
 }
 .wordmark {
   font-family: var(--font-display);
@@ -306,7 +317,7 @@ a {
   max-width: 520px;
   margin: 0 auto;
   min-height: 100dvh;
-  padding: calc(48px + env(safe-area-inset-top, 0px)) 16px 48px;
+  padding: calc(48px + env(safe-area-inset-top, 0px)) 16px calc(48px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -630,7 +641,7 @@ a {
   position: relative;
   width: 100%;
   max-width: 560px;
-  max-height: 90dvh;
+  max-height: min(90dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 32px));
   overflow-y: auto;
   background: var(--surface);
   border-radius: 16px 16px 0 0;
@@ -1287,13 +1298,14 @@ a {
 }
 
 /* Duel fits a phone screen: the covers shrink with the screen height so the cards, "Haven't seen" and the
-   buttons all sit above the tab bar. The 375px covers everything else on the screen, tab bar included. */
+   buttons all sit above the tab bar. The 375px covers everything else on the screen, tab bar included;
+   --safe-y adds the status bar and home indicator when there are any. */
 .duel {
   gap: 12px;
 }
 .duel .contender-pick {
-  width: min(100%, 260px, calc((100vh - 375px) * 2 / 3));
-  width: min(100%, 260px, calc((100svh - 375px) * 2 / 3));
+  width: min(100%, 260px, calc((100vh - 375px - var(--safe-y)) * 2 / 3));
+  width: min(100%, 260px, calc((100svh - 375px - var(--safe-y)) * 2 / 3));
   min-width: 96px;
 }
 .duel .contender .item-meta {
@@ -1306,8 +1318,8 @@ main.sort {
   gap: 10px;
 }
 .sort-card .cover-lg {
-  width: min(56vw, 220px, calc((100vh - 420px) * 2 / 3));
-  width: min(56vw, 220px, calc((100svh - 420px) * 2 / 3));
+  width: min(56vw, 220px, calc((100vh - 420px - var(--safe-y)) * 2 / 3));
+  width: min(56vw, 220px, calc((100svh - 420px - var(--safe-y)) * 2 / 3));
   min-width: 80px;
 }
 .sort-card .item-meta {
