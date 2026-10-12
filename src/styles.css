@@ -1163,12 +1163,19 @@ a {
 .contender-rank.is-new {
   background: var(--accent);
 }
+.newcomer-slot {
+  /* Always the same height, so a hint appearing never moves the buttons. */
+  min-height: 3.3em;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
 .newcomer-hint {
   text-align: center;
-  margin-top: -4px;
+  margin: 0;
 }
 .form-ask {
-  margin: 0 auto 12px;
+  margin: 12px auto 0;
   max-width: 560px;
 }
 
@@ -1207,4 +1214,42 @@ a {
 .form-choices {
   display: flex;
   gap: 6px;
+}
+
+/* Duel: titles and details keep a fixed height (long ones are cut with an ellipsis), so the buttons
+   below never jump between duels. The full details are one tap away in the Ranking. */
+.contender .item-title {
+  line-height: 1.25;
+  height: 2.5em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.contender .item-meta {
+  line-height: 1.35;
+  height: 4.05em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* The backup reminder floats above the tab bar, so it never pushes the screen down while you're tapping. */
+.backup-note {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 9;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 24px rgba(20, 19, 40, 0.18);
+}
+@media (min-width: 720px) {
+  .backup-note {
+    bottom: 16px;
+  }
 }

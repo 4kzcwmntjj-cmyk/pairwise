@@ -97,47 +97,18 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
         {app.votes.length.toLocaleString()} duels
         {placing > 0 ? `, ${placing} still being placed` : ''}
       </p>
-      {formOpen && pending > 0 && (
-        <div className="notice form-ask" role="status">
-          <p>These have both an anime and a manga. Which did you know?</p>
-          <ul className="form-list">
-            {app.formPending.map((id) => {
-              const it = app.itemById.get(id);
-              if (!it) return null;
-              return (
-                <li key={id}>
-                  <span>{app.title(it)}</span>
-                  <span className="form-choices">
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: false })}>
-                      Watched
-                    </button>
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: false, manga: true })}>
-                      Read
-                    </button>
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: true })}>
-                      Both
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <button className="btn btn-quiet btn-small" onClick={() => app.answerForm(null, null)}>
-            Later (they wait in the Library)
-          </button>
-        </div>
-      )}
       <p className="duel-question">Which do you prefer?</p>
+      <div className="newcomer-slot">
       {fresh.length === 2 ? (
         <p className="hint newcomer-hint">
-          {starting ? 'Your list starts here. ' : ''}If you know both, pick the one you prefer. If you haven't seen one, press
-          Haven't seen under it and another takes its place.
+          {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
         </p>
       ) : fresh.length === 1 ? (
         <p className="hint newcomer-hint">
-          {app.title(app.itemById.get(fresh[0])!)} isn't on your list yet. Pick as usual if you know it.
+          New to your list. Pick as usual if you know it.
         </p>
       ) : null}
+      </div>
       <div className="arena" key={`${pair!.a}|${pair!.b}`}>
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
@@ -168,6 +139,36 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
               ? `${app.moved.title} moved down to #${app.moved.to}.`
               : `${app.moved.title} stays at #${app.moved.to}.`)}
       </p>
+      {formOpen && pending > 0 && (
+        <div className="notice form-ask" role="status">
+          <p>These have both an anime and a manga. Which did you know?</p>
+          <ul className="form-list">
+            {app.formPending.map((id) => {
+              const it = app.itemById.get(id);
+              if (!it) return null;
+              return (
+                <li key={id}>
+                  <span>{app.title(it)}</span>
+                  <span className="form-choices">
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: false })}>
+                      Watched
+                    </button>
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: false, manga: true })}>
+                      Read
+                    </button>
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: true })}>
+                      Both
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <button className="btn btn-quiet btn-small" onClick={() => app.answerForm(null, null)}>
+            Later (they wait in the Library)
+          </button>
+        </div>
+      )}
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
