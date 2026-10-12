@@ -65,3 +65,9 @@ Every per-title edit lives on one card (`src/app/ItemSheet.tsx`): duel record, s
 The welcome screen is now a front page: on a first visit it loads the title list and waits for Start (with How it works and Load a saved copy); tapping the Shōbu name in the top bar returns to it, with Back to duels and a count of ranked titles and duels. Load a saved copy only shows there while the list is empty; otherwise it stays in Settings behind a confirmation.
 
 The Library no longer has its own Search AniList and Start duels buttons. Browse's search box searches every title (ignoring the status and year filters) and offers "Not here? Search AniList for …", which opens the AniList search with the text already run.
+
+## Development
+
+- `npm install`, then `npx vite --port 5199 --host 127.0.0.1` for the dev server and `npm test` for the unit tests.
+- Demo list: `npx vite-node scripts/sim/make-demo.ts /tmp/demo.json` writes a saved copy with 150 sorted titles and 600 duels, built from the current catalogue. Load it in Settings → Load a copy.
+- Screen check: `python3 scripts/e2e/screens.py /tmp/demo.json /tmp/shots` (needs Playwright for Python) screenshots every main screen at phone size in light and dark, and at desktop size.
