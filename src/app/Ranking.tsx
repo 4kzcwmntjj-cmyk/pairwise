@@ -1,40 +1,18 @@
 import { useMemo, useState } from 'react';
 import { isSettled as isSettledIn } from '../rank/stats';
-import type { Item, Status } from '../types';
 import { Cover } from './Cover';
-import { formUnknown, knownIn } from '../rank/medium';
-import { viewWords } from './meta';
 import { saveFile } from './saveCopy';
 import { renderTop } from './shareImage';
 import type { AppState } from './useApp';
 
-type View = 'ranked' | 'unseen';
-
 export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
-  const [view, setView] = useState<View>('ranked');
   const [query, setQuery] = useState('');
   const [sharing, setSharing] = useState<string | null>(null);
 
   const lists = useMemo(() => {
-    const byStatus = (s: Status) =>
-      [...app.marks.values()]
-        .filter((m) => m.status === s)
-        .map((m) => app.itemById.get(m.itemId))
-        .filter((i): i is Item => !!i)
-        .sort((x, y) => y.popularity - x.popularity);
-    return {
-      ranked: app.fit.order.map((id) => app.itemById.get(id)!).filter(Boolean),
-      unseen: byStatus('unseen'),
-    };
-  }, [app.fit, app.marks, app.itemById]);
+    return { ranked: app.fit.order.map((id) => app.itemById.get(id)!).filter(Boolean) };
+  }, [app.fit, app.itemById]);
 
-  // For titles with both forms, in the both view. The cover already shows which one you know when it's one;
-  // this covers the cases it can't.
-  const formLabel = (item: Item) => {
-    const m = app.allMarks.get(item.id);
-    if (formUnknown(item, m)) return 'anime or manga?';
-    return knownIn(item, m, 'anime') && knownIn(item, m, 'manga') ? 'anime and manga' : '';
-  };
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
   async function shareTop() {
@@ -55,25 +33,13 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
     }
   }
   const q = query.trim().toLowerCase();
-  const shown = lists[view].filter(
+  const shown = lists.ranked.filter(
     (i) => !q || [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)),
   );
 
   return (
     <main className="screen ranking">
       <div className="ranking-head">
-        <div className="segmented" role="tablist">
-          {(
-            [
-              ['ranked', `Ranked (${lists.ranked.length})`],
-              ['unseen', `${viewWords(app.view).unseen} (${lists.unseen.length})`],
-            ] as const
-          ).map(([v, label]) => (
-            <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
-              {label}
-            </button>
-          ))}
-        </div>
         <input
           id="ranking-filter"
           className="search"
@@ -82,7 +48,7 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {view === 'ranked' && top.length >= 3 && (
+        {top.length >= 3 && (
           <div className="action-row start">
             <button className="btn btn-small" onClick={shareTop} disabled={sharing === 'Drawing…'}>
               Share top {Math.min(top.length, 10)}
@@ -90,7 +56,7 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
             {sharing && <span className="hint" role="status">{sharing}</span>}
           </div>
         )}
-        {view === 'ranked' && top.length >= 10 && (
+        {top.length >= 10 && (
           <p className="hint">
             {settled} of your top 10 are settled. A title is settled once more duels are unlikely to move it far.
           </p>
@@ -99,7 +65,7 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
 
       {shown.length === 0 ? (
         <p className="empty-list">
-          {view === 'ranked' ? 'Titles you mark as seen will be ranked here.' : 'Nothing here yet.'}
+          {q ? `Nothing ranked matches "${query.trim()}".` : 'Titles you mark as seen will be ranked here.'}
         </p>
       ) : (
         <ol className="rank-list">
@@ -111,18 +77,17 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
             return (
               <li key={item.id}>
                 <button className="rank-row" onClick={() => onOpen(item.id)}>
-                  {view === 'ranked' && <span className="rank-num">{rank}</span>}
+                  {<span className="rank-num">{rank}</span>}
                   <Cover look={app.look(item)} title={title} size="sm" />
                   <span className="rank-body">
                     <span className="rank-title">{title}</span>
                     <span className="rank-meta">
                       {app.look(item).short}
-                      {view === 'ranked' && (
+                      {(
                         <>
                           {' · '}
                           {duels === 0 ? 'no duels' : duels === 1 ? '1 duel' : `${duels} duels`}
                           {isSettled ? ', settled' : ''}
-                          {app.view === 'both' && formLabel(item) && <>{' · '}{formLabel(item)}</>}
                         </>
                       )}
                     </span>

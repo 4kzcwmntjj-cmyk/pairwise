@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { CATALOGUE_SIZE, MANGA_SIZE } from '../anilist/catalogue';
 import { fromExport, type Snapshot } from '../store/store';
 import type { AppState } from './useApp';
-import { ViewSwitch } from './ViewSwitch';
 
 export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -80,15 +79,6 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
             </button>
           ))}
         </div>
-      </section>
-
-      <section>
-        <h3>Anime, manga or both</h3>
-        <ViewSwitch app={app} />
-        <p>
-          One ranking underneath. The anime view shows what you've watched, the manga view what you've read, and both shows
-          everything. For a title that exists as both, you say which you know: in Quick sort, in Duel's quick check, or on the title's card. Duels only use titles in the view.
-        </p>
       </section>
 
       <section>

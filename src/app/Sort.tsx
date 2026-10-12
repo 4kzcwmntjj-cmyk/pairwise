@@ -377,9 +377,6 @@ function SortSingle({
   const title = app.title(item);
   return (
     <>
-      {app.fit.order.length >= 2 && !longShots && (
-        <p className="hint">You don't need to sort everything here: duels bring in titles you've probably seen as they go.</p>
-      )}
       {longShots && (
         <div className="notice" role="status">
           <p>
