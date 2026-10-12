@@ -105,8 +105,9 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           Suggestions come from AniList users' recommendations for the titles you rank highest, plus genres you rank well.
           Tonight's pick is one of the best of them, the same all day until you press Another; Share makes a picture of
           it. Below are rows: one for each of your top three ("Because you rank … highly"), Hidden gems (strongly
-          recommended from your list, but not among the 300 most popular titles), and Read the manga (titles you've
-          watched, ruled out reading and rank in the top third). A title shows in one row only. Press Not interested, or
+          recommended from your list, but not among the 300 most popular titles), and Read the manga or Watch the anime (titles you
+          know in one form, have ruled out in the other and rank in the top third; Read shows in the Anime and Both views,
+          Watch in the Manga and Both views). A title shows in one row only. Press Not interested, or
           the × on a cover, and it won't come back. Hidden ones can be restored at the bottom of the page.
         </p>
       </section>

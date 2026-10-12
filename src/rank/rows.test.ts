@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Item, Mark } from '../types';
+import type { Item, Mark, View } from '../types';
 import type { Recommendation } from './recommend';
-import { buildRows, dayNumber, hiddenGems, popularityRanks, readTheManga, seededRandom, tonightOrder } from './rows';
+import { buildRows, dayNumber, hiddenGems, popularityRanks, otherForm, seededRandom, tonightOrder } from './rows';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
   id,
@@ -42,31 +42,37 @@ describe('hiddenGems', () => {
   });
 });
 
-describe('readTheManga', () => {
-  const both = (id: string) => item(id, { formats: ['TV', 'MANGA'], entries: [{ id: 1, format: 'MANGA', popularity: 1 }] });
+describe('otherForm', () => {
+  const entries = [{ id: 1, format: 'MANGA', popularity: 1 }, { id: 2, format: 'TV', popularity: 1 }];
+  const both = (id: string) => item(id, { formats: ['TV', 'MANGA'], entries });
   const a = both('a1');
   const b = both('b2');
   const c = both('c3');
   const d = item('d4');
-  const e = item('e5', { formats: ['TV', 'MANGA'] }); // no entries to show a manga cover from
-  const items = [a, b, c, d, e];
-  const order = ['a1', 'b2', 'c3', 'd4', 'e5'];
+  const e = item('e5', { formats: ['TV', 'MANGA'] }); // no entries to show the other cover from
+  const f = both('f6');
+  const g = item('g7', { formats: ['TV', 'MANGA'], entries: [{ id: 3, format: 'TV', popularity: 1 }] }); // no manga entry
+  const items = [a, b, c, d, e, f, g];
+  const order = ['a1', 'b2', 'c3', 'd4', 'e5', 'f6', 'g7'];
   const marks = new Map([
     mark('a1', { anime: true, manga: false }), // watched, ruled out the manga
-    mark('b2', { anime: true, manga: true }), // read it
+    mark('b2', { anime: true, manga: true }), // both
     mark('c3'), // plain seen: not known which
     mark('d4', { anime: true, manga: false }), // anime only, no manga to read
     mark('e5', { anime: true, manga: false }),
+    mark('f6', { anime: false, manga: true }), // read, ruled out the anime
+    mark('g7', { anime: true, manga: false }),
   ]);
 
-  it('lists ranked titles watched but not read, in rank order', () => {
-    expect(readTheManga(items, marks, order, never).map((i) => i.id)).toEqual(['a1']);
+  it('lists ranked titles known in one form and not the other, in rank order', () => {
+    expect(otherForm(items, marks, order, never, 'anime').map((i) => i.id)).toEqual(['a1']);
+    expect(otherForm(items, marks, order, never, 'manga').map((i) => i.id)).toEqual(['f6']);
   });
 
   it('leaves out hidden titles and titles outside the top third of a long list', () => {
-    expect(readTheManga(items, marks, order, (i) => i.id === 'a1')).toEqual([]);
+    expect(otherForm(items, marks, order, (i) => i.id === 'a1', 'anime')).toEqual([]);
     const long = [...Array.from({ length: 40 }, (_, k) => `z${k}`), 'a1'];
-    expect(readTheManga(items, marks, long, never)).toEqual([]);
+    expect(otherForm(items, marks, long, never, 'anime')).toEqual([]);
   });
 });
 
@@ -85,6 +91,7 @@ describe('buildRows', () => {
     allItems: items,
     allMarks: marks,
     fullOrder: ['s1', 's2'],
+    view: 'both' as View,
     rankOf: new Map([['s1', 1], ['s2', 2]]),
     title: (i: Item) => i.title,
   };
@@ -104,13 +111,28 @@ describe('buildRows', () => {
     expect(rows).toEqual([]);
   });
 
-  it('adds a manga row with the rank as its note', () => {
-    const m = item('m9', { formats: ['TV', 'MANGA'], entries: [{ id: 9, format: 'MANGA', popularity: 1 }] });
-    const allMarks = new Map([...marks, mark('m9', { anime: true, manga: false })]);
-    const rows = buildRows({ ...base, allItems: [...items, m], allMarks, fullOrder: ['s1', 'm9', 's2'], rankOf: new Map([['m9', 2]]) });
-    const manga = rows.find((r) => r.kind === 'manga')!;
-    expect(manga.picks[0]).toMatchObject({ note: 'You rank it #2' });
-    expect(manga.picks[0].item.id).toBe('m9');
+  describe('the manga and anime rows', () => {
+    const entries = [{ id: 9, format: 'MANGA', popularity: 1 }, { id: 8, format: 'TV', popularity: 1 }];
+    const m = item('m9', { formats: ['TV', 'MANGA'], entries });
+    const w = item('w8', { formats: ['TV', 'MANGA'], entries });
+    const allMarks = new Map([...marks, mark('m9', { anime: true, manga: false }), mark('w8', { anime: false, manga: true })]);
+    const input = { ...base, allItems: [...items, m, w], allMarks, fullOrder: ['s1', 'm9', 'w8', 's2'], rankOf: new Map([['m9', 2], ['w8', 3]]) };
+    const headings = (view: View) => buildRows({ ...input, view }).filter((r) => r.kind === 'manga' || r.kind === 'anime').map((r) => r.heading);
+
+    it('shows Read the manga and Watch the anime in the Both view, with the rank as a note', () => {
+      const rows = buildRows(input);
+      expect(headings('both')).toEqual(['Read the manga', 'Watch the anime']);
+      const manga = rows.find((r) => r.kind === 'manga')!;
+      expect(manga.picks).toHaveLength(1);
+      expect(manga.picks[0]).toMatchObject({ note: 'You rank it #2' });
+      expect(manga.picks[0].item.id).toBe('m9');
+      expect(rows.find((r) => r.kind === 'anime')!.picks[0]).toMatchObject({ note: 'You rank it #3' });
+    });
+
+    it('shows only the row about the other form in the Anime and Manga views', () => {
+      expect(headings('anime')).toEqual(['Read the manga']);
+      expect(headings('manga')).toEqual(['Watch the anime']);
+    });
   });
 });
 

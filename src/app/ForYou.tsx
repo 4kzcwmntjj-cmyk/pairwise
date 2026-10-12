@@ -34,11 +34,12 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
         allItems: app.allItems,
         allMarks: app.allMarks,
         fullOrder: app.fullOrder,
+        view: app.view,
         rankOf: app.rankOf,
         title: app.title,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [app.items, app.fit, visible, hiddenKeys, app.marks, app.allItems, app.allMarks, app.fullOrder, app.rankOf, language],
+    [app.items, app.fit, visible, hiddenKeys, app.marks, app.allItems, app.allMarks, app.fullOrder, app.view, app.rankOf, language],
   );
 
   // Tonight's pick goes through a shuffle that stays the same for the day; Another moves to the next.
@@ -215,8 +216,8 @@ function RecRow({ row, app, onOpen, onHide }: { row: SuggestionRow; app: AppStat
 function RecCard({ pick, kind, app, onOpen, onHide }: { pick: RowPick; kind: SuggestionRow['kind']; app: AppState; onOpen: (id: string) => void; onHide: (id: string) => void }) {
   const { item } = pick;
   const title = app.title(item);
-  // The manga row shows the manga's cover and years; the others show the side you know.
-  const look = kind === 'manga' ? lookOf(item, 'manga') : app.look(item);
+  // The manga and anime rows show the form you haven't tried; the others show the side you know.
+  const look = kind === 'manga' || kind === 'anime' ? lookOf(item, kind) : app.look(item);
   const note = pick.note ?? look.short;
   return (
     <li className="rec-card">
@@ -225,8 +226,8 @@ function RecCard({ pick, kind, app, onOpen, onHide }: { pick: RowPick; kind: Sug
         <span className="rec-card-title">{title}</span>
         {note && <span className="rec-card-note">{note}</span>}
       </button>
-      {/* A title you've seen can't be hidden: it would drop out of the Hidden list, so the manga row has no button. */}
-      {kind !== 'manga' && <HideButton item={item} title={title} onHide={onHide} />}
+      {/* A title you've seen can't be hidden: it would drop out of the Hidden list, so the manga and anime rows have no button. */}
+      {(kind === 'because' || kind === 'gems') && <HideButton item={item} title={title} onHide={onHide} />}
     </li>
   );
 }

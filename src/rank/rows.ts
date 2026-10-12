@@ -1,4 +1,5 @@
-import type { Item, Mark } from '../types';
+import { isManga } from '../anilist/group';
+import type { Item, Mark, Medium, View } from '../types';
 import { hasBoth, knownIn } from './medium';
 import type { Recommendation } from './recommend';
 
@@ -29,7 +30,7 @@ export interface RowPick {
 
 export interface SuggestionRow {
   id: string;
-  kind: 'because' | 'gems' | 'manga';
+  kind: 'because' | 'gems' | 'manga' | 'anime';
   heading: string;
   /** For a "because" row, the title it is about. */
   source?: Item;
@@ -52,6 +53,8 @@ export interface RowInput {
   allMarks: Map<string, Mark>;
   /** Your whole ranking, anime and manga together, best first. */
   fullOrder: string[];
+  /** The view you're in: Read the manga shows in Anime and Both, Watch the anime in Manga and Both. */
+  view: View;
   /** Your rank in the view, for captions. */
   rankOf: Map<string, number>;
   title: (item: Item) => string;
@@ -102,25 +105,28 @@ export function hiddenGems(recs: Recommendation[], popularityRank: Map<string, n
 }
 
 /**
- * Titles with an anime and a manga that you've watched and ruled out reading,
- * ranked in the top third of your list, best first.
+ * Titles with an anime and a manga that you know in one form and have ruled
+ * out in the other, ranked in the top third of your list, best first. `known`
+ * is the form you know: 'anime' gives the titles to read, 'manga' the ones to watch.
  */
-export function readTheManga(
+export function otherForm(
   allItems: Item[],
   allMarks: Map<string, Mark>,
   fullOrder: string[],
   isHidden: (item: Item) => boolean,
+  known: Medium,
 ): Item[] {
+  const other: Medium = known === 'anime' ? 'manga' : 'anime';
   const byId = new Map(allItems.map((i) => [i.id, i]));
   const limit = Math.max(10, Math.ceil(fullOrder.length / 3));
   const out: Item[] = [];
   for (const id of fullOrder.slice(0, limit)) {
     const item = byId.get(id);
     if (!item || isHidden(item)) continue;
-    // Needs the manga's own entries to show its cover.
-    if (!hasBoth(item) || !item.entries?.length) continue;
+    // Needs the other form's own entries to show its cover.
+    if (!hasBoth(item) || !item.entries?.some((e) => isManga(e.format) === (other === 'manga'))) continue;
     const mark = allMarks.get(id);
-    if (knownIn(item, mark, 'anime') !== true || knownIn(item, mark, 'manga') !== false) continue;
+    if (knownIn(item, mark, known) !== true || knownIn(item, mark, other) !== false) continue;
     out.push(item);
     if (out.length === MAX_ROW) break;
   }
@@ -128,7 +134,7 @@ export function readTheManga(
 }
 
 export function buildRows(input: RowInput): SuggestionRow[] {
-  const { items, order, recs, isHidden, marks, allItems, allMarks, fullOrder, rankOf, title } = input;
+  const { items, order, recs, isHidden, marks, allItems, allMarks, fullOrder, view, rankOf, title } = input;
   const byId = new Map(items.map((i) => [i.id, i]));
   const rows: SuggestionRow[] = [];
   const taken = new Set<string>();
@@ -154,13 +160,21 @@ export function buildRows(input: RowInput): SuggestionRow[] {
     rows.push({ id: 'gems', kind: 'gems', heading: 'Hidden gems', picks: gems });
   }
 
-  const manga = readTheManga(allItems, allMarks, fullOrder, isHidden);
-  if (manga.length >= 1) {
+  const cross: [Medium, 'manga' | 'anime', string][] = [
+    ['anime', 'manga', 'Read the manga'],
+    ['manga', 'anime', 'Watch the anime'],
+  ];
+  for (const [known, kind, heading] of cross) {
+    // A row recommends the form you don't know, so it makes no sense in that form's own view:
+    // no Read the manga in the Manga view, no Watch the anime in the Anime view.
+    if (view === kind) continue;
+    const found = otherForm(allItems, allMarks, fullOrder, isHidden, known);
+    if (!found.length) continue;
     rows.push({
-      id: 'manga',
-      kind: 'manga',
-      heading: 'Read the manga',
-      picks: manga.map((item) => ({ item, note: `You rank it #${rankOf.get(item.id) ?? fullOrder.indexOf(item.id) + 1}` })),
+      id: kind,
+      kind,
+      heading,
+      picks: found.map((item) => ({ item, note: `You rank it #${rankOf.get(item.id) ?? fullOrder.indexOf(item.id) + 1}` })),
     });
   }
   return rows;
