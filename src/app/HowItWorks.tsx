@@ -48,7 +48,7 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
       </section>
 
       <section>
-        <h3>3. Ranking and Stats</h3>
+        <h3>3. Ranking and Taste</h3>
         <p>
           Ranking is the full list, with each title's duel count. A title is marked settled once more duels are unlikely
           to move it far; until then its position is a best guess.
@@ -56,11 +56,11 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           Every title has one card with everything about it: your record, whether you've seen it (and which, anime or
           manga), what the title groups together, Split up and Join, and Not interested for suggestions. Open it by tapping
-          the title's name in Duel or Quick log, the i on a cover in Browse, or the title anywhere in Ranking, For you and
-          Stats.
+          the title's name in Duel or Quick log, the i on a cover in Browse, or the title anywhere in Ranking, Picks and
+          Taste.
         </p>
         <p>
-          Stats shows how your top 10 has moved over time, how settled your list is, where your taste leans, and where you
+          Taste shows how your top 10 has moved over time, how settled your list is, where your taste leans, and where you
           disagree with AniList's average scores. Most of it needs a few dozen duels before it says anything.
         </p>
         <p>
@@ -94,13 +94,13 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         </p>
         <p>
           Split lets you tick the parts to take out. Past duels stay with the original; the new titles start with none.
-          Join folds another title into this one and counts duels from both. Every change is listed in Settings, where you
+          Join folds another title into this one and counts duels from both. Every change is listed in Settings (the gear at the end of the tab bar), where you
           can undo it. Your changes survive catalogue updates.
         </p>
       </section>
 
       <section>
-        <h3>6. For you</h3>
+        <h3>6. Picks</h3>
         <p>
           Suggestions come from AniList users' recommendations for the titles you rank highest, plus genres you rank well.
           Tonight's pick is one of the best of them, the same all day until you press Another; Share makes a picture of

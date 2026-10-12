@@ -100,7 +100,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
       <main className="screen stats">
         <div className="empty">
           <h2>Nothing to show yet</h2>
-          <p>Stats are built from your duels. Play a few and they will appear here.</p>
+          <p>Taste is built from your duels. Play a few and they will appear here.</p>
         </div>
       </main>
     );

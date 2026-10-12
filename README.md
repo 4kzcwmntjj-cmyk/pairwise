@@ -6,8 +6,8 @@ Rank anime by picking between two at a time (勝負, shōbu: a match or contest)
 - **Sort**: go one at a time (seen it, haven't seen, ask later), or tap every title you've seen in a cover grid. Search finds anything in the catalogue, or on AniList for titles outside it.
 - **Duel**: pick the one you prefer. The ranking is a Bradley-Terry fit over every vote you've made.
 - **Ranking**: your list, plus the titles you've marked haven't seen. Open a title to split parts of it into their own title, or join another title into it, when the catalogue's franchise grouping is wrong. Those changes are stored separately (`src/anilist/overrides.ts`) and reapplied on every catalogue update.
-- **For you**: unseen titles suggested from AniList users' recommendations for the shows you rank highest, plus the genres you rank well.
-- **Stats**: totals, your top 10 over time (replayed from the vote log), how settled the list is, taste by genre, studio and decade, how you compare with AniList's scores, rivalries and upsets. Group stats wait for 30 ranked titles and 100 duels.
+- **Picks** (the For you tab until 13 Oct): unseen titles suggested from AniList users' recommendations for the shows you rank highest, plus the genres you rank well.
+- **Taste** (the Stats tab until 13 Oct): totals, your top 10 over time (replayed from the vote log), how settled the list is, taste by genre, studio and decade, how you compare with AniList's scores, rivalries and upsets. Group stats wait for 30 ranked titles and 100 duels.
 
 The catalogue (`public/catalogue.json`) is built by `scripts/build-catalogue.ts` on GitHub Actions monthly (`.github/workflows/catalogue.yml`), so devices never download it from AniList. Everything you do is saved in your browser (IndexedDB). Settings has "Save a copy" (the share sheet on phones) and "Load a copy" for backups and moving devices. A reminder in Duel (with an Add to Home Screen button) asks you to save after 150 new marks and duels or two weeks; the app also asks the browser to keep its data. Undo on Duel and Sort only undoes what was done on that screen; split and join changes are undone from Settings.
 

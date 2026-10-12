@@ -102,7 +102,7 @@ export function ItemSheet({
         <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />
         {fullMark?.status !== 'seen' && item.source === 'anilist' && (
           <section className="sheet-section">
-            <h3 className="sheet-label">For you</h3>
+            <h3 className="sheet-label">Picks</h3>
             {hidden ? (
               <div className="action-row start">
                 <span className="hint">Hidden from your suggestions.</span>

@@ -87,13 +87,13 @@ export function pickTip(state: TipState, ctx: TipContext): Tip | null {
   if (ctx.ranked >= MIN_RANKED_FOR_FORYOU && fresh('foryou')) {
     return {
       id: 'foryou',
-      text: `With ${MIN_RANKED_FOR_FORYOU} titles ranked, the For you tab can suggest what to watch or read next.`,
+      text: `With ${MIN_RANKED_FOR_FORYOU} titles ranked, the Picks tab can suggest what to watch or read next.`,
     };
   }
   if (ctx.ranked >= MIN_RANKED_FOR_STATS && ctx.duels >= MIN_DUELS_FOR_STATS && fresh('stats')) {
     return {
       id: 'stats',
-      text: "Stats has enough to show where your taste leans and where you disagree with AniList's scores.",
+      text: "Taste has enough to show where your taste leans and where you disagree with AniList's scores.",
     };
   }
   return null;
