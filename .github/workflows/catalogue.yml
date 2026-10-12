@@ -39,14 +39,16 @@ jobs:
       - run: npm ci
       - name: Fetch from AniList (one retry after a pause)
         run: npx vite-node scripts/build-catalogue.ts || (sleep 180 && npx vite-node scripts/build-catalogue.ts)
-      - name: Keep the raw AniList data for offline checks
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-media
-          path: raw-media.json.gz
-          if-no-files-found: ignore
-          retention-days: 30
+      - name: Keep the raw AniList data on the raw-data branch, for offline checks of the grouping
+        if: hashFiles('raw-media.json.gz') != ''
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir /tmp/raw && cp raw-media.json.gz /tmp/raw/ && cd /tmp/raw
+          git init -q -b raw-data
+          git add raw-media.json.gz
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Raw AniList data from the catalogue build"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}" raw-data
       - name: Commit the new catalogue
         run: |
           git config user.name "github-actions[bot]"
