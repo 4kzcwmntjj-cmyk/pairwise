@@ -99,54 +99,67 @@ function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, s
 export function shareHeight(layout: ShareLayout, count: number): number {
   if (layout === 'list') return 1350;
   const rest = Math.max(count - 3, 0);
-  const rows = Math.ceil(rest / 4);
-  return rows ? GRID_TOP_END + 30 + rows * (GRID_CELL_H + 16) + 96 : GRID_TOP_END + 96;
+  return rest ? GRID_TOP_END + 30 + rest * (ROW_H + ROW_GAP) + 86 : GRID_TOP_END + 96;
 }
 
+// "Covers" layout: the top three as large covers, then ranks 4 and below as compact rows.
 const GRID_TOP = 168;
 const TOP_W = Math.floor((SHARE_WIDTH - PAD * 2 - 48) / 3);
 const TOP_H = Math.round((TOP_W * 3) / 2);
 const GRID_TOP_END = GRID_TOP + TOP_H + 14 + 2 * 32 + 30 + 20;
-const CELL_W = Math.floor((SHARE_WIDTH - PAD * 2 - 3 * 20) / 4);
-const CELL_COVER_H = Math.round((CELL_W * 3) / 2);
-const GRID_CELL_H = CELL_COVER_H + 12 + 2 * 26;
+const ROW_H = 84;
+const ROW_GAP = 10;
 
 function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover[], boxes: Box[]) {
   const measure = (s: string) => ctx.measureText(s).width;
   rows.forEach((row, i) => {
-    let x: number, y: number, w: number, h: number, titleSize: number, lineH: number, lines: number;
     if (i < 3) {
-      x = PAD + i * (TOP_W + 24);
-      y = GRID_TOP;
-      w = TOP_W;
-      h = TOP_H;
-      titleSize = 28;
-      lineH = 32;
-      lines = 2;
-    } else {
-      const k = i - 3;
-      x = PAD + (k % 4) * (CELL_W + 20);
-      y = GRID_TOP_END + 30 + Math.floor(k / 4) * (GRID_CELL_H + 16);
-      w = CELL_W;
-      h = CELL_COVER_H;
-      titleSize = 22;
-      lineH = 26;
-      lines = 2;
+      const x = PAD + i * (TOP_W + 24);
+      const y = GRID_TOP;
+      coverBox(ctx, row, covers[i], x, y, TOP_W, TOP_H, 14, boxes, i);
+      badge(ctx, row.rank, x + 10, y + 10, 56, true);
+      ctx.fillStyle = INK;
+      ctx.font = `600 28px ${BODY}`;
+      let ty = y + TOP_H + 14 + 28;
+      for (const l of wrapLines(measure, row.title, TOP_W, 2)) {
+        ctx.fillText(l, x, ty);
+        ty += 32;
+      }
+      if (row.meta) {
+        ctx.fillStyle = MUTED;
+        ctx.font = `22px ${BODY}`;
+        ctx.fillText(wrapLines(measure, row.meta, TOP_W, 1)[0], x, y + TOP_H + 20 + 2 * 32 + 22);
+      }
+      return;
     }
-    coverBox(ctx, row, covers[i], x, y, w, h, 14, boxes, i);
-    badge(ctx, row.rank, x + 10, y + 10, i < 3 ? 56 : 44, i < 3);
 
+    const y = GRID_TOP_END + 30 + (i - 3) * (ROW_H + ROW_GAP);
+    ctx.fillStyle = SURFACE;
+    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, ROW_H, 18);
+    ctx.fill();
+
+    ctx.fillStyle = MUTED;
+    ctx.font = `600 30px ${DISPLAY}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(String(row.rank), PAD + 46, y + ROW_H / 2 + 11);
+    ctx.textAlign = 'left';
+
+    const ch = ROW_H - 16;
+    const cw = Math.round((ch * 2) / 3);
+    const cx = PAD + 92;
+    coverBox(ctx, row, covers[i], cx, y + 8, cw, ch, 8, boxes, i);
+
+    const tx = cx + cw + 24;
+    const tw = SHARE_WIDTH - PAD - 24 - tx;
     ctx.fillStyle = INK;
-    ctx.font = `600 ${titleSize}px ${BODY}`;
-    let ty = y + h + 12 + titleSize;
-    for (const l of wrapLines(measure, row.title, w, lines)) {
-      ctx.fillText(l, x, ty);
-      ty += lineH;
-    }
-    if (i < 3 && row.meta) {
+    ctx.font = `600 27px ${BODY}`;
+    const lines = wrapLines(measure, row.title, tw, 1);
+    const hasMeta = !!row.meta;
+    ctx.fillText(lines[0], tx, y + (hasMeta ? 38 : 50));
+    if (hasMeta) {
       ctx.fillStyle = MUTED;
-      ctx.font = `22px ${BODY}`;
-      ctx.fillText(wrapLines(measure, row.meta, w, 1)[0], x, y + h + 20 + 2 * lineH + 22);
+      ctx.font = `21px ${BODY}`;
+      ctx.fillText(wrapLines(measure, row.meta, tw, 1)[0], tx, y + 66);
     }
   });
 }
