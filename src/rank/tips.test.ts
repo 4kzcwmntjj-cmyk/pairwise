@@ -19,15 +19,16 @@ describe('tips', () => {
   });
 
   it('suggests Split up for a big franchise near the top, once', () => {
-    const c = ctx({ onScreen: [{ title: 'Fate', rank: 12, entries: 14 }] });
+    const c = ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 12, entries: 14, anime: 9, manga: 5 }] });
     const tip = pickTip(NO_TIPS, c);
     expect(tip?.id).toBe('split');
-    expect(tip?.text).toContain('Fate');
+    expect(tip?.text).toContain('Fate groups 14 entries: 9 anime and 5 manga.');
+    expect(tip?.open?.itemId).toBe('f');
     expect(pickTip(afterShown(NO_TIPS, tip!, 12), ctx({ ...c, duels: 40 }))).toBeNull();
   });
 
   it('ignores big franchises lower down', () => {
-    expect(pickTip(NO_TIPS, ctx({ onScreen: [{ title: 'Fate', rank: 80, entries: 14 }] }))).toBeNull();
+    expect(pickTip(NO_TIPS, ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 80, entries: 14, anime: 14, manga: 0 }] }))).toBeNull();
   });
 
   it('points to Browse after five passes in a row', () => {

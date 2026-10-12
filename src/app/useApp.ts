@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalStore, toExport, type Snapshot } from '../store/store';
 import { saveCopy } from './saveCopy';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
+import { isManga } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
@@ -197,7 +198,10 @@ export function useApp() {
       ranked: fit.order.length,
       onScreen: [pair.a, pair.b].flatMap((id) => {
         const it = itemById.get(id);
-        return it ? [{ title: displayTitle(it, settings), rank: rankOf.get(id), entries: it.entries?.length ?? 0 }] : [];
+        if (!it) return [];
+        const entries = it.entries ?? [];
+        const manga = entries.filter((e) => isManga(e.format)).length;
+        return [{ id, title: displayTitle(it, settings), rank: rankOf.get(id), entries: entries.length, anime: entries.length - manga, manga }];
       }),
       newcomerLog,
       recent: votes.slice(-15).map((v) => v.outcome),

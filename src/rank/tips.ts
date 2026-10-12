@@ -22,7 +22,7 @@ export interface TipContext {
   /** Titles ranked in the current view. */
   ranked: number;
   /** The titles on screen, with their rank in this view and how many entries they group. */
-  onScreen: { title: string; rank?: number; entries: number }[];
+  onScreen: { id: string; title: string; rank?: number; entries: number; anime: number; manga: number }[];
   /** Whether each recent newcomer was a title you'd seen, oldest first. */
   newcomerLog: boolean[];
   /** The last outcomes, oldest first. */
@@ -36,11 +36,16 @@ export interface TipContext {
 export interface Tip {
   id: string;
   text: string;
+  /** A title the tip is about, with a button to open it. */
+  open?: { itemId: string; label: string };
 }
 
 export const MIN_RANKED_FOR_FORYOU = 20;
 export const MIN_RANKED_FOR_STATS = 30;
 export const MIN_DUELS_FOR_STATS = 100;
+
+const parts = (t: { anime: number; manga: number }) =>
+  t.anime && t.manga ? `: ${t.anime} anime and ${t.manga} manga` : '';
 
 /** The tip to show now, or null. */
 export function pickTip(state: TipState, ctx: TipContext): Tip | null {
@@ -52,7 +57,8 @@ export function pickTip(state: TipState, ctx: TipContext): Tip | null {
   if (big && fresh('split')) {
     return {
       id: 'split',
-      text: `${big.title} groups ${big.entries} entries. If they are really separate series, open it in Ranking and choose Split up.`,
+      text: `${big.title} groups ${big.entries} entries${parts(big)}. If you'd rather rank some of them on their own, you can split it up.`,
+      open: { itemId: big.id, label: `Open ${big.title}` },
     };
   }
   const lastFive = ctx.newcomerLog.slice(-5);

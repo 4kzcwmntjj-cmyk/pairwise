@@ -1304,3 +1304,38 @@ main.sort {
   margin: 0;
   flex: 1;
 }
+.note-label {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.tip {
+  flex-wrap: wrap;
+}
+.tip p {
+  min-width: 14em;
+}
+.tip-actions {
+  display: flex;
+  gap: 8px;
+}
+.quick-check .form-ask {
+  margin-top: 8px;
+}
+@media (max-width: 520px) {
+  .form-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+.quick-check .form-list {
+  gap: 12px;
+}

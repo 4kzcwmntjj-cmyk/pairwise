@@ -8,7 +8,7 @@ import type { AppState } from './useApp';
 /** Titles waiting for "anime or manga?" before Duel asks about them together. */
 const FORM_BATCH = 4;
 
-export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void }) {
+export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () => void; onOpen: (id: string) => void }) {
   const [picked, setPicked] = useState<Outcome | null>(null);
   const pair = app.pair;
   const fresh = pair?.fresh ?? [];
@@ -36,7 +36,7 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || (formOpen && pending > 0)) return;
       if (e.key === 'ArrowLeft') choose('a');
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
@@ -62,6 +62,46 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
     );
   }
   const starting = app.votes.length === 0;
+
+  // A few new titles that exist as anime and manga are waiting: ask about them in place of the next duel.
+  if (formOpen && pending > 0) {
+    return (
+      <main className="screen duel quick-check">
+        <div className="notice form-ask" role="status">
+          <p>
+            <span className="note-label">Quick check</span>
+            You've added {pending === 1 ? 'a title' : `${pending} titles`} that {pending === 1 ? 'exists' : 'exist'} as both anime
+            and manga. Which did you see? This decides where they show in the Anime and Manga views.
+          </p>
+          <ul className="form-list">
+            {app.formPending.map((id) => {
+              const it = app.itemById.get(id);
+              if (!it) return null;
+              return (
+                <li key={id}>
+                  <span>{app.title(it)}</span>
+                  <span className="form-choices">
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: false })}>
+                      Anime
+                    </button>
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: false, manga: true })}>
+                      Manga
+                    </button>
+                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: true })}>
+                      Both
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <button className="btn btn-quiet btn-small" onClick={() => app.answerForm(null, null)}>
+            Back to duels (the rest wait in the Library)
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   const placing = app.fit.order.filter((id) => (app.fit.duels.get(id) ?? 0) < PLACED_AFTER).length;
   const side = (item: Item, outcome: 'a' | 'b') => {
@@ -112,10 +152,26 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
       </div>
       {app.tip && (
         <div className="tip" role="status">
-          <p>{app.tip.text}</p>
-          <button className="btn btn-quiet btn-small" onClick={app.dismissTip}>
-            Got it
-          </button>
+          <p>
+            <span className="note-label">Tip</span>
+            {app.tip.text}
+          </p>
+          <div className="tip-actions">
+            {app.tip.open && (
+              <button
+                className="btn btn-small"
+                onClick={() => {
+                  onOpen(app.tip!.open!.itemId);
+                  app.dismissTip();
+                }}
+              >
+                {app.tip.open.label}
+              </button>
+            )}
+            <button className="btn btn-quiet btn-small" onClick={app.dismissTip}>
+              Got it
+            </button>
+          </div>
         </div>
       )}
       {app.tip ? null : fresh.length === 2 ? (
@@ -143,36 +199,6 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
         {app.votes.length.toLocaleString()} duels
         {placing > 0 ? `, ${placing} still being placed` : ''}
       </p>
-      {formOpen && pending > 0 && (
-        <div className="notice form-ask" role="status">
-          <p>These are both anime and manga. Which have you seen?</p>
-          <ul className="form-list">
-            {app.formPending.map((id) => {
-              const it = app.itemById.get(id);
-              if (!it) return null;
-              return (
-                <li key={id}>
-                  <span>{app.title(it)}</span>
-                  <span className="form-choices">
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: false })}>
-                      Anime
-                    </button>
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: false, manga: true })}>
-                      Manga
-                    </button>
-                    <button className="btn btn-small" onClick={() => app.answerForm(id, { anime: true, manga: true })}>
-                      Both
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <button className="btn btn-quiet btn-small" onClick={() => app.answerForm(null, null)}>
-            Later (they wait in the Library)
-          </button>
-        </div>
-      )}
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
