@@ -59,3 +59,9 @@ Ranking has a Share top 10 button (shown from three ranked titles). It draws a 1
 ## The title card
 
 Every per-title edit lives on one card (`src/app/ItemSheet.tsx`): duel record, seen / anime / manga, what the title groups (entries with years and formats, folded after six), Split up and Join, and Not interested for For you (unseen titles only). It opens from the title name in Duel and Quick sort (`TitleLink`, with a small i), the i button on each cover in Browse, and rows in Ranking, For you and Stats.
+
+## Front page and Library search
+
+The welcome screen is now a front page: on a first visit it loads the title list and waits for Start (with How it works and Load a saved copy); tapping the Shōbu name in the top bar returns to it, with Back to duels and a count of ranked titles and duels. Load a saved copy only shows there while the list is empty; otherwise it stays in Settings behind a confirmation.
+
+The Library no longer has its own Search AniList and Start duels buttons. Browse's search box searches every title (ignoring the status and year filters) and offers "Not here? Search AniList for …", which opens the AniList search with the text already run.

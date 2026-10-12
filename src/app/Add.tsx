@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { searchAniList } from '../anilist/catalogue';
 import { addEntry, franchiseFor, toItem, type RawMedia } from '../anilist/group';
 import type { Item } from '../types';
@@ -8,8 +8,8 @@ import type { AppState } from './useApp';
 
 const STATUS_LABEL = { seen: 'Seen', unseen: "Haven't seen" } as const;
 
-export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
-  const [query, setQuery] = useState('');
+export function Add({ app, onOpen, initial = '' }: { app: AppState; onOpen: (id: string) => void; initial?: string }) {
+  const [query, setQuery] = useState(initial);
   const [remote, setRemote] = useState<RawMedia[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +51,14 @@ export function Add({ app, onOpen }: { app: AppState; onOpen: (id: string) => vo
     await app.saveItems([item]);
     onOpen(app.resolveId(item.id));
   }
+
+  // Arriving with a search from the Library: run it straight away.
+  const ran = useRef(false);
+  useEffect(() => {
+    if (ran.current || !initial.trim()) return;
+    ran.current = true;
+    search();
+  });
 
   const row = (item: Item) => {
     const title = app.title(item);

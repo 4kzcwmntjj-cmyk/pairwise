@@ -14,9 +14,9 @@ const PAGE = 60;
 type Show = 'open' | 'unsorted' | 'seen' | 'unseen' | 'form';
 
 export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => void; onOpen: (id: string) => void }) {
-  const [finding, setFinding] = useState(false);
-  const onFind = () => setFinding(true);
-  const seen = useMemo(() => [...app.marks.values()].filter((m) => m.status === 'seen').length, [app.marks]);
+  /** Searching AniList for this text, or null. */
+  const [finding, setFinding] = useState<string | null>(null);
+  const onFind = (query = '') => setFinding(query);
   const mode = app.settings.sortMode;
   const [show, setShow] = useState<Show>('open');
   // Titles marked seen before manga came in, which still need watched or read.
@@ -28,15 +28,15 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
     setShow(s);
     if (mode !== 'grid') app.setSettings({ ...app.settings, sortMode: 'grid' });
   };
-  if (finding) {
+  if (finding !== null) {
     return (
       <main className="screen sort">
         <div className="sort-head">
-          <button className="btn btn-quiet btn-small" onClick={() => setFinding(false)}>
-            Back to sorting
+          <button className="btn btn-quiet btn-small" onClick={() => setFinding(null)}>
+            Back to the Library
           </button>
         </div>
-        <Add app={app} onOpen={onOpen} />
+        <Add app={app} onOpen={onOpen} initial={finding} />
       </main>
     );
   }
@@ -61,16 +61,6 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
             </button>
           ))}
         </div>
-        <div className="action-row start">
-          <button className="btn btn-small" onClick={onFind}>
-            Search AniList
-          </button>
-          {seen >= 2 && (
-            <button className="btn btn-primary btn-small" onClick={onDone}>
-              Start duels ({seen} seen)
-            </button>
-          )}
-        </div>
       </div>
       {formless > 0 && !(mode === 'grid' && show === 'form') && (
         <p className="hint">
@@ -84,7 +74,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
       {mode === 'grid' ? (
         <SortGrid app={app} onFind={onFind} onOpen={onOpen} show={show} setShow={setShow} />
       ) : (
-        <SortSingle app={app} onDone={onDone} onFind={onFind} onBrowse={() => browse('unsorted')} onOpen={onOpen} />
+        <SortSingle app={app} onDone={onDone} onBrowse={() => browse('unsorted')} onOpen={onOpen} />
       )}
     </main>
   );
@@ -103,7 +93,7 @@ function SortGrid({
   setShow,
 }: {
   app: AppState;
-  onFind: () => void;
+  onFind: (query?: string) => void;
   onOpen: (id: string) => void;
   show: Show;
   setShow: (s: Show) => void;
@@ -128,7 +118,8 @@ function SortGrid({
   }, [app.items, app.look]);
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
-    if (q) items = items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
+    // A search looks through every title, whatever the other filters say.
+    if (q) return items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
     if (decade !== null) items = items.filter((i) => Math.floor((yearOf(i) ?? 0) / 10) * 10 === decade);
     if (year !== null) items = items.filter((i) => yearOf(i) === year);
     const status = (i: Item) => app.marks.get(i.id)?.status;
@@ -182,11 +173,19 @@ function SortGrid({
           id="sort-filter"
           className="search"
           type="search"
-          placeholder="Filter these titles"
+          placeholder="Search titles"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="grid-filters">
+        {q ? (
+          <p className="hint">
+            Showing matches from every title.{' '}
+            <button className="btn-link inline" onClick={() => onFind(query.trim())}>
+              Not here? Search AniList for "{query.trim()}"
+            </button>
+          </p>
+        ) : (
+          <div className="grid-filters">
           <select id="grid-show" aria-label="Show" value={show} onChange={(e) => setShow(e.target.value as Show)}>
             <option value="open">Not sorted and seen</option>
             <option value="unsorted">Not sorted</option>
@@ -222,14 +221,12 @@ function SortGrid({
                 ))}
             </select>
           )}
-        </div>
+          </div>
+        )}
       </div>
       {list.length === 0 ? (
         <p className="empty-list">
-          {q ? `Nothing matches "${query.trim()}" here.` : 'Nothing here with these filters.'}{' '}
-          <button className="btn-link inline" onClick={onFind}>
-            Search AniList
-          </button>
+          {q ? `Nothing in the catalogue matches "${query.trim()}".` : 'Nothing here with these filters.'}
         </p>
       ) : (
         <ul className="cover-grid">
@@ -292,13 +289,11 @@ const LIKELY_AT_LEAST = 0.15;
 function SortSingle({
   app,
   onDone,
-  onFind,
   onBrowse,
   onOpen,
 }: {
   app: AppState;
   onDone: () => void;
-  onFind: () => void;
   onBrowse: () => void;
   onOpen: (id: string) => void;
 }) {

@@ -26,6 +26,8 @@ export function App() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
+  /** The front page: shown on a first visit until Start, and whenever the Shōbu name is tapped. */
+  const [home, setHome] = useState<boolean | null>(null);
 
   const hasItems = app.items.length > 0;
 
@@ -42,12 +44,26 @@ export function App() {
     if (app.ready && hasItems && tab === null) setTab('duel');
   }, [app.ready, hasItems, tab]);
 
-  if (!app.ready) return <div className="boot" />;
+  // A first visit (nothing stored yet) opens on the front page and stays there until Start.
+  useEffect(() => {
+    if (app.ready && home === null) setHome(!hasItems);
+  }, [app.ready, home, hasItems]);
+
+  if (!app.ready || home === null) return <div className="boot" />;
   if (help) return <HowItWorks onClose={() => setHelp(false)} />;
-  if (!hasItems) {
+  if (home || !hasItems) {
     // The welcome screen loads the catalogue itself; the launch check would only write it all again.
-    synced.current = true;
-    return <Welcome app={app} onHelp={() => setHelp(true)} />;
+    if (!hasItems) synced.current = true;
+    return (
+      <Welcome
+        app={app}
+        onHelp={() => setHelp(true)}
+        onStart={() => {
+          setHome(false);
+          setTab('duel');
+        }}
+      />
+    );
   }
 
   const current: Tab = tab ?? 'duel';
@@ -55,7 +71,9 @@ export function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="wordmark">Shōbu</span>
+        <button className="wordmark" onClick={() => setHome(true)} aria-label="Shōbu: front page" title="Front page">
+          Shōbu
+        </button>
         <ViewSwitch app={app} compact />
         <nav className="tabs" aria-label="Sections">
           {TABS.map(([t, label]) => (

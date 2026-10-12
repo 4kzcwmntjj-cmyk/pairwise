@@ -38,7 +38,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           The Library holds every title. Quick sort shows one at a time, likeliest first, and asks if you know it; it's a
           fast way to add a batch at once. Browse shows covers you can narrow by decade and year, which helps you remember what
-          you've seen once the obvious ones are done. Search AniList finds anything older or less popular.
+          you've seen once the obvious ones are done. Its search box looks through every title; if what you want isn't
+          there, it offers to search AniList, which finds anything older or less popular.
         </p>
         <p>
           Some titles exist as both anime and manga, such as Death Note. For those, the Library asks which you've seen:
