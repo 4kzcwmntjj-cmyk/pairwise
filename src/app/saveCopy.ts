@@ -5,8 +5,10 @@
  */
 export type SaveResult = 'shared' | 'downloaded' | 'cancelled';
 
-export async function saveCopy(name: string, json: string): Promise<SaveResult> {
-  const file = new File([json], name, { type: 'application/json' });
+export const saveCopy = (name: string, json: string) => saveFile(new File([json], name, { type: 'application/json' }));
+
+export async function saveFile(file: File): Promise<SaveResult> {
+  const name = file.name;
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
     try {

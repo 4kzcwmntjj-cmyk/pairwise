@@ -4,6 +4,8 @@ import type { Item, Status } from '../types';
 import { Cover } from './Cover';
 import { formUnknown, knownIn } from '../rank/medium';
 import { viewWords } from './meta';
+import { saveFile } from './saveCopy';
+import { renderTop } from './shareImage';
 import type { AppState } from './useApp';
 
 type View = 'ranked' | 'unseen';
@@ -11,6 +13,7 @@ type View = 'ranked' | 'unseen';
 export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
   const [view, setView] = useState<View>('ranked');
   const [query, setQuery] = useState('');
+  const [sharing, setSharing] = useState<string | null>(null);
 
   const lists = useMemo(() => {
     const byStatus = (s: Status) =>
@@ -34,6 +37,23 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
   };
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
+  async function shareTop() {
+    setSharing('Drawing…');
+    try {
+      const rows = top.flatMap((id, i) => {
+        const item = app.itemById.get(id);
+        if (!item) return [];
+        const look = app.look(item);
+        return [{ rank: i + 1, title: app.title(item), meta: look.short, cover: look.coverLarge ?? look.cover, color: look.coverColor }];
+      });
+      const noun = app.view === 'both' ? 'anime and manga' : app.view;
+      const blob = await renderTop(rows, `My top ${rows.length} ${noun}`);
+      const result = await saveFile(new File([blob], `shobu-top-${rows.length}.png`, { type: 'image/png' }));
+      setSharing(result === 'shared' ? 'Shared.' : result === 'downloaded' ? 'Saved the picture.' : null);
+    } catch (e) {
+      setSharing((e as Error).message);
+    }
+  }
   const q = query.trim().toLowerCase();
   const shown = lists[view].filter(
     (i) => !q || [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)),
@@ -62,6 +82,14 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        {view === 'ranked' && top.length >= 3 && (
+          <div className="action-row start">
+            <button className="btn btn-small" onClick={shareTop} disabled={sharing === 'Drawing…'}>
+              Share top {Math.min(top.length, 10)}
+            </button>
+            {sharing && <span className="hint" role="status">{sharing}</span>}
+          </div>
+        )}
         {view === 'ranked' && top.length >= 10 && (
           <p className="hint">
             {settled} of your top 10 are settled. A title is settled once more duels are unlikely to move it far.

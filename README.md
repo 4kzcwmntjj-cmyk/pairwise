@@ -51,3 +51,7 @@ First launch now stores the catalogue before showing the app, and skips the laun
 ## Tips
 
 Duel shows one short tip at a time, below the buttons, the first time something relevant comes up: a franchise with ten or more entries near the top (Split up), five passes on new titles in a row (Browse by year), the first title known in one form only (the view switch), a jump of eight places or more, heavy use of ties, 20 titles ranked (For you) and Stats unlocking. Tips wait for eight duels, are at least ten duels apart, and each appears once. State is in the `tips` meta key and the export. Settings can turn tips off or show them again. Rules are in `src/rank/tips.ts`.
+
+## Share your top 10
+
+Ranking has a Share top 10 button (shown from three ranked titles). It draws a 1080×1350 picture of your top ten in the current view with canvas (`src/app/shareImage.ts`): rank, cover, title, years and studio. On phones it opens the share sheet; elsewhere it downloads a PNG. Covers load with CORS; any that fail to load are drawn as a block in the cover's colour.
