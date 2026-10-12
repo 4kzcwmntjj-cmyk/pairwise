@@ -13,17 +13,18 @@ export interface ShareRow {
 
 export const SHARE_WIDTH = 1080;
 
-const BG = '#15142a';
-const SURFACE = '#1f1e3a';
-const INK = '#f2f1fb';
-const MUTED = '#a3a1c2';
-const ACCENT = '#8f93ff';
+export const BG = '#15142a';
+export const SURFACE = '#1f1e3a';
+export const LINE = '#353459';
+export const INK = '#f2f1fb';
+export const MUTED = '#a3a1c2';
+export const ACCENT = '#8f93ff';
 
-const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
-const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+export const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
+export const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const PAD = 64;
 
-type Cover = Drawable | null;
+export type Cover = Drawable | null;
 
 /** Breaks text into at most `maxLines` lines that fit `width`, ending the last with an ellipsis if cut. */
 export function wrapLines(measure: (s: string) => number, text: string, width: number, maxLines: number): string[] {
@@ -53,7 +54,7 @@ export function wrapLines(measure: (s: string) => number, text: string, width: n
   return lines.slice(0, maxLines);
 }
 
-function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
 }
@@ -66,10 +67,10 @@ function drawCover(ctx: CanvasRenderingContext2D, img: Drawable, x: number, y: n
   ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
 }
 
-type Box = { x: number; y: number; w: number; h: number };
+export type Box = { x: number; y: number; w: number; h: number; r?: number };
 
-function coverBox(ctx: CanvasRenderingContext2D, row: ShareRow, img: Cover, x: number, y: number, w: number, h: number, r: number, boxes?: Box[], i?: number) {
-  if (boxes && i !== undefined) boxes[i] = { x, y, w, h };
+export function coverBox(ctx: CanvasRenderingContext2D, row: { color?: string }, img: Cover, x: number, y: number, w: number, h: number, r: number, boxes?: Box[], i?: number) {
+  if (boxes && i !== undefined) boxes[i] = { x, y, w, h, r };
   ctx.save();
   round(ctx, x, y, w, h, r);
   ctx.clip();
@@ -171,7 +172,7 @@ export interface ShareResult {
 }
 
 /** True when the box holds one flat colour, i.e. no picture was drawn into it. */
-function isFlat(ctx: CanvasRenderingContext2D, b: Box): boolean {
+export function isFlat(ctx: CanvasRenderingContext2D, b: Box): boolean {
   const first = ctx.getImageData(Math.round(b.x + b.w * 0.5), Math.round(b.y + b.h * 0.5), 1, 1).data;
   for (let fy = 1; fy <= 5; fy++) {
     for (let fx = 1; fx <= 5; fx++) {
@@ -180,6 +181,41 @@ function isFlat(ctx: CanvasRenderingContext2D, b: Box): boolean {
     }
   }
   return true;
+}
+
+/**
+ * A cover can decode yet draw as nothing (seen on an iPhone). Checks each box
+ * and redraws a blank one through an <img> element. Returns how many are still missing,
+ * and adds what happened to `details`.
+ */
+export async function fixBlankCovers(
+  ctx: CanvasRenderingContext2D,
+  rows: { cover?: string; color?: string }[],
+  covers: Cover[],
+  boxes: Box[],
+  details: string[],
+): Promise<number> {
+  let missing = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row.cover) continue;
+    const box = boxes[i];
+    if (covers[i] && box && !isFlat(ctx, box)) continue;
+    if (covers[i] && box) {
+      details[i] += '; drew blank';
+      const alt = await decodeAsImage(row.cover);
+      if (alt) {
+        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, box.r ?? 14);
+        if (!isFlat(ctx, box)) {
+          details[i] += '; fixed by redrawing from an image element';
+          continue;
+        }
+        details[i] += '; still blank';
+      }
+    }
+    missing++;
+  }
+  return missing;
 }
 
 export async function renderTop(rows: ShareRow[], heading: string): Promise<ShareResult> {
@@ -208,27 +244,7 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Shar
   const boxes: Box[] = [];
   drawGrid(ctx, rows, covers, boxes);
 
-  // A cover can decode yet draw as nothing; check, and redraw through an <img> if so.
-  let missing = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row.cover) continue;
-    const box = boxes[i];
-    if (covers[i] && box && !isFlat(ctx, box)) continue;
-    if (covers[i] && box) {
-      details[i] += '; drew blank';
-      const alt = await decodeAsImage(row.cover);
-      if (alt) {
-        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, 14);
-        if (!isFlat(ctx, box)) {
-          details[i] += '; fixed by redrawing from an image element';
-          continue;
-        }
-        details[i] += '; still blank';
-      }
-    }
-    missing++;
-  }
+  const missing = await fixBlankCovers(ctx, rows, covers, boxes, details);
 
   ctx.fillStyle = MUTED;
   ctx.font = `600 26px ${DISPLAY}`;

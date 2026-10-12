@@ -1066,13 +1066,7 @@ a {
   font-size: 0.82rem;
 }
 .legend-list li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .swatch {
   flex: none;
@@ -1528,4 +1522,157 @@ main.sort {
   margin: 6px 0 0;
   padding-left: 18px;
   text-align: left;
+}
+
+/* Stats cards: one finding each, with covers and a Share button. The detailed charts fold away below. */
+.find-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.find-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.find-card p {
+  margin: 0;
+}
+.find-kicker {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.find-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.find-line {
+  font-size: 1.02rem;
+  font-weight: 500;
+}
+.find-covers {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 8px;
+}
+.find-covers.count-1 {
+  grid-template-columns: minmax(0, 150px);
+}
+.find-covers.count-2 {
+  grid-template-columns: repeat(2, minmax(0, 130px));
+}
+.find-covers.count-3 {
+  grid-template-columns: repeat(3, minmax(0, 120px));
+}
+.find-covers.count-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.find-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.find-cover .cover {
+  border-radius: 8px;
+}
+.find-cover-title {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.find-cover-caption {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.find-card .rank-list {
+  margin-top: 4px;
+}
+.find-facts {
+  margin: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+.find-facts div {
+  display: grid;
+  grid-template-columns: 9.5em 1fr;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+.find-facts dt {
+  color: var(--muted);
+}
+.find-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+.find-card .action-row {
+  margin-top: 4px;
+}
+.more-detail {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.more-detail > summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 4px 0;
+}
+.more-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+.legend-list button {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.legend-list button .swatch {
+  margin-top: 0.3em;
+}
+.legend-list button.on {
+  background: var(--accent-soft);
+  font-weight: 600;
 }

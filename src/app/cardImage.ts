@@ -1,0 +1,180 @@
+/** Draws a Stats card (see cards.ts) as a picture to share. Same palette as the top-10 picture. */
+
+import type { CardSpec } from './cards';
+import { loadCovers } from './coverLoader';
+import { ACCENT, BG, BODY, DISPLAY, INK, LINE, MUTED, SHARE_WIDTH, SURFACE, coverBox, fixBlankCovers, round, wrapLines, type Box, type Cover } from './shareImage';
+
+export interface CardArt {
+  title: string;
+  cover?: string;
+  color?: string;
+}
+
+const W = SHARE_WIDTH;
+const PAD = 72;
+const INNER = W - PAD * 2;
+/** Drawn on a tall canvas first, then cut to the height the content used. */
+const SCRATCH_H = 3200;
+const MIN_H = 1080;
+
+/** Cover width for a strip of `count` covers: large for one or two, narrower as more share the row. */
+export function stripWidth(count: number, gap = 24): number {
+  return Math.min(360, Math.floor((INNER - gap * (count - 1)) / count));
+}
+
+export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): Promise<{ blob: Blob; missing: number; details: string[] }> {
+  try {
+    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
+  } catch {
+    // Fall back to the system fonts.
+  }
+  // Covers first (the strip), then the rows' covers.
+  const pictured = [...spec.covers, ...(spec.rows ?? [])].map((c) => ({ ...c, ...art(c.id) }));
+  const results = await loadCovers(pictured.map((p) => p.cover));
+  const covers: Cover[] = results.map((r) => r.img);
+  const details = pictured.map((p, i) => `${p.title}: ${results[i].how}`);
+  const boxes: Box[] = [];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = SCRATCH_H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, SCRATCH_H);
+  ctx.textBaseline = 'alphabetic';
+  const measure = (s: string) => ctx.measureText(s).width;
+
+  // Kicker
+  let y = PAD + 30;
+  ctx.fillStyle = ACCENT;
+  ctx.font = `600 28px ${DISPLAY}`;
+  ctx.fillText(spec.kicker.toUpperCase(), PAD, y);
+
+  // Headline: as large as fits in three lines.
+  let size = 72;
+  let lines: string[] = [];
+  for (const s of [72, 64, 56, 48]) {
+    size = s;
+    ctx.font = `600 ${size}px ${DISPLAY}`;
+    lines = wrapLines(measure, spec.headline, INNER, 3);
+    if (!lines[lines.length - 1].endsWith('…') && lines.length <= (size > 56 ? 2 : 3)) break;
+  }
+  ctx.fillStyle = INK;
+  y += 28;
+  for (const l of lines) {
+    y += Math.round(size * 1.2);
+    ctx.fillText(l, PAD, y);
+  }
+
+  // The finding, then its context in a quieter style.
+  y += 24;
+  spec.lines.forEach((text, k) => {
+    const first = k === 0;
+    ctx.font = first ? `500 38px ${BODY}` : `32px ${BODY}`;
+    ctx.fillStyle = first ? INK : MUTED;
+    for (const l of wrapLines(measure, text, INNER, 4)) {
+      y += first ? 50 : 44;
+      ctx.fillText(l, PAD, y);
+    }
+    y += 10;
+  });
+
+  // Cover strip, with titles and captions underneath when there are several.
+  const count = spec.covers.length;
+  if (count) {
+    y += 30;
+    const gap = 24;
+    const cw = stripWidth(count, gap);
+    const ch = Math.round(cw * 1.5);
+    let below = 0;
+    spec.covers.forEach((c, i) => {
+      const x = PAD + i * (cw + gap);
+      coverBox(ctx, pictured[i], covers[i], x, y, cw, ch, count > 3 ? 10 : 16, boxes, i);
+      let ty = y + ch;
+      if (count > 1) {
+        ctx.fillStyle = INK;
+        ctx.font = `600 ${count > 3 ? 24 : 28}px ${BODY}`;
+        for (const l of wrapLines(measure, pictured[i].title, cw, 2)) {
+          ty += count > 3 ? 32 : 36;
+          ctx.fillText(l, x, ty);
+        }
+      }
+      if (c.caption) {
+        ctx.fillStyle = MUTED;
+        ctx.font = `${count > 3 ? 22 : 26}px ${BODY}`;
+        ty += count > 3 ? 30 : 34;
+        ctx.fillText(wrapLines(measure, c.caption, cw, 1)[0], x, ty);
+      }
+      below = Math.max(below, ty - (y + ch));
+    });
+    y += ch + below;
+  }
+
+  // Rows: one compact line per title.
+  if (spec.rows?.length) {
+    y += 28;
+    const rh = 124;
+    spec.rows.forEach((r, k) => {
+      const i = count + k;
+      ctx.fillStyle = SURFACE;
+      round(ctx, PAD, y, INNER, rh, 18);
+      ctx.fill();
+      const coverH = rh - 20;
+      const coverW = Math.round((coverH * 2) / 3);
+      coverBox(ctx, pictured[i], covers[i], PAD + 12, y + 10, coverW, coverH, 8, boxes, i);
+      const tx = PAD + 12 + coverW + 24;
+      const tw = PAD + INNER - 24 - tx;
+      ctx.fillStyle = INK;
+      ctx.font = `600 30px ${BODY}`;
+      ctx.fillText(wrapLines(measure, pictured[i].title, tw, 1)[0], tx, y + 52);
+      ctx.fillStyle = MUTED;
+      ctx.font = `26px ${BODY}`;
+      ctx.fillText(wrapLines(measure, r.line, tw, 1)[0], tx, y + 90);
+      y += rh + 12;
+    });
+    y -= 12;
+  }
+
+  // Facts: label on the left, value on the right.
+  if (spec.facts?.length) {
+    y += 40;
+    const labelW = 300;
+    const vx = PAD + labelW + 24;
+    const vw = PAD + INNER - vx;
+    for (const f of spec.facts) {
+      ctx.fillStyle = LINE;
+      ctx.fillRect(PAD, y, INNER, 2);
+      ctx.font = `600 28px ${BODY}`;
+      const values = wrapLines(measure, f.value, vw, 2);
+      ctx.fillStyle = INK;
+      values.forEach((l, k) => ctx.fillText(l, vx, y + 48 + k * 38));
+      ctx.fillStyle = MUTED;
+      ctx.font = `26px ${BODY}`;
+      wrapLines(measure, f.label, labelW, 2).forEach((l, k) => ctx.fillText(l, PAD, y + 48 + k * 36));
+      y += 48 + Math.max(values.length - 1, 0) * 38 + 26;
+    }
+  }
+
+  const missing = await fixBlankCovers(ctx, pictured, covers, boxes, details);
+
+  const height = Math.max(MIN_H, Math.min(SCRATCH_H, y + 140));
+  ctx.fillStyle = MUTED;
+  ctx.font = `600 26px ${DISPLAY}`;
+  ctx.textAlign = 'right';
+  ctx.fillText('Shōbu', W - PAD, height - 56);
+  ctx.textAlign = 'left';
+
+  const out = document.createElement('canvas');
+  out.width = W;
+  out.height = height;
+  out.getContext('2d')!.drawImage(canvas, 0, 0);
+
+  // As in the top-10 picture, covers are released only once the PNG exists.
+  return new Promise((resolve, reject) =>
+    out.toBlob((b) => {
+      for (const c of covers) (c as ImageBitmap | null)?.close?.();
+      if (b) resolve({ blob: b, missing, details });
+      else reject(new Error('Could not draw the picture.'));
+    }, 'image/png'),
+  );
+}

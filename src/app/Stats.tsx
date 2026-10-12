@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   MIN_DUELS_FOR_TASTE,
   MIN_RANKED_FOR_CROWD,
@@ -22,6 +22,9 @@ import type { Item } from '../types';
 import { Cover } from './Cover';
 import { withLook, type Look } from '../rank/look';
 import type { AppState } from './useApp';
+import { buildCards, type CardSpec } from './cards';
+import { renderCard } from './cardImage';
+import { SharePreview } from './SharePreview';
 
 const shortDate = (at: number | string) => {
   const d = typeof at === 'string' ? new Date(`${at}T12:00:00`) : new Date(at);
@@ -66,6 +69,31 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
   const main = useMemo(() => mainstream(app.items, marks), [app.items, marks]);
   const duels = useMemo(() => duelStats(votes, fit.order), [votes, fit.order]);
   const bands = useMemo(() => settledBands(fit), [fit]);
+  const noun = app.view === 'both' ? 'titles' : app.view;
+  // Every title in the view, as you know it: the base for "typical" and popularity positions.
+  const catalogue = useMemo(() => app.items.map((i) => withLook(i, app.look(i))), [app.items, app.look]);
+  const cards = useMemo(
+    () =>
+      ranked.length < 10
+        ? []
+        : buildCards({
+            ranked,
+            catalogue,
+            marks,
+            votes,
+            order: fit.order,
+            crowd,
+            tieShare: over.tieShare,
+            enoughForType: unlocked,
+            noun,
+            title: (id) => {
+              const item = app.itemById.get(id);
+              return item ? app.title(item) : id;
+            },
+          }),
+    [ranked, catalogue, marks, votes, fit.order, crowd, over.tieShare, unlocked, noun, app.itemById, app.title],
+  );
+  const [sharing, setSharing] = useState<CardSpec | null>(null);
 
   if (votes.length === 0) {
     return (
@@ -90,145 +118,249 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
 
   return (
     <main className="screen stats">
-      <div className="stat-tiles">
-        <Tile value={n(over.duels)} label="duels" />
-        <Tile value={n(over.seen)} label="seen" sub={`${n(over.unseen)} not seen`} />
-        <Tile value={`${Math.round(over.tieShare * 100)}%`} label="too close to call" />
-        <Tile
-          value={n(over.activeDays)}
-          label={over.activeDays === 1 ? 'day played' : 'days played'}
-          sub={over.currentStreak > 1 ? `${over.currentStreak} in a row now` : over.longestStreak > 1 ? `best run ${over.longestStreak}` : undefined}
+      {!unlocked && (
+        <Locked
+          text={`Your type needs at least ${MIN_RANKED_FOR_TASTE} ranked titles and ${MIN_DUELS_FOR_TASTE} duels.`}
+          have={`You have ${n(ranked.length)} and ${n(votes.length)}.`}
         />
-      </div>
-      <p className="hint">
-        {over.firstAt ? `Since ${shortDate(over.firstAt)}. ` : ''}
-        {over.busiest && over.busiest.count > 1 ? `Busiest day: ${shortDate(over.busiest.day)}, ${n(over.busiest.count)} duels. ` : ''}
-        {over.activeDays > 1 ? `About ${Math.round(over.perActiveDay)} duels on a day you play.` : ''}
-      </p>
-
-      <Section title="Your top 10 over time">
-        {points.length >= 3 ? (
-          <RankChart points={points} ids={top10} title={title} />
-        ) : (
-          <p className="hint">The chart needs duels on at least three different days. Come back after a few sessions.</p>
-        )}
-        {week && (week.climbers.length > 0 || week.fallers.length > 0) && (
-          <div className="stat-cols">
-            <MoveList heading="Climbed this week" moves={week.climbers} link={link} up />
-            <MoveList heading="Fell this week" moves={week.fallers} link={link} />
-          </div>
-        )}
-        {week && <p className="hint">{n(week.duelsSince)} duels in the last 7 days.</p>}
-      </Section>
-
-      <Section title="How settled it is" note="A title is settled once more duels are unlikely to move it far.">
-        <ul className="bands">
-          {bands.map((b) => (
-            <li key={b.label}>
-              <span>{b.label}</span>
-              <span className="meter" aria-hidden="true">
-                <span style={{ width: `${(b.settled / b.total) * 100}%` }} />
-              </span>
-              <span className="band-count">
-                {b.settled} of {b.total}
-              </span>
-            </li>
+      )}
+      {cards.length > 0 && (
+        <div className="find-cards">
+          {cards.map((c) => (
+            <FindCard key={c.id} card={c} app={app} onOpen={onOpen} onShare={() => setSharing(c)} />
           ))}
-        </ul>
-      </Section>
+        </div>
+      )}
 
-      <Section title="Your taste" note="Where each group's titles sit in your ranking, compared with the middle of your list.">
-        {taste ? (
-          <>
-            <TasteBlock heading="Genres" data={taste.genres} />
-            <TasteBlock heading="Studios" data={taste.studios} />
-            <TasteBlock heading="Decades" data={taste.decades} />
-          </>
-        ) : (
-          <Locked
-            text={`Group stats need at least ${MIN_RANKED_FOR_TASTE} ranked titles and ${MIN_DUELS_FOR_TASTE} duels, or they mostly show noise.`}
-            have={`You have ${n(ranked.length)} and ${n(votes.length)}.`}
-          />
-        )}
-      </Section>
-
-      <Section title="You and the crowd" note="Compared with AniList's average scores, among the titles you have ranked.">
-        {crowd ? (
-          <>
-            <p className="big-line">
-              {Math.round(crowd.agreement * 100)}% agreement
-              <span className="hint"> across {n(crowd.n)} titles. 100% would be AniList's exact order.</span>
-            </p>
-            <TakeList heading="You rank these higher than AniList does" takes={crowd.lovedMore} onOpen={onOpen} title={app.title} look={app.look} />
-            <TakeList heading="You rank these lower" takes={crowd.lovedLess} onOpen={onOpen} title={app.title} look={app.look} />
-          </>
-        ) : (
-          <Locked text={`Needs ${MIN_RANKED_FOR_CROWD} ranked titles with an AniList score.`} have={`You have ${n(ranked.length)} ranked.`} />
-        )}
-        {main && (
+      <details className="more-detail" open={cards.length === 0}>
+        <summary>More detail</summary>
+        <div className="more-detail-body">
+          <div className="stat-tiles">
+            <Tile value={n(over.duels)} label="duels" />
+            <Tile value={n(over.seen)} label="seen" sub={`${n(over.unseen)} not seen`} />
+            <Tile value={`${Math.round(over.tieShare * 100)}%`} label="too close to call" />
+            <Tile
+              value={n(over.activeDays)}
+              label={over.activeDays === 1 ? 'day played' : 'days played'}
+              sub={over.currentStreak > 1 ? `${over.currentStreak} in a row now` : over.longestStreak > 1 ? `best run ${over.longestStreak}` : undefined}
+            />
+          </div>
           <p className="hint">
-            Half of what you have seen is in the top {main.medianTopPercent}% of the catalogue by popularity. You have seen{' '}
-            {main.top100Seen} of the {main.top100} most popular
-            {main.top100Sorted < main.top100 ? `, and sorted ${main.top100Sorted}` : ''}.
+            {over.firstAt ? `Since ${shortDate(over.firstAt)}. ` : ''}
+            {over.busiest && over.busiest.count > 1 ? `Busiest day: ${shortDate(over.busiest.day)}, ${n(over.busiest.count)} duels. ` : ''}
+            {over.activeDays > 1 ? `About ${Math.round(over.perActiveDay)} duels on a day you play.` : ''}
           </p>
-        )}
-      </Section>
 
-      <Section title="Duels">
-        {duels.upsets.length > 0 && (
-          <div className="stat-block">
-            <h4>Results your ranking overruled</h4>
-            <ul className="plain-list">
-              {duels.upsets.map((u) => (
-                <li key={`${u.winner}${u.loser}`}>
-                  {link(u.winner)} beat {link(u.loser)}, who now sits {u.gap} {u.gap === 1 ? 'place' : 'places'} higher.
+          <Section title="Your top 10 over time">
+            {points.length >= 3 ? (
+              <RankChart points={points} ids={top10} title={title} />
+            ) : (
+              <p className="hint">The chart needs duels on at least three different days. Come back after a few sessions.</p>
+            )}
+            {week && (week.climbers.length > 0 || week.fallers.length > 0) && (
+              <div className="stat-cols">
+                <MoveList heading="Climbed this week" moves={week.climbers} link={link} up />
+                <MoveList heading="Fell this week" moves={week.fallers} link={link} />
+              </div>
+            )}
+            {week && <p className="hint">{n(week.duelsSince)} duels in the last 7 days.</p>}
+          </Section>
+
+          <Section title="How settled it is" note="A title is settled once more duels are unlikely to move it far.">
+            <ul className="bands">
+              {bands.map((b) => (
+                <li key={b.label}>
+                  <span>{b.label}</span>
+                  <span className="meter" aria-hidden="true">
+                    <span style={{ width: `${(b.settled / b.total) * 100}%` }} />
+                  </span>
+                  <span className="band-count">
+                    {b.settled} of {b.total}
+                  </span>
                 </li>
               ))}
             </ul>
-          </div>
-        )}
-        {duels.rivalries.length > 0 && (
-          <div className="stat-block">
-            <h4>Rivalries</h4>
-            <ul className="plain-list">
-              {duels.rivalries.map((r) => (
-                <li key={`${r.a}${r.b}`}>
-                  {link(r.a)} v {link(r.b)}: {r.aWins}–{r.bWins}
-                  {r.ties ? `, ${r.ties} too close` : ''}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {duels.undefeated.length > 0 && (
-          <div className="stat-block">
-            <h4>Undefeated</h4>
-            <ul className="plain-list">
-              {duels.undefeated.map((r) => (
-                <li key={r.id}>
-                  {link(r.id)}, {r.wins}–0
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {duels.winless.length > 0 && (
-          <div className="stat-block">
-            <h4>Winless</h4>
-            <ul className="plain-list">
-              {duels.winless.map((r) => (
-                <li key={r.id}>
-                  {link(r.id)}, 0–{r.losses}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {duels.upsets.length + duels.rivalries.length + duels.undefeated.length + duels.winless.length === 0 && (
-          <p className="hint">Nothing stands out yet. Rivalries and streaks show up as titles meet more than once.</p>
-        )}
-      </Section>
+          </Section>
+
+          <Section title="Your taste" note="Where each group's titles sit in your ranking, compared with the middle of your list.">
+            {taste ? (
+              <>
+                <TasteBlock heading="Genres" data={taste.genres} />
+                <TasteBlock heading="Studios" data={taste.studios} />
+                <TasteBlock heading="Decades" data={taste.decades} />
+              </>
+            ) : (
+              <Locked
+                text={`Group stats need at least ${MIN_RANKED_FOR_TASTE} ranked titles and ${MIN_DUELS_FOR_TASTE} duels, or they mostly show noise.`}
+                have={`You have ${n(ranked.length)} and ${n(votes.length)}.`}
+              />
+            )}
+          </Section>
+
+          <Section title="You and the crowd" note="Compared with AniList's average scores, among the titles you have ranked.">
+            {crowd ? (
+              <>
+                <p className="big-line">
+                  {Math.round(crowd.agreement * 100)}% agreement
+                  <span className="hint"> across {n(crowd.n)} titles. 100% would be AniList's exact order.</span>
+                </p>
+                <TakeList heading="You rank these higher than AniList does" takes={crowd.lovedMore} onOpen={onOpen} title={app.title} look={app.look} />
+                <TakeList heading="You rank these lower" takes={crowd.lovedLess} onOpen={onOpen} title={app.title} look={app.look} />
+              </>
+            ) : (
+              <Locked text={`Needs ${MIN_RANKED_FOR_CROWD} ranked titles with an AniList score.`} have={`You have ${n(ranked.length)} ranked.`} />
+            )}
+            {main && (
+              <p className="hint">
+                Half of what you have seen is in the top {main.medianTopPercent}% of the catalogue by popularity. You have seen{' '}
+                {main.top100Seen} of the {main.top100} most popular
+                {main.top100Sorted < main.top100 ? `, and sorted ${main.top100Sorted}` : ''}.
+              </p>
+            )}
+          </Section>
+
+          <Section title="Duels">
+            {duels.upsets.length > 0 && (
+              <div className="stat-block">
+                <h4>Results your ranking overruled</h4>
+                <ul className="plain-list">
+                  {duels.upsets.map((u) => (
+                    <li key={`${u.winner}${u.loser}`}>
+                      {link(u.winner)} beat {link(u.loser)}, who now sits {u.gap} {u.gap === 1 ? 'place' : 'places'} higher.
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {duels.rivalries.length > 0 && (
+              <div className="stat-block">
+                <h4>Rivalries</h4>
+                <ul className="plain-list">
+                  {duels.rivalries.map((r) => (
+                    <li key={`${r.a}${r.b}`}>
+                      {link(r.a)} v {link(r.b)}: {r.aWins}–{r.bWins}
+                      {r.ties ? `, ${r.ties} too close` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {duels.undefeated.length > 0 && (
+              <div className="stat-block">
+                <h4>Undefeated</h4>
+                <ul className="plain-list">
+                  {duels.undefeated.map((r) => (
+                    <li key={r.id}>
+                      {link(r.id)}, {r.wins}–0
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {duels.winless.length > 0 && (
+              <div className="stat-block">
+                <h4>Winless</h4>
+                <ul className="plain-list">
+                  {duels.winless.map((r) => (
+                    <li key={r.id}>
+                      {link(r.id)}, 0–{r.losses}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {duels.upsets.length + duels.rivalries.length + duels.undefeated.length + duels.winless.length === 0 && (
+              <p className="hint">Nothing stands out yet. Rivalries and streaks show up as titles meet more than once.</p>
+            )}
+          </Section>
+        </div>
+      </details>
+      {sharing && (
+        <SharePreview
+          title={`${sharing.kicker}: ${sharing.headline}`}
+          filename={`shobu-${sharing.id}`}
+          make={async () => {
+            const { blob, missing, details } = await renderCard(sharing, (id) => {
+              const item = app.itemById.get(id);
+              if (!item) return { title: id };
+              const look = app.look(item);
+              return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
+            });
+            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined, details };
+          }}
+          onClose={() => setSharing(null)}
+        />
+      )}
     </main>
+  );
+}
+
+function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; onShare: () => void }) {
+  const itemOf = (id: string) => app.itemById.get(id);
+  const many = card.covers.length > 1;
+  return (
+    <article className={`find-card find-${card.id}`}>
+      <p className="find-kicker">{card.kicker}</p>
+      <h3 className="find-headline">{card.headline}</h3>
+      {card.lines.map((l, k) => (
+        <p key={l} className={k === 0 ? 'find-line' : 'hint'}>
+          {l}
+        </p>
+      ))}
+      {card.covers.length > 0 && (
+        <ul className={`find-covers count-${card.covers.length}`}>
+          {card.covers.map((c) => {
+            const item = itemOf(c.id);
+            if (!item) return null;
+            const title = app.title(item);
+            return (
+              <li key={c.id}>
+                <button className="find-cover" onClick={() => onOpen(c.id)} aria-label={`${title}${c.caption ? `, ${c.caption}` : ''}`}>
+                  <Cover look={app.look(item)} title={title} size="lg" />
+                  {many && <span className="find-cover-title">{title}</span>}
+                  {c.caption && <span className="find-cover-caption">{c.caption}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {card.rows && card.rows.length > 0 && (
+        <ol className="rank-list">
+          {card.rows.map((r) => {
+            const item = itemOf(r.id);
+            if (!item) return null;
+            const title = app.title(item);
+            return (
+              <li key={r.id}>
+                <button className="rank-row" onClick={() => onOpen(r.id)}>
+                  <Cover look={app.look(item)} title={title} size="sm" />
+                  <span className="rank-body">
+                    <span className="rank-title">{title}</span>
+                    <span className="rank-meta">{r.line}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {card.facts && (
+        <dl className="find-facts">
+          {card.facts.map((f) => (
+            <div key={f.label}>
+              <dt>{f.label}</dt>
+              <dd>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <div className="action-row start">
+        <button className="btn btn-small" onClick={onShare}>
+          Share
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -348,6 +480,8 @@ function TakeList({ heading, takes, onOpen, title, look }: { heading: string; ta
 
 /** Rank of each top-10 title at each checkpoint. Rank 1 is at the top. */
 function RankChart({ points, ids, title }: { points: HistoryPoint[]; ids: string[]; title: (id: string) => string }) {
+  // Ten lines are hard to tell apart; tapping a name in the legend picks out its line.
+  const [picked, setPicked] = useState<string | null>(null);
   const W = 640;
   const H = 260;
   const pad = { l: 34, r: 14, t: 12, b: 26 };
@@ -369,13 +503,14 @@ function RankChart({ points, ids, title }: { points: HistoryPoint[]; ids: string
             </text>
           </g>
         ))}
-        {ids.map((id, k) => {
+        {[...ids.entries()].sort(([, a], [, b]) => Number(a === picked) - Number(b === picked)).map(([k, id]) => {
           const pts = points.map((p, i) => [i, p.ranks.get(id)] as const).filter((q): q is readonly [number, number] => q[1] !== undefined);
           if (pts.length === 0) return null;
           const color = `hsl(${hue(k)} 65% 55%)`;
+          const faded = picked !== null && picked !== id;
           return (
-            <g key={id} stroke={color} fill={color}>
-              <polyline fill="none" strokeWidth={2} strokeLinejoin="round" points={pts.map(([i, r]) => `${x(i)},${y(r)}`).join(' ')} />
+            <g key={id} stroke={color} fill={color} opacity={faded ? 0.12 : 1} className={picked === id ? 'picked' : undefined}>
+              <polyline fill="none" strokeWidth={picked === id ? 4 : 2} strokeLinejoin="round" points={pts.map(([i, r]) => `${x(i)},${y(r)}`).join(' ')} />
               {pts.map(([i, r]) => (
                 <circle key={i} cx={x(i)} cy={y(r)} r={3} stroke="none" />
               ))}
@@ -390,11 +525,16 @@ function RankChart({ points, ids, title }: { points: HistoryPoint[]; ids: string
         </text>
       </svg>
       <figcaption>
+        <p className="hint legend">Tap a title to pick out its line.</p>
         <ol className="legend-list">
           {ids.map((id, k) => (
             <li key={id}>
-              <span className="swatch" style={{ background: `hsl(${hue(k)} 65% 55%)` }} aria-hidden="true" />
-              {title(id)}
+              <button className={picked === id ? 'on' : ''} aria-pressed={picked === id} onClick={() => setPicked(picked === id ? null : id)}>
+                <span className="swatch" style={{ background: `hsl(${hue(k)} 65% 55%)` }} aria-hidden="true" />
+                <span>
+                  {k + 1}. {title(id)}
+                </span>
+              </button>
             </li>
           ))}
         </ol>
