@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { afterShown, NO_TIPS, pickTip, type TipContext, type TipState } from './tips';
+import { afterShown, NO_TIPS, pickTip, storyList, type TipContext, type TipState } from './tips';
 
 const base: TipContext = {
   duels: 12,
@@ -19,17 +19,26 @@ describe('tips', () => {
   });
 
   it('suggests Split up for a big franchise near the top, once', () => {
-    const c = ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 12, entries: 14, anime: 9, manga: 5 }] });
+    const c = ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 12, storylines: ['Fate/stay night', 'Prisma Illya', 'Lord El-Melloi II'] }] });
     const tip = pickTip(NO_TIPS, c);
     expect(tip?.id).toBe('split');
-    expect(tip?.text).toContain('Fate groups 14 entries.');
+    expect(tip?.text).toContain('Fate covers 3 storylines: Fate/stay night, Prisma Illya and Lord El-Melloi II.');
     expect(tip?.text).not.toMatch(/anime|manga/i);
     expect(tip?.open?.itemId).toBe('f');
     expect(pickTip(afterShown(NO_TIPS, tip!, 12), ctx({ ...c, duels: 40 }))).toBeNull();
   });
 
   it('ignores big franchises lower down', () => {
-    expect(pickTip(NO_TIPS, ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 80, entries: 14, anime: 14, manga: 0 }] }))).toBeNull();
+    expect(pickTip(NO_TIPS, ctx({ onScreen: [{ id: 'f', title: 'Fate', rank: 80, storylines: ['A', 'B'] }] }))).toBeNull();
+  });
+
+  it('stays quiet for a big franchise with one storyline', () => {
+    expect(pickTip(NO_TIPS, ctx({ onScreen: [{ id: 'j', title: 'Jujutsu Kaisen', rank: 3, storylines: [] }] }))).toBeNull();
+  });
+
+  it('shortens a long list of storylines', () => {
+    expect(storyList(['A', 'B', 'C', 'D', 'E'])).toBe('5 storylines, including A, B and C');
+    expect(storyList(['A', 'B'])).toBe('2 storylines: A and B');
   });
 
   it('points to Browse after five passes in a row', () => {

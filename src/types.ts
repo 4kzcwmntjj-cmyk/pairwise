@@ -12,6 +12,8 @@ export interface Entry {
   cover?: string;
   studio?: string;
   genres?: string[];
+  /** Which storyline of its franchise the entry belongs to (an entry id). Only set when there are two or more. */
+  story?: number;
 }
 
 /** One rankable item. For anime, a franchise: several AniList entries grouped together. */

@@ -30,6 +30,17 @@ describe('mergeCatalogue', () => {
     expect(merged[0].entryIds).toEqual([1, 2, 99]);
   });
 
+  it('when the catalogue cuts a title in two, the saved title stays with the part that kept its id', () => {
+    const local = [item('al-1', [1, 2, 3, 10, 11])];
+    // Catalogue order is by popularity, so the cut-off part can come first.
+    const incoming = [item('al-10', [10, 11], { title: 'Nisekoi' }), item('al-1', [1, 2, 3], { title: 'Monogatari' })];
+    const merged = mergeCatalogue(local, incoming);
+    expect(merged.map((i) => [i.id, i.entryIds])).toEqual([
+      ['al-1', [1, 2, 3]],
+      ['al-10', [10, 11]],
+    ]);
+  });
+
   it('adds titles that are new in the catalogue', () => {
     const merged = mergeCatalogue([item('al-1', [1])], [item('al-1', [1]), item('al-7', [7])]);
     expect(merged.map((i) => i.id).sort()).toEqual(['al-1', 'al-7']);

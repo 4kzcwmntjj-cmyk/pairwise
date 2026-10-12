@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Item } from '../types';
 import { Cover } from './Cover';
-import { isManga } from '../anilist/group';
+import { isManga, storylinesOf } from '../anilist/group';
 import { formatLabel, shortFormat } from './meta';
-import type { AppState } from './useApp';
+import { entryName, type AppState } from './useApp';
 
 type Mode = null | 'split' | 'join';
 
@@ -72,10 +72,15 @@ function Contents({ app, item }: { app: AppState; item: Item }) {
 function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOpen: (id: string) => void; onClose: () => void }) {
   const [ticked, setTicked] = useState<Set<number>>(new Set());
   const [made, setMade] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
   const entries = useMemo(
     () => [...(item.entries ?? [])].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.id - b.id),
     [item.entries],
   );
+  const lines = useMemo(() => storylinesOf(item.entries), [item.entries]);
+  // With two or more storylines, whole storylines are offered first; single entries are one tap away.
+  const [byEntry, setByEntry] = useState(false);
+  const pickLines = lines.length >= 2 && !byEntry;
 
   if (entries.length < item.entryIds.length) {
     return (
@@ -98,9 +103,16 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
       else n.add(id);
       return n;
     });
-  const valid = ticked.size > 0 && ticked.size < entries.length;
+  const switchTo = (entriesMode: boolean) => {
+    setTicked(new Set());
+    setByEntry(entriesMode);
+  };
+  const total = pickLines ? lines.length : entries.length;
+  const valid = ticked.size > 0 && ticked.size < total;
+  // What each ticked box moves: a storyline's entries, or one entry.
+  const groupsFor = (boxes: number[]) =>
+    pickLines ? boxes.map((k) => lines.find((l) => l.key === k)!.entries.map((e) => e.id)) : boxes.map((e) => [e]);
   const mangaIds = entries.filter((e) => isManga(e.format)).map((e) => e.id);
-  const [busy, setBusy] = useState(false);
   const split = async (groups: number[][]) => {
     setBusy(true);
     const ids = await app.splitItem(item.id, groups);
@@ -145,40 +157,56 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
     );
   }
 
+  const counts = (anime: number, manga: number) =>
+    [anime ? `${anime} anime` : '', manga ? `${manga} manga` : ''].filter(Boolean).join(', ');
+
   return (
     <div className="regroup-panel">
       <p className="hint">
-        Tick the parts that should come out of {app.title(item)}. Past duels stay with {app.title(item)}.
+        Tick the {pickLines ? 'storylines' : 'parts'} that should come out of {app.title(item)}. Past duels stay with {app.title(item)}.
       </p>
-      {mangaIds.length > 0 && mangaIds.length < entries.length && (
+      {!pickLines && mangaIds.length > 0 && mangaIds.length < entries.length && (
         <button className="btn btn-quiet btn-small" onClick={() => setTicked(new Set(mangaIds))}>
           Tick the manga
         </button>
       )}
       <ul className="entry-list">
-        {entries.map((e) => (
-          <li key={e.id}>
-            <label className="check">
-              <input type="checkbox" checked={ticked.has(e.id)} onChange={() => toggle(e.id)} />
-              <span>
-                <span className="entry-title">
-                  {(app.settings.titleLanguage === 'romaji' ? e.titleRomaji : e.titleEnglish) ?? e.titleRomaji ?? e.titleEnglish}
-                </span>
-                <span className="entry-meta">
-                  {formatLabel(e.format)}
-                  {e.year ? `, ${e.year}` : ''}
-                </span>
-              </span>
-            </label>
-          </li>
-        ))}
+        {pickLines
+          ? lines.map((l) => (
+              <li key={l.key}>
+                <label className="check">
+                  <input type="checkbox" checked={ticked.has(l.key)} onChange={() => toggle(l.key)} />
+                  <span>
+                    <span className="entry-title">{entryName(l.lead, app.settings)}</span>
+                    <span className="entry-meta">
+                      {counts(l.anime, l.manga)}
+                      {l.lead.year ? `, from ${l.lead.year}` : ''}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))
+          : entries.map((e) => (
+              <li key={e.id}>
+                <label className="check">
+                  <input type="checkbox" checked={ticked.has(e.id)} onChange={() => toggle(e.id)} />
+                  <span>
+                    <span className="entry-title">{entryName(e, app.settings)}</span>
+                    <span className="entry-meta">
+                      {formatLabel(e.format)}
+                      {e.year ? `, ${e.year}` : ''}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
       </ul>
       <div className="action-row start">
-        <button className="btn btn-primary btn-small" disabled={!valid || busy} onClick={() => split([[...ticked]])}>
+        <button className="btn btn-primary btn-small" disabled={!valid || busy} onClick={() => split([groupsFor([...ticked]).flat()])}>
           {ticked.size > 1 ? 'Make these one title' : 'Make it a separate title'}
         </button>
         {ticked.size > 1 && valid && (
-          <button className="btn btn-small" disabled={busy} onClick={() => split([...ticked].map((e) => [e]))}>
+          <button className="btn btn-small" disabled={busy} onClick={() => split(groupsFor([...ticked]))}>
             Make each its own title
           </button>
         )}
@@ -186,6 +214,11 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
           Cancel
         </button>
       </div>
+      {lines.length >= 2 && (
+        <button className="btn-link inline" onClick={() => switchTo(!byEntry)}>
+          {byEntry ? 'Choose whole storylines instead' : 'Pick entries yourself'}
+        </button>
+      )}
     </div>
   );
 }

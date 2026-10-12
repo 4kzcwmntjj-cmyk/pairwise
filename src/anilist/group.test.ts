@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addEntry, describeFormats, franchiseFor, groupFranchises, type RawMedia } from './group';
+import { addEntry, describeFormats, franchiseFor, groupFranchises, storylinesOf, type BridgeCut, type RawMedia } from './group';
 
 function media(id: number, title: string, opts: Partial<RawMedia> & { year?: number; rel?: [string, number][] } = {}): RawMedia {
   return {
@@ -138,5 +138,116 @@ describe('manga in franchises', () => {
   it('finds the franchise for a manga found by search', () => {
     const items = groupFranchises([anime(1, 'Death Note')]);
     expect(franchiseFor(manga(100, 'DN manga', [['ADAPTATION', 1, 'ANIME']]), items)?.entryIds).toEqual([1]);
+  });
+});
+
+describe('cutting extras that link two series', () => {
+  it('cuts a crossover special that is the only link between two series', () => {
+    const cuts: BridgeCut[] = [];
+    const items = groupFranchises(
+      [
+        media(1, 'Bakemonogatari', { popularity: 3000, rel: [['SEQUEL', 2]] }),
+        media(2, 'Nisemonogatari', { popularity: 2000, rel: [['PREQUEL', 1]] }),
+        media(10, 'Nisekoi', { popularity: 2500, rel: [['SEQUEL', 11]] }),
+        media(11, 'Nisekoi:', { popularity: 1500, rel: [['PREQUEL', 10]] }),
+        media(20, 'Nisekoimonogatari', { format: 'SPECIAL', popularity: 100, rel: [['PARENT', 1], ['PARENT', 10]] }),
+      ],
+      [],
+      (c) => cuts.push(c),
+    );
+    expect(items.map((i) => i.entryIds).sort()).toEqual([[1, 2, 20], [10, 11]]);
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0].extra.map((m) => m.id)).toEqual([20]);
+  });
+
+  it('keeps an OVA that sits between two seasons', () => {
+    const items = groupFranchises([
+      media(1, 'Show', { rel: [['SEQUEL', 2]] }),
+      media(2, 'Show OVA', { format: 'OVA', rel: [['PREQUEL', 1], ['SEQUEL', 3]] }),
+      media(3, 'Show S2', { rel: [['PREQUEL', 2]] }),
+    ]);
+    expect(items).toHaveLength(1);
+  });
+
+  it('cuts a lone crossover film, but keeps extras that hang off one series', () => {
+    const items = groupFranchises([
+      media(1, 'Lupin', { popularity: 500, rel: [['SIDE_STORY', 3]] }),
+      media(2, 'Conan', { popularity: 900, rel: [['SIDE_STORY', 3]] }),
+      media(3, 'Lupin vs Conan', { format: 'MOVIE', rel: [['PARENT', 1], ['PARENT', 2]] }),
+      media(4, 'Lupin special', { format: 'SPECIAL', popularity: 10, rel: [['PARENT', 1]] }),
+    ]);
+    expect(items.map((i) => i.entryIds).sort()).toEqual([[1, 4], [2, 3]]);
+  });
+
+  it('keeps a series and a film chain together when the films continue the series', () => {
+    const items = groupFranchises([
+      media(30, 'Evangelion', { rel: [['SEQUEL', 32]] }),
+      media(32, 'End of Evangelion', { format: 'MOVIE', rel: [['PREQUEL', 30], ['SEQUEL', 2759]] }),
+      media(2759, 'Rebuild 1.0', { format: 'MOVIE', rel: [['PREQUEL', 32], ['SEQUEL', 3784]] }),
+      media(3784, 'Rebuild 2.0', { format: 'MOVIE', rel: [['PREQUEL', 2759]] }),
+      media(4130, 'Petit Eva', { format: 'ONA', rel: [['PARENT', 30]] }),
+    ]);
+    expect(items).toHaveLength(1);
+  });
+
+  it('counts a short web series as an extra but a full one as a series', () => {
+    const shortOna = media(5, 'Petit', { format: 'ONA', rel: [['PARENT', 1], ['PARENT', 2]] });
+    shortOna.duration = 3;
+    const films = [media(2, 'Film 1', { format: 'MOVIE', rel: [['SEQUEL', 3]] }), media(3, 'Film 2', { format: 'MOVIE', rel: [['PREQUEL', 2]] })];
+    const two = groupFranchises([media(1, 'TV', { popularity: 5000 }), ...films, shortOna]);
+    expect(two.map((i) => i.entryIds).sort()).toEqual([[1, 5], [2, 3]]);
+    const fullOna = { ...shortOna, duration: 24 };
+    expect(groupFranchises([media(1, 'TV', { popularity: 5000 }), ...films, fullOna])).toHaveLength(1);
+    // A single film linked only through the short stays: it is most likely a side story.
+    expect(groupFranchises([media(1, 'TV', { popularity: 5000 }), films[0], shortOna])).toHaveLength(1);
+  });
+
+  it('lets the part the old title was named after keep its id, even if less popular', () => {
+    const all = [
+      media(1, 'Lupin', { year: 1971, popularity: 10 }),
+      media(2, 'Conan', { year: 1996, popularity: 9000 }),
+      media(3, 'Crossover', { format: 'SPECIAL', rel: [['PARENT', 1], ['PARENT', 2]] }),
+    ];
+    const before = [{ ...groupFranchises([media(1, 'Lupin', { year: 1971 }), media(2, 'Conan', { year: 1996, rel: [['SIDE_STORY', 1]] })])[0], id: 'al-x' }];
+    expect(before[0].title).toBe('Lupin');
+    const after = groupFranchises(all, before);
+    expect(after.find((i) => i.entryIds.includes(1))!.id).toBe('al-x');
+    expect(after.find((i) => i.entryIds.includes(2))!.id).not.toBe('al-x');
+  });
+});
+
+describe('storylines', () => {
+  const rel = (pairs: [string, number, 'ANIME' | 'MANGA'][]) => ({
+    edges: pairs.map(([relationType, id, type]) => ({ relationType, node: { id, type } })),
+  });
+  it('records storylines, with side stories and manga attached', () => {
+    const items = groupFranchises([
+      { ...media(1, 'Fate/stay night', { year: 2006, popularity: 3000 }), relations: rel([['SIDE_STORY', 5, 'ANIME'], ['SOURCE', 100, 'MANGA']]) },
+      { ...media(2, 'Fate/Zero', { year: 2011, popularity: 5000 }), relations: rel([['SEQUEL', 3, 'ANIME'], ['SEQUEL', 1, 'ANIME'], ['SOURCE', 101, 'MANGA']]) },
+      { ...media(3, 'Fate/Zero 2', { year: 2012 }), relations: rel([['PREQUEL', 2, 'ANIME']]) },
+      { ...media(5, 'Prisma Illya', { year: 2013, popularity: 2000 }), relations: rel([['PARENT', 1, 'ANIME'], ['SEQUEL', 6, 'ANIME']]) },
+      { ...media(6, 'Prisma Illya 2wei', { year: 2014 }), relations: rel([['PREQUEL', 5, 'ANIME'], ['SIDE_STORY', 7, 'ANIME']]) },
+      { ...media(7, 'Prisma Illya OVA', { format: 'OVA', year: 2015 }), relations: rel([['PARENT', 6, 'ANIME']]) },
+      { ...media(100, 'Fate/stay night manga', { format: 'MANGA' }), relations: rel([['ADAPTATION', 1, 'ANIME']]) },
+      { ...media(101, 'Fate/Zero manga', { format: 'MANGA' }), relations: rel([['ADAPTATION', 2, 'ANIME'], ['SEQUEL', 102, 'MANGA']]) },
+      { ...media(102, 'Fate/Zero manga 2', { format: 'MANGA' }), relations: rel([['PREQUEL', 101, 'MANGA']]) },
+    ]);
+    expect(items).toHaveLength(1);
+    const lines = storylinesOf(items[0].entries);
+    // Zero is a prequel of stay night, so they are one storyline; Prisma Illya is a side story with series of its own.
+    expect(lines.map((l) => [l.lead.titleEnglish, l.anime, l.manga])).toEqual([
+      ['Fate/stay night', 3, 3],
+      ['Prisma Illya', 3, 0],
+    ]);
+  });
+
+  it('records nothing for a franchise with one storyline', () => {
+    const items = groupFranchises([
+      media(1, 'Jujutsu Kaisen', { rel: [['SEQUEL', 2], ['SIDE_STORY', 3]] }),
+      media(2, 'Jujutsu Kaisen 2', { rel: [['PREQUEL', 1]] }),
+      media(3, 'Jujutsu Kaisen 0', { format: 'MOVIE', rel: [['PARENT', 1]] }),
+    ]);
+    expect(items[0].entries!.some((e) => e.story !== undefined)).toBe(false);
+    expect(storylinesOf(items[0].entries)).toEqual([]);
   });
 });

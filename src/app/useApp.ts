@@ -5,7 +5,7 @@ import { backupIsDue, snoozed, type BackupNote } from './backup';
 import { useInstall } from './install';
 import { askPersistence, checkPersisted, PERSIST_AFTER, type Persistence } from './storage';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
-import { isManga } from '../anilist/group';
+import { storylinesOf } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
@@ -13,7 +13,7 @@ import { afterShown, NO_TIPS, pickTip, type Tip, type TipState } from '../rank/t
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
 import { applyAnswer, clearIn, formUnknown, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
-import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
+import { DEFAULT_SETTINGS, type Entry, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
 export const store = new LocalStore();
 
@@ -47,6 +47,11 @@ export function displayTitle(item: Item, settings: Settings) {
   return settings.titleLanguage === 'romaji'
     ? item.titleRomaji ?? item.title
     : item.titleEnglish ?? item.titleRomaji ?? item.title;
+}
+
+/** The name of one AniList entry in the chosen title language. */
+export function entryName(e: Entry, settings: Settings) {
+  return (settings.titleLanguage === 'romaji' ? (e.titleRomaji ?? e.titleEnglish) : (e.titleEnglish ?? e.titleRomaji)) ?? `AniList ${e.id}`;
 }
 
 export function useApp() {
@@ -216,9 +221,11 @@ export function useApp() {
       onScreen: [pair.a, pair.b].flatMap((id) => {
         const it = itemById.get(id);
         if (!it) return [];
-        const entries = it.entries ?? [];
-        const manga = entries.filter((e) => isManga(e.format)).length;
-        return [{ id, title: displayTitle(it, settings), rank: rankOf.get(id), entries: entries.length, anime: entries.length - manga, manga }];
+        // One-off spin-offs (a single short series) don't make the tip worth showing.
+        const storylines = storylinesOf(it.entries)
+          .filter((l) => l.entries.length >= 2)
+          .map((l) => entryName(l.lead, settings));
+        return [{ id, title: displayTitle(it, settings), rank: rankOf.get(id), storylines }];
       }),
       newcomerLog,
       recent: votes.slice(-15).map((v) => v.outcome),

@@ -21,8 +21,8 @@ export interface TipContext {
   duels: number;
   /** Titles ranked in the current view. */
   ranked: number;
-  /** The titles on screen, with their rank in this view and how many entries they group. */
-  onScreen: { id: string; title: string; rank?: number; entries: number; anime: number; manga: number }[];
+  /** The titles on screen, with their rank in this view and the names of their storylines that have two or more entries. */
+  onScreen: { id: string; title: string; rank?: number; storylines: string[] }[];
   /** Whether each recent newcomer was a title you'd seen, oldest first. */
   newcomerLog: boolean[];
   /** The last outcomes, oldest first. */
@@ -50,11 +50,11 @@ export function pickTip(state: TipState, ctx: TipContext): Tip | null {
   if (state.lastAt > 0 && ctx.duels - state.lastAt < TIP_GAP) return null;
   const fresh = (id: string) => !state.seen.includes(id);
 
-  const big = ctx.onScreen.find((t) => t.entries >= 10 && t.rank !== undefined && t.rank <= 30);
+  const big = ctx.onScreen.find((t) => t.storylines.length >= 2 && t.rank !== undefined && t.rank <= 30);
   if (big && fresh('split')) {
     return {
       id: 'split',
-      text: `${big.title} groups ${big.entries} entries. If you'd rather rank some of them on their own, you can split it up.`,
+      text: `${big.title} covers ${storyList(big.storylines)}. If you'd rather rank them separately, you can split it up.`,
       open: { itemId: big.id, label: `Open ${big.title}` },
     };
   }
@@ -97,6 +97,13 @@ export function pickTip(state: TipState, ctx: TipContext): Tip | null {
     };
   }
   return null;
+}
+
+/** "3 storylines: A, B and C", or "7 storylines, including A, B and C". */
+export function storyList(names: string[]): string {
+  const shown = names.slice(0, 3);
+  const list = shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}` : shown[0];
+  return names.length > 3 ? `${names.length} storylines, including ${list}` : `${names.length} storylines: ${list}`;
 }
 
 export const afterShown = (state: TipState, tip: Tip, duels: number): TipState => ({

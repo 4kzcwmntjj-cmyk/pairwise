@@ -37,16 +37,24 @@ export function mergeCatalogue(local: Item[], incoming: Item[]): Item[] {
   const localById = new Map(local.map((i) => [i.id, i]));
   const ownerOfEntry = new Map<number, Item>();
   for (const item of local) for (const e of item.entryIds) ownerOfEntry.set(e, item);
+  const inCatalogue = new Set(incoming.flatMap((i) => i.entryIds));
   const used = new Set<string>();
   const out: Item[] = [];
   const finalId = new Map<string, string>();
-  for (const inc of incoming) {
-    const owner = inc.entryIds.map((e) => ownerOfEntry.get(e)).find((o) => o && !used.has(o.id));
+  // When the catalogue cuts a saved title in two, the part that kept the catalogue id keeps the saved
+  // title too, so titles that keep their id are placed first.
+  const owners = (inc: Item) => inc.entryIds.map((e) => ownerOfEntry.get(e)).filter((o): o is Item => !!o);
+  const keepsId = (inc: Item) => owners(inc).some((o) => o.id === inc.id);
+  const order = [...incoming.filter(keepsId), ...incoming.filter((i) => !keepsId(i))];
+  for (const inc of order) {
+    const candidates = owners(inc).filter((o) => !used.has(o.id));
+    const owner = candidates.find((o) => o.id === inc.id) ?? candidates[0];
     const id = owner?.id ?? inc.id;
     if (used.has(id) || (!owner && localById.has(id) && localById.get(id)!.source === 'manual')) continue;
     used.add(id);
     finalId.set(inc.id, id);
-    const extraEntries = owner ? owner.entryIds.filter((e) => !inc.entryIds.includes(e)) : [];
+    // Entries this device added by search, which the catalogue doesn't have anywhere.
+    const extraEntries = owner ? owner.entryIds.filter((e) => !inCatalogue.has(e)) : [];
     const extraData = (owner?.entries ?? []).filter((e) => extraEntries.includes(e.id));
     out.push({
       ...inc,
