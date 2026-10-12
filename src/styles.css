@@ -1278,25 +1278,6 @@ a {
   overflow: hidden;
 }
 
-/* The backup reminder floats above the tab bar, so it never pushes the screen down while you're tapping. */
-.backup-note {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  z-index: 9;
-  max-width: 520px;
-  margin: 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 6px 24px rgba(20, 19, 40, 0.18);
-}
-@media (min-width: 720px) {
-  .backup-note {
-    bottom: 16px;
-  }
-}
-
 /* Duel fits a phone screen: the covers shrink with the screen height so the cards, "Haven't seen" and the
    buttons all sit above the tab bar. The 375px covers everything else on the screen, tab bar included;
    --safe-y adds the status bar and home indicator when there are any. */
@@ -1369,7 +1350,17 @@ main.sort {
 }
 .tip-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+/* Steps shown under the Add to Home Screen button where the browser has no install prompt. */
+.tip .install-steps {
+  order: 1;
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
 }
 .quick-check .form-ask {
   margin-top: 8px;

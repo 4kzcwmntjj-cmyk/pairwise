@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CATALOGUE_SIZE, MANGA_SIZE } from '../anilist/catalogue';
 import { fromExport, type Snapshot } from '../store/store';
+import { AddToHome } from './AddToHome';
 import type { AppState } from './useApp';
 
 export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => void }) {
@@ -88,6 +89,13 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
           {app.votes.length.toLocaleString()} duels.
           {app.backup?.at ? ` Last saved to a file on ${new Date(app.backup.at).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}.` : ' Not saved to a file yet.'} Save a copy now and then. On a phone it opens the share sheet: choose Save to Files, or send it to yourself. You can also use it to move your list to another device.
         </p>
+        {app.persisted && app.persisted !== 'unsupported' && (
+          <p className="hint">
+            {app.persisted === 'yes'
+              ? 'This browser has agreed to keep your data and not clear it when space runs low.'
+              : 'This browser has not agreed to keep your data, so it may clear it when space runs low. Installing the app usually changes that.'}
+          </p>
+        )}
         <div className="action-row start">
           <button className="btn" onClick={exportData}>
             Save a copy
@@ -95,6 +103,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
           <button className="btn" onClick={() => fileRef.current?.click()}>
             Load a copy
           </button>
+          <AddToHome className="btn" />
           <input
             ref={fileRef}
             id="import-file"

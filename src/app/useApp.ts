@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalStore, toExport, type Snapshot } from '../store/store';
 import { saveCopy } from './saveCopy';
+import { backupIsDue, snoozed, type BackupNote } from './backup';
+import { useInstall } from './install';
+import { askPersistence, checkPersisted, PERSIST_AFTER, type Persistence } from './storage';
 import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { isManga } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
@@ -14,16 +17,7 @@ import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, ty
 
 export const store = new LocalStore();
 
-/** When the list was last saved to a file, how much was in it then, and when to stop reminding. */
-export interface BackupNote {
-  at: number;
-  size: number;
-  snoozeUntil?: number;
-}
-/** Remind after this many new marks and duels since the last copy (or since the start, if never saved)... */
-export const BACKUP_AFTER_CHANGES = 150;
-/** ...or after this long, if anything changed at all. */
-export const BACKUP_AFTER_DAYS = 14;
+export { BACKUP_AFTER_CHANGES, BACKUP_AFTER_DAYS, type BackupNote } from './backup';
 
 /** Each screen undoes only what was done on it. Grouping changes are undone from Settings. */
 export type UndoScope = 'duel' | 'sort';
@@ -63,6 +57,9 @@ export function useApp() {
   const [rawVotes, setVotes] = useState<Vote[]>([]);
   const [groupOps, setGroupOps] = useState<GroupOp[]>([]);
   const [backup, setBackup] = useState<BackupNote | null>(null);
+  /** Whether the browser has agreed to keep this data; null until checked. */
+  const [persisted, setPersisted] = useState<Persistence | null>(null);
+  const { installed } = useInstall();
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -189,10 +186,30 @@ export function useApp() {
     () => [...allMarks.values()].some((m) => m.anime !== undefined && m.manga !== undefined && m.anime !== m.manga),
     [allMarks],
   );
+  // The backup reminder takes the tip slot while it is due, so no tip is used up behind it.
+  const size = rawMarks.size + rawVotes.length;
+  const backupDue = ready && backupIsDue(size, backup, Date.now());
+
+  // Ask the browser to keep the data once there is something worth keeping, and again once the app is
+  // installed (Chrome grants it more readily then).
+  const worthKeeping = ready && size >= PERSIST_AFTER;
+  useEffect(() => {
+    if (!worthKeeping) return;
+    let cancelled = false;
+    (async () => {
+      let now = await checkPersisted();
+      if (now === 'no') now = await askPersistence();
+      if (!cancelled) setPersisted(now);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [worthKeeping, installed]);
+
   useEffect(() => {
     if (!ready) return;
     if (tip && (votes.length < tip.at || votes.length - tip.at >= 2)) return setTip(null);
-    if (tip || !pair) return;
+    if (tip || !pair || backupDue) return;
     const next = pickTip(tips, {
       duels: votes.length,
       ranked: fit.order.length,
@@ -213,7 +230,7 @@ export function useApp() {
     setTips(after);
     setTip({ ...next, at: votes.length });
     store.setMeta('tips', after).catch(() => undefined);
-  }, [ready, tip, tips, pair, votes, fit, itemById, settings, rankOf, newcomerLog, moved, knowsOneForm]);
+  }, [ready, tip, tips, pair, votes, fit, itemById, settings, rankOf, newcomerLog, moved, knowsOneForm, backupDue]);
 
   const changeTips = useCallback(async (next: TipState) => {
     setTips(next);
@@ -540,16 +557,6 @@ export function useApp() {
     [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, catalogueAt],
   );
 
-  const size = rawMarks.size + rawVotes.length;
-  const backupDue = (() => {
-    if (!ready || size === 0) return false;
-    if (backup?.snoozeUntil && Date.now() < backup.snoozeUntil) return false;
-    const changed = size - (backup?.size ?? 0);
-    if (changed <= 0) return false;
-    if (!backup) return changed >= BACKUP_AFTER_CHANGES / 3;
-    return changed >= BACKUP_AFTER_CHANGES || Date.now() - backup.at > BACKUP_AFTER_DAYS * 86_400_000;
-  })();
-
   /** Saves a copy of everything to a file (the share sheet on phones). */
   const saveBackup = async () => {
     const name = `shobu-${new Date().toISOString().slice(0, 10)}.json`;
@@ -563,7 +570,7 @@ export function useApp() {
   };
 
   const snoozeBackup = async () => {
-    const note: BackupNote = { at: backup?.at ?? 0, size: backup?.size ?? 0, snoozeUntil: Date.now() + 3 * 86_400_000 };
+    const note = snoozed(backup, Date.now());
     setBackup(note);
     await store.setMeta('backup', note);
   };
@@ -713,6 +720,7 @@ export function useApp() {
     groupOps,
     backup,
     backupDue,
+    persisted,
     saveBackup,
     snoozeBackup,
     resolveId: grouping.resolve,

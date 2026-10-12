@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import type { Item, Outcome } from '../types';
+import { BackupNote } from './BackupNote';
 import { Cover } from './Cover';
 import { TitleLink } from './TitleLink';
 import { viewWords } from './meta';
@@ -152,7 +153,9 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           Undo
         </button>
       </div>
-      {app.tip && (
+      {app.backupDue ? (
+        <BackupNote app={app} />
+      ) : app.tip ? (
         <div className="tip" role="status">
           <p>
             <span className="note-label">Tip</span>
@@ -175,8 +178,8 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
             </button>
           </div>
         </div>
-      )}
-      {app.tip ? null : fresh.length === 2 ? (
+      ) : null}
+      {app.backupDue || app.tip ? null : fresh.length === 2 ? (
         <p className="hint newcomer-hint">
           {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
         </p>
