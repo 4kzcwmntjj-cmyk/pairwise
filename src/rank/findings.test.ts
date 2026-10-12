@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
-import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, QUALIFY } from './findings';
+import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, themeTags, QUALIFY } from './findings';
 import { crowdView } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
@@ -192,5 +192,16 @@ describe('tags', () => {
     expect(leans.map((l) => l.name)).toEqual(['Revenge']);
     expect(leans[0].ids).toHaveLength(5);
     expect(themeLeans(plain(40))).toEqual([]);
+  });
+
+  it('counts only the theme tags a title shows (its strongest 4)', () => {
+    const weak = (i: Item) => ({ ...i, tags: ['A', 'Male Protagonist', 'B', 'C', 'D', 'Revenge'] });
+    expect(themeTags(weak(catalogue[0]))).toEqual(['A', 'B', 'C', 'D']);
+    // Revenge in 5th place among themes: shown nowhere, so it names no type, lean or theme.
+    const ranked = [...spread(revenge, 8).map(weak), ...plain(30)];
+    const t = pickType({ ...base, catalogue: tagged, ranked });
+    expect(t.type.name).not.toBe('The Avenger');
+    expect(t.traits.tag?.name).not.toBe('Revenge');
+    expect(themeLeans(ranked).map((l) => l.name)).not.toContain('Revenge');
   });
 });

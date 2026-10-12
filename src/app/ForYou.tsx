@@ -225,8 +225,10 @@ function RecCard({ pick, kind, app, onOpen, onHide }: { pick: RowPick; kind: Sug
     <li className="rec-card">
       <button className="rec-card-open" onClick={() => onOpen(item.id)} aria-label={note ? `${title}, ${note}` : title}>
         <Cover look={look} title={title} size="lg" />
-        <span className="rec-card-title">{title}</span>
-        {note && <span className="rec-card-note">{note}</span>}
+        <span className="rec-card-text">
+          <span className="rec-card-title">{title}</span>
+          {note && <span className="rec-card-note">{note}</span>}
+        </span>
       </button>
       {/* A title you've seen can't be hidden: it would drop out of the Hidden list, so the manga and anime rows have no button. */}
       {(kind === 'because' || kind === 'gems') && <HideButton item={item} title={title} onHide={onHide} />}

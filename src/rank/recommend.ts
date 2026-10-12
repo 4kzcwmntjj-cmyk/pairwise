@@ -1,6 +1,6 @@
 import type { Item, Mark } from '../types';
 import type { Fit } from './solver';
-import { NOT_THEMES } from './findings';
+import { themeTags } from './findings';
 
 export interface Recommendation {
   item: Item;
@@ -99,7 +99,8 @@ export function recommend(items: Item[], fit: Fit, marks: Map<string, Mark>, lim
       links,
       because: (sources.get(item.id) ?? []).sort((a, b) => b[1] - a[1]).map(([id]) => id),
       genres: gs.filter((g) => affinity(g) > 0.05).sort((a, b) => affinity(b) - affinity(a)),
-      tags: ts.filter((t) => !NOT_THEMES.has(t) && tagAffinity(t) > 0.1 && (tagCount.get(t) ?? 0) >= 2).sort((a, b) => tagAffinity(b) - tagAffinity(a)),
+      // Reasons name only tags the title's card shows.
+      tags: themeTags(item).filter((t) => tagAffinity(t) > 0.1 && (tagCount.get(t) ?? 0) >= 2).sort((a, b) => tagAffinity(b) - tagAffinity(a)),
     });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);

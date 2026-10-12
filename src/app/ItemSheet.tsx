@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
-import { NOT_THEMES } from '../rank/findings';
+import { themeTags } from '../rank/findings';
 import { Cover } from './Cover';
 import { choicesFor, chosen, formUnknown } from '../rank/medium';
 import { Regroup } from './Regroup';
@@ -48,7 +48,7 @@ export function ItemSheet({
   const duels = app.fit.duels.get(itemId) ?? 0;
   const look = app.look(item);
   // Genres, then the strongest theme tags (cast and audience tags left out).
-  const labels = [...(item.genres ?? []).slice(0, 3), ...(item.tags ?? []).filter((t) => !NOT_THEMES.has(t)).slice(0, 4)];
+  const labels = [...(item.genres ?? []).slice(0, 3), ...themeTags(item)];
   const url = look.url;
   const hidden = item.entryIds.some((e) => app.dismissed.includes(String(e)));
 

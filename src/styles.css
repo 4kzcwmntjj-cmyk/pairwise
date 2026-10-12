@@ -1815,9 +1815,20 @@ main.sort {
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+/* Room for a two-line title and a one-line note on every card, so every row is the same height. */
+.rec-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: calc(0.82rem * 1.2 * 2 + 2px + 0.72rem * 1.4);
+}
 .rec-card-note {
   font-size: 0.72rem;
+  line-height: 1.4;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rec-card-hide {
   position: absolute;

@@ -91,6 +91,22 @@ export const NOT_THEMES = new Set([
   'Kids',
 ]);
 
+/** How many theme tags a title shows (on its card) and counts for in Taste. */
+export const SHOWN_THEMES = 4;
+
+/**
+ * A title's strongest theme tags: the ones its card shows. Taste counts only these, so a number like
+ * "Military 5 of your top 20" matches what the cards say; a tag in 5th to 8th place is a weak signal anyway.
+ */
+export function themeTags(i: Item): string[] {
+  return (i.tags ?? []).filter((t) => !NOT_THEMES.has(t)).slice(0, SHOWN_THEMES);
+}
+
+/** Whether a title counts as having a tag: a theme tag must be among its shown ones; cast and audience tags count anywhere. */
+export function hasTag(i: Item, t: string): boolean {
+  return NOT_THEMES.has(t) ? !!i.tags?.includes(t) : themeTags(i).includes(t);
+}
+
 export interface Archetype {
   id: string;
   name: string;
@@ -277,7 +293,7 @@ export function pickType(input: TypeInput): TypeFinding {
   // Tags: one test per named tag; at least 5 titles. The trait line can name any theme tag (3+ titles).
   const tagNames = Object.keys(TAG_TYPES);
   for (const t of tagNames) {
-    const has = (i: Item) => !!i.tags?.includes(t);
+    const has = (i: Item) => hasTag(i, t);
     const hits = wide.filter(has);
     if (hits.length < 5) continue;
     const p = baseRate(catalogue, has);
@@ -294,10 +310,10 @@ export function pickType(input: TypeInput): TypeFinding {
   let tagTrait: Traits['tag'] = null;
   let bestTag = 0;
   const wideTags = new Map<string, number>();
-  for (const i of wide) for (const t of i.tags ?? []) if (!NOT_THEMES.has(t)) wideTags.set(t, (wideTags.get(t) ?? 0) + 1);
+  for (const i of wide) for (const t of themeTags(i)) wideTags.set(t, (wideTags.get(t) ?? 0) + 1);
   for (const [t, count] of wideTags) {
     if (count < 3) continue;
-    const p = baseRate(catalogue, (i) => !!i.tags?.includes(t));
+    const p = baseRate(catalogue, (i) => hasTag(i, t));
     const s = surprise(nw, p, count, wideTags.size);
     if (s > bestTag) {
       bestTag = s;
@@ -544,9 +560,9 @@ export function themeLeans(ranked: Item[], top = GENRE_TOP, count = 3): ThemeLea
   const head = ranked.slice(0, top);
   if (head.length < 10) return [];
   const total = new Map<string, number>();
-  for (const i of ranked) for (const t of i.tags ?? []) total.set(t, (total.get(t) ?? 0) + 1);
+  for (const i of ranked) for (const t of themeTags(i)) total.set(t, (total.get(t) ?? 0) + 1);
   const groups = new Map<string, string[]>();
-  for (const i of head) for (const t of i.tags ?? []) if (!NOT_THEMES.has(t)) groups.set(t, [...(groups.get(t) ?? []), i.id]);
+  for (const i of head) for (const t of themeTags(i)) groups.set(t, [...(groups.get(t) ?? []), i.id]);
   return [...groups]
     .map(([name, ids]) => ({ name, ids, excess: ids.length - (head.length * (total.get(name) ?? 0)) / ranked.length }))
     .filter((g) => g.ids.length >= 3 && g.excess >= MIN_EXCESS)
