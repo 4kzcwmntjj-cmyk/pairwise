@@ -794,36 +794,17 @@ a {
 .grid-item .cover-sm .cover-fallback {
   font-size: 1.2rem;
 }
-.grid-item.is-seen .cover-sm {
-  box-shadow: 0 0 0 3px var(--accent);
-}
-.grid-item.is-unseen .cover-sm {
+.grid-item.is-unseen .cover-sm,
+.grid-item.is-unseen .grid-title {
   opacity: 0.45;
 }
-.grid-badge {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-.grid-note {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(20, 19, 40, 0.8);
-  color: #fff;
-  font-size: 0.68rem;
+.grid-state {
+  font-size: 0.72rem;
   font-weight: 600;
+  color: var(--muted);
+}
+.grid-item.is-seen .grid-state {
+  color: var(--accent);
 }
 .grid-title {
   font-size: 0.75rem;

@@ -11,14 +11,14 @@ import type { AppState } from './useApp';
 const PAGE = 60;
 
 /** Which titles the browse grid shows. */
-type Show = 'open' | 'unsorted' | 'seen' | 'unseen' | 'form';
+type Show = 'all' | 'unmarked' | 'seen' | 'unseen' | 'form';
 
 export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => void; onOpen: (id: string) => void }) {
   /** Searching AniList for this text, or null. */
   const [finding, setFinding] = useState<string | null>(null);
   const onFind = (query = '') => setFinding(query);
   const mode = app.settings.sortMode;
-  const [show, setShow] = useState<Show>('open');
+  const [show, setShow] = useState<Show>('all');
   // Titles marked seen before manga came in, which still need watched or read.
   const formless = useMemo(
     () => (app.view === 'both' ? app.items.filter((i) => formUnknown(i, app.allMarks.get(i.id))).length : 0),
@@ -74,7 +74,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
       {mode === 'grid' ? (
         <SortGrid app={app} onFind={onFind} onOpen={onOpen} show={show} setShow={setShow} />
       ) : (
-        <SortSingle app={app} onDone={onDone} onBrowse={() => browse('unsorted')} onOpen={onOpen} />
+        <SortSingle app={app} onDone={onDone} onBrowse={() => browse('unmarked')} onOpen={onOpen} />
       )}
     </main>
   );
@@ -107,6 +107,7 @@ function SortGrid({
   const sentinel = useRef<HTMLDivElement>(null);
 
   const q = query.trim().toLowerCase();
+  const words = viewWords(app.view);
   const yearOf = (i: Item) => app.look(i).startYear;
   const decades = useMemo(() => {
     const ds = new Set<number>();
@@ -116,22 +117,51 @@ function SortGrid({
     }
     return [...ds].sort((a, b) => b - a);
   }, [app.items, app.look]);
+  // Marks as they are now, read when the filters change (not on every tap) to fix the order in All.
+  const marksNow = useRef(app.marks);
+  marksNow.current = app.marks;
+  const inScope = (i: Item) => {
+    const y = yearOf(i);
+    if (decade !== null && Math.floor((y ?? 0) / 10) * 10 !== decade) return false;
+    return year === null || y === year;
+  };
+  const counts = useMemo(() => {
+    const c: Record<Show, number> = { all: 0, unmarked: 0, seen: 0, unseen: 0, form: 0 };
+    for (const i of app.items) {
+      if (!inScope(i)) continue;
+      const status = app.marks.get(i.id)?.status;
+      c.all++;
+      if (!status) c.unmarked++;
+      else c[status]++;
+      if (formUnknown(i, app.allMarks.get(i.id))) c.form++;
+    }
+    return c;
+  }, [app.items, app.marks, app.allMarks, app.look, decade, year]);
+  // In All, titles marked Haven't seen come after the rest. Who counts is fixed when the filters change,
+  // so a tile tapped to Haven't seen stays where it is.
+  const lastInAll = useMemo(() => {
+    const ids = new Set<string>();
+    if (show !== 'all') return ids;
+    for (const i of app.items) if (marksNow.current.get(i.id)?.status === 'unseen') ids.add(i.id);
+    return ids;
+  }, [app.items, app.ready, show, decade, year]);
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
     // A search looks through every title, whatever the other filters say.
     if (q) return items.filter((i) => [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)));
-    if (decade !== null) items = items.filter((i) => Math.floor((yearOf(i) ?? 0) / 10) * 10 === decade);
-    if (year !== null) items = items.filter((i) => yearOf(i) === year);
+    items = items.filter(inScope);
     const status = (i: Item) => app.marks.get(i.id)?.status;
     const keep: Record<Show, (i: Item) => boolean> = {
-      open: (i) => status(i) !== 'unseen',
-      unsorted: (i) => !status(i),
+      all: () => true,
+      unmarked: (i) => !status(i),
       seen: (i) => status(i) === 'seen',
       unseen: (i) => status(i) === 'unseen',
       form: (i) => formUnknown(i, app.allMarks.get(i.id)),
     };
-    return items.filter((i) => touched.has(i.id) || keep[show](i));
-  }, [app.items, app.marks, app.allMarks, app.look, q, decade, year, show, touched]);
+    items = items.filter((i) => touched.has(i.id) || keep[show](i));
+    if (show === 'all') items = [...items.filter((i) => !lastInAll.has(i.id)), ...items.filter((i) => lastInAll.has(i.id))];
+    return items;
+  }, [app.items, app.marks, app.allMarks, app.look, q, decade, year, show, touched, lastInAll]);
 
   useEffect(() => {
     setLimit(PAGE);
@@ -167,6 +197,7 @@ function SortGrid({
             ? "Tap once if you've read it, twice if not, a third time to clear."
             : "Tap once if you've seen or read it, twice if not, a third time to clear."}{' '}
         Duels work out the order.
+        {show === 'all' && ` Titles marked "${viewWords(app.view).unseen}" come last.`}
       </p>
       <div className="grid-tools">
         <input
@@ -187,11 +218,15 @@ function SortGrid({
         ) : (
           <div className="grid-filters">
           <select id="grid-show" aria-label="Show" value={show} onChange={(e) => setShow(e.target.value as Show)}>
-            <option value="open">Not sorted and seen</option>
-            <option value="unsorted">Not sorted</option>
-            <option value="seen">Seen</option>
-            <option value="unseen">{viewWords(app.view).unseen}</option>
-            {app.view === 'both' && <option value="form">Anime or manga?</option>}
+            <option value="all">All ({counts.all.toLocaleString()})</option>
+            <option value="unmarked">Not marked ({counts.unmarked.toLocaleString()})</option>
+            <option value="seen">
+              {words.seenLabel} ({counts.seen.toLocaleString()})
+            </option>
+            <option value="unseen">
+              {words.unseen} ({counts.unseen.toLocaleString()})
+            </option>
+            {app.view === 'both' && <option value="form">Anime or manga? ({counts.form.toLocaleString()})</option>}
           </select>
           <select
             id="grid-decade"
@@ -234,18 +269,14 @@ function SortGrid({
             const mark = app.marks.get(item.id);
             const title = app.title(item);
             const state = mark?.status ?? 'none';
+            const stateWord = state === 'seen' ? words.seenLabel : state === 'unseen' ? words.unseen : null;
             return (
               <li key={item.id} className={`grid-item is-${state}`}>
-                <button onClick={() => cycle(item)} aria-label={`${title}${state === 'seen' ? ', seen' : state === 'unseen' ? ", haven't seen" : ''}`}>
+                <button onClick={() => cycle(item)} aria-label={stateWord ? `${title}, ${stateWord.toLowerCase()}` : title}>
                   <Cover look={app.look(item)} title={title} size="sm" />
-                  {state === 'seen' && (
-                    <span className="grid-badge" aria-hidden="true">
-                      ✓
-                    </span>
-                  )}
-                  {state === 'unseen' && <span className="grid-note">Haven't seen</span>}
                   <span className="grid-title">{title}</span>
                   <span className="grid-year">{app.look(item).years}</span>
+                  {stateWord && <span className="grid-state">{stateWord}</span>}
                 </button>
                 <span className="grid-info-area">
                   <button className="info-button" onClick={() => onOpen(item.id)} aria-label={`Details for ${title}`} title="Details">

@@ -32,7 +32,7 @@ export const shortFormat = (format: string) => SHORT_FORMAT[format] ?? 'Other';
 /** How the view talks about knowing a title. */
 export const viewWords = (view: View) =>
   view === 'anime'
-    ? { seen: 'watched', unseen: "Haven't watched" }
+    ? { seen: 'watched', seenLabel: 'Watched', unseen: "Haven't watched" }
     : view === 'manga'
-      ? { seen: 'read', unseen: "Haven't read" }
-      : { seen: 'seen', unseen: "Haven't seen" };
+      ? { seen: 'read', seenLabel: 'Read', unseen: "Haven't read" }
+      : { seen: 'seen', seenLabel: 'Seen', unseen: "Haven't seen" };

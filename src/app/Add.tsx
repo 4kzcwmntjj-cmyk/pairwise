@@ -71,7 +71,7 @@ export function Add({ app, onOpen, initial = '' }: { app: AppState; onOpen: (id:
             <span className="rank-title">{title}</span>
             <span className="rank-meta">{app.look(item).meta}</span>
           </span>
-          <span className="status-note">{mark ? STATUS_LABEL[mark.status] : 'Not sorted'}</span>
+          <span className="status-note">{mark ? STATUS_LABEL[mark.status] : 'Not marked'}</span>
         </button>
       </li>
     );
