@@ -58,7 +58,7 @@ def run(p, name, vw, vh, scheme):
 
     nav('Duel'); page.wait_for_timeout(600); shot('01duel')
     nav('Library'); page.wait_for_timeout(400)
-    page.get_by_role('radio', name='Quick sort').click(); page.wait_for_timeout(400); shot('02quick')
+    page.get_by_role('radio', name='Quick log').click(); page.wait_for_timeout(400); shot('02quick')
     page.get_by_role('radio', name='Browse').click(); page.wait_for_timeout(600); shot('03browse')
     nav('Ranking'); page.wait_for_timeout(600); shot('04ranking')
     page.locator('.rank-row').first.click(); page.wait_for_selector('.sheet'); page.wait_for_timeout(300)

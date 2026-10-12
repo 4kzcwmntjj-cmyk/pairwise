@@ -12,6 +12,7 @@ import { seenModel } from '../rank/seen';
 import { afterShown, NO_TIPS, pickTip, type Tip, type TipState } from '../rank/tips';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
+import { cleanName, entryOf, type SentList } from '../rank/listLink';
 import { applyAnswer, clearIn, formUnknown, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
 import { DEFAULT_SETTINGS, type Entry, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
@@ -39,6 +40,15 @@ export interface Moved {
   /** Two titles joined at once (the first duel of a new list). */
   both?: boolean;
 }
+
+/** A friend's list, from a link they sent (see listLink.ts). */
+export interface Friend extends SentList {
+  /** One saved list per name; a new link from the same name replaces the old one. */
+  key: string;
+  received: number;
+}
+const MAX_FRIENDS = 20;
+const friendKey = (l: SentList) => (l.name ? `n:${l.name.toLowerCase()}` : `l:${l.made ?? ''}:${l.entries.slice(0, 8).join('.')}`);
 
 /** Newcomer outcomes kept for working out how often to bring one in. */
 const NEWCOMER_LOG = 20;
@@ -83,6 +93,11 @@ export function useApp() {
   const [tips, setTips] = useState<TipState>(NO_TIPS);
   /** The tip on screen, and the duel count when it appeared. */
   const [tip, setTip] = useState<(Tip & { at: number }) | null>(null);
+  /** Lists friends have sent, newest first, and the name you put on lists you send. */
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [myName, setMyNameState] = useState('');
+  const friendsRef = useRef<Friend[]>([]);
+  friendsRef.current = friends;
   const warm = useRef<Map<string, number> | undefined>(undefined);
   /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
   const generation = useRef(0);
@@ -107,15 +122,23 @@ export function useApp() {
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
     setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
+    setFriends((s.meta.friends as Friend[]) ?? []);
+    setMyNameState((s.meta.myName as string) ?? '');
     setUndoStack([]);
     setPair(null);
   }, []);
 
   useEffect(() => {
+    // Only the last load counts: in development React runs this twice, and a late first load could
+    // otherwise overwrite what was saved in between (a friend's list read from the link, say).
+    let live = true;
     store
       .loadAll()
-      .then(applySnapshot)
-      .finally(() => setReady(true));
+      .then((s) => live && applySnapshot(s))
+      .finally(() => live && setReady(true));
+    return () => {
+      live = false;
+    };
   }, [applySnapshot]);
 
   // What the app works with: titles after your grouping changes, with marks and votes following them.
@@ -149,6 +172,22 @@ export function useApp() {
   const fit: Fit = useMemo(() => ({ ...fullFit, order: fullFit.order.filter(inViewSeen) }), [fullFit, inViewSeen]);
 
   const rankOf = useMemo(() => new Map(fit.order.map((id, i) => [id, i + 1])), [fit]);
+
+  /** Which of your titles holds each AniList entry, for reading a friend's list. */
+  const itemOfEntry = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const i of allItems) for (const e of i.entryIds) m.set(e, i.id);
+    return m;
+  }, [allItems]);
+  /** Your whole ranking (anime and manga together) as AniList entries, for a link to send. */
+  const myEntries = useMemo(
+    () => fullFit.order.flatMap((id) => {
+      const it = itemById.get(id);
+      const e = it && entryOf(it);
+      return e === undefined ? [] : [e];
+    }),
+    [fullFit, itemById],
+  );
 
   /** The chance you've seen each unsorted title in this view. Sort's queue and newcomer duels both use it. */
   const seenGuess = useMemo(() => seenModel(items, marks), [items, marks]);
@@ -568,10 +607,34 @@ export function useApp() {
       marks: [...rawMarks.values()],
       votes: rawVotes,
       settings,
-      meta: { skipped, dismissed, newcomerLog, tips, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+      meta: { skipped, dismissed, newcomerLog, tips, groupOps, friends, myName, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
     }),
-    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, catalogueAt],
+    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, friends, myName, catalogueAt],
   );
+
+  /** Keeps a friend's list; returns its key. */
+  const addFriend = useCallback(async (list: SentList) => {
+    const key = friendKey(list);
+    const friend: Friend = { ...list, key, received: Date.now() };
+    const next = [friend, ...friendsRef.current.filter((f) => f.key !== key)].slice(0, MAX_FRIENDS);
+    friendsRef.current = next;
+    setFriends(next);
+    await store.setMeta('friends', next);
+    return key;
+  }, []);
+
+  const removeFriend = useCallback(async (key: string) => {
+    const next = friendsRef.current.filter((f) => f.key !== key);
+    friendsRef.current = next;
+    setFriends(next);
+    await store.setMeta('friends', next);
+  }, []);
+
+  const setMyName = useCallback(async (name: string) => {
+    const n = cleanName(name) ?? '';
+    setMyNameState(n);
+    await store.setMeta('myName', n);
+  }, []);
 
   /** Saves a copy of everything to a file (the share sheet on phones). */
   const saveBackup = async () => {
@@ -816,6 +879,15 @@ export function useApp() {
     canRankApart,
     rankApart,
     rankTogether,
+    /** Your whole ranking, anime and manga together, whatever the view. */
+    fullOrder: fullFit.order,
+    itemOfEntry,
+    myEntries,
+    friends,
+    addFriend,
+    removeFriend,
+    myName,
+    setMyName,
   };
 }
 

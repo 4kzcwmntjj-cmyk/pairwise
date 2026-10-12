@@ -295,7 +295,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
   );
 }
 
-function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; onShare: () => void }) {
+export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; onShare: () => void }) {
   const itemOf = (id: string) => app.itemById.get(id);
   const many = card.covers.length > 1;
   return (
@@ -307,6 +307,7 @@ function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppStat
           {l}
         </p>
       ))}
+      {card.coversLabel && card.covers.length > 0 && <p className="find-label">{card.coversLabel}</p>}
       {card.covers.length > 0 && (
         <ul className={`find-covers count-${card.covers.length}`}>
           {card.covers.map((c) => {
@@ -325,6 +326,7 @@ function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppStat
           })}
         </ul>
       )}
+      {card.rowsLabel && card.rows && card.rows.length > 0 && <p className="find-label">{card.rowsLabel}</p>}
       {card.rows && card.rows.length > 0 && (
         <ol className="rank-list">
           {card.rows.map((r) => {

@@ -5,7 +5,7 @@ import { renderTop } from './shareImage';
 import { SharePreview } from './SharePreview';
 import type { AppState } from './useApp';
 
-export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
+export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id: string) => void; onCompare: () => void }) {
   const [query, setQuery] = useState('');
   const [previewing, setPreviewing] = useState(false);
 
@@ -42,13 +42,16 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {top.length >= 3 && (
-          <div className="action-row start">
+        <div className="action-row start">
+          {top.length >= 3 && (
             <button className="btn btn-small" onClick={() => setPreviewing(true)}>
               Share top {Math.min(top.length, 10)}
             </button>
-          </div>
-        )}
+          )}
+          <button className="btn btn-small" onClick={onCompare}>
+            Compare{app.friends.length > 0 ? ` (${app.friends.length})` : ' with a friend'}
+          </button>
+        </div>
         {top.length >= 10 && (
           <p className="hint">
             {settled} of your top 10 are settled. A title is settled once more duels are unlikely to move it far.

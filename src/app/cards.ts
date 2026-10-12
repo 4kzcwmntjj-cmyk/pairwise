@@ -26,7 +26,10 @@ export interface CardSpec {
   /** The finding, then any context for it. */
   lines: string[];
   covers: CardTitle[];
+  /** Short heading over the covers or the rows, when the card has both and they mean different things. */
+  coversLabel?: string;
   rows?: CardRow[];
+  rowsLabel?: string;
   facts?: { label: string; value: string }[];
 }
 

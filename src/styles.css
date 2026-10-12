@@ -1657,3 +1657,52 @@ main.sort {
   background: var(--accent-soft);
   font-weight: 600;
 }
+
+/* Compare with a friend */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.field select {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+.link-text {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font: 0.8rem/1.4 ui-monospace, monospace;
+  word-break: break-all;
+  resize: none;
+}
+.find-label {
+  margin-top: 6px !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.compare .find-cards {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.compare .action-row .hint {
+  align-self: center;
+}
+.send-sheet h3 {
+  margin: 0;
+  padding-right: 56px;
+}
+.send-sheet p {
+  margin: 0;
+}

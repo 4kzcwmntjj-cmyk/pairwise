@@ -63,6 +63,12 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           Stats shows how your top 10 has moved over time, how settled your list is, where your taste leans, and where you
           disagree with AniList's average scores. Most of it needs a few dozen duels before it says anything.
         </p>
+        <p>
+          Compare, at the top of Ranking, makes a link that holds your whole list. Send it to a friend: when they open it,
+          they see a match score (how often you'd both pick the same title of two you've both ranked), what you both love,
+          where you disagree most, and what's in your top 10 that they haven't ranked. If they send theirs back, you see the
+          same. Nothing goes to a server; the list is inside the link, and the lists you receive are kept on this device.
+        </p>
       </section>
 
       <section>
@@ -116,7 +122,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           Everything is stored in this browser on this device. There is no account. Use Save a copy in Settings now and
           then; on an iPhone it opens the share sheet, where you can pick Save to Files. Load a copy brings it back, or
-          moves your list to another device. The app reminds you when you have unsaved work.
+          moves your list to another device, along with friends' lists you've received. The app reminds you when you have
+          unsaved work.
         </p>
       </section>
 

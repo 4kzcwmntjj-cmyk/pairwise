@@ -79,9 +79,23 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
     y += 10;
   });
 
+  /** A small heading over the covers or the rows. */
+  const label = (text: string | undefined) => {
+    if (!text) return;
+    y += 24;
+    ctx.fillStyle = MUTED;
+    ctx.font = `600 26px ${BODY}`;
+    for (const l of wrapLines(measure, text, INNER, 2)) {
+      y += 36;
+      ctx.fillText(l, PAD, y);
+    }
+    y -= 8;
+  };
+
   // Cover strip, with titles and captions underneath when there are several.
   const count = spec.covers.length;
   if (count) {
+    label(spec.coversLabel);
     y += 30;
     const gap = 24;
     const cw = stripWidth(count, gap);
@@ -112,6 +126,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
 
   // Rows: one compact line per title.
   if (spec.rows?.length) {
+    label(spec.rowsLabel);
     y += 28;
     const rh = 124;
     spec.rows.forEach((r, k) => {
