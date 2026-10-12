@@ -110,7 +110,15 @@ export function Duel({ app, onLibrary }: { app: AppState; onLibrary: () => void 
           Undo
         </button>
       </div>
-      {fresh.length === 2 ? (
+      {app.tip && (
+        <div className="tip" role="status">
+          <p>{app.tip.text}</p>
+          <button className="btn btn-quiet btn-small" onClick={app.dismissTip}>
+            Got it
+          </button>
+        </div>
+      )}
+      {app.tip ? null : fresh.length === 2 ? (
         <p className="hint newcomer-hint">
           {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
         </p>

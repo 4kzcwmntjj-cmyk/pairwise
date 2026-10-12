@@ -97,7 +97,16 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
       </section>
 
       <section>
-        <h3>7. Your data</h3>
+        <h3>7. Tips</h3>
+        <p>
+          Duel shows a short tip the first time something it explains comes up, such as a franchise that may need splitting
+          or the Library's Browse tab. Each tip shows once and they are spaced apart. Settings can turn them off or show them
+          again.
+        </p>
+      </section>
+
+      <section>
+        <h3>8. Your data</h3>
         <p>
           Everything is stored in this browser on this device. There is no account. Use Save a copy in Settings now and
           then; on an iPhone it opens the share sheet, where you can pick Save to Files. Load a copy brings it back, or

@@ -47,6 +47,17 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
             How it works
           </button>
         </div>
+        <p>
+          Tips are short notes in Duel that appear once, when something they explain comes up.
+        </p>
+        <div className="action-row start">
+          <button className="btn" onClick={() => app.changeTips({ ...app.tips, off: !app.tips.off })}>
+            {app.tips.off ? 'Turn tips on' : 'Turn tips off'}
+          </button>
+          <button className="btn btn-quiet" onClick={() => app.changeTips({ off: false, seen: [], lastAt: 0 })}>
+            Show tips again
+          </button>
+        </div>
       </section>
 
       <section>

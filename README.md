@@ -47,3 +47,7 @@ The Sort tab is now the Library: quick sort (one at a time, likeliest first) for
 A new list starts in Duel: with fewer than two titles ranked, the likeliest unsorted titles duel each other (`fresh` holds the side or sides not yet on your list). While the list has fewer than 15 titles, at least 60% of duels bring someone in. The newcomer roll now comes before placement; before, a backlog of titles marked seen in the Library (three placement duels each) kept newcomers out entirely. In the both view, two-form newcomers wait in a queue and Duel asks "watched or read?" about four at a time.
 
 First launch now stores the catalogue before showing the app, and skips the launch-time catalogue check right after the welcome screen loaded it. Both had been delaying the first answers by a couple of seconds.
+
+## Tips
+
+Duel shows one short tip at a time, below the buttons, the first time something relevant comes up: a franchise with ten or more entries near the top (Split up), five passes on new titles in a row (Browse by year), the first title known in one form only (the view switch), a jump of eight places or more, heavy use of ties, 20 titles ranked (For you) and Stats unlocking. Tips wait for eight duels, are at least ten duels apart, and each appears once. State is in the `tips` meta key and the export. Settings can turn tips off or show them again. Rules are in `src/rank/tips.ts`.

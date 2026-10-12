@@ -5,6 +5,7 @@ import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
+import { afterShown, NO_TIPS, pickTip, type Tip, type TipState } from '../rank/tips';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
 import { applyAnswer, clearIn, formUnknown, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
@@ -75,6 +76,10 @@ export function useApp() {
   const [passed, setPassed] = useState<Set<string>>(new Set());
   /** Newcomers picked in the both view whose form (watched or read) is still to be asked, oldest first. */
   const [formAsks, setFormAsks] = useState<string[]>([]);
+  /** Which tips have been shown, and whether they're switched off. */
+  const [tips, setTips] = useState<TipState>(NO_TIPS);
+  /** The tip on screen, and the duel count when it appeared. */
+  const [tip, setTip] = useState<(Tip & { at: number }) | null>(null);
   const warm = useRef<Map<string, number> | undefined>(undefined);
   /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
   const generation = useRef(0);
@@ -94,6 +99,8 @@ export function useApp() {
     setSkipped((s.meta.skipped as string[]) ?? []);
     setDismissed((s.meta.dismissed as string[]) ?? []);
     setNewcomerLog((s.meta.newcomerLog as boolean[]) ?? []);
+    setTips({ ...NO_TIPS, ...((s.meta.tips as Partial<TipState>) ?? {}) });
+    setTip(null);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
     setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
@@ -175,6 +182,40 @@ export function useApp() {
     },
     [newcomerLog],
   );
+
+  // Tips: one at a time, when something relevant is on screen. Shown once, then left alone.
+  const knowsOneForm = useMemo(
+    () => [...allMarks.values()].some((m) => m.anime !== undefined && m.manga !== undefined && m.anime !== m.manga),
+    [allMarks],
+  );
+  useEffect(() => {
+    if (!ready) return;
+    if (tip && (votes.length < tip.at || votes.length - tip.at >= 2)) return setTip(null);
+    if (tip || !pair) return;
+    const next = pickTip(tips, {
+      duels: votes.length,
+      ranked: fit.order.length,
+      onScreen: [pair.a, pair.b].flatMap((id) => {
+        const it = itemById.get(id);
+        return it ? [{ title: displayTitle(it, settings), rank: rankOf.get(id), entries: it.entries?.length ?? 0 }] : [];
+      }),
+      newcomerLog,
+      recent: votes.slice(-15).map((v) => v.outcome),
+      movedUp: moved && !moved.isNew && moved.from > moved.to ? { title: moved.title, places: moved.from - moved.to } : null,
+      knowsOneForm,
+    });
+    if (!next) return;
+    const after = afterShown(tips, next, votes.length);
+    setTips(after);
+    setTip({ ...next, at: votes.length });
+    store.setMeta('tips', after).catch(() => undefined);
+  }, [ready, tip, tips, pair, votes, fit, itemById, settings, rankOf, newcomerLog, moved, knowsOneForm]);
+
+  const changeTips = useCallback(async (next: TipState) => {
+    setTips(next);
+    setTip(null);
+    await store.setMeta('tips', next);
+  }, []);
 
   const pushUndo = (e: UndoEntry) => setUndoStack((s) => [...s.slice(-99), e]);
 
@@ -490,9 +531,9 @@ export function useApp() {
       marks: [...rawMarks.values()],
       votes: rawVotes,
       settings,
-      meta: { skipped, dismissed, newcomerLog, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+      meta: { skipped, dismissed, newcomerLog, tips, groupOps, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
     }),
-    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, groupOps, catalogueAt],
+    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, catalogueAt],
   );
 
   const size = rawMarks.size + rawVotes.length;
@@ -644,6 +685,10 @@ export function useApp() {
     skipSort,
     seenGuess,
     notSeenInDuel,
+    tip,
+    dismissTip: () => setTip(null),
+    tips,
+    changeTips,
     formPending,
     answerForm,
     dismissed,

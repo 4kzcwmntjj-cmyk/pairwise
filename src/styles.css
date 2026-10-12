@@ -1286,3 +1286,21 @@ main.sort {
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+
+/* Tips */
+.tip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px auto 0;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 0.875rem;
+}
+.tip p {
+  margin: 0;
+  flex: 1;
+}
