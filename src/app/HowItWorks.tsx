@@ -36,13 +36,13 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
       <section>
         <h3>2. Library</h3>
         <p>
-          The Library holds every title. Quick sort shows one at a time, likeliest first, and asks if you know it; it's a
+          The Library holds every title. Quick log shows one at a time, likeliest first, and asks if you know it; it's a
           fast way to add a batch at once. Browse shows covers you can narrow by status, decade and year and put in a different order, which helps you remember what
           you've seen once the obvious ones are done. A title is logged once you've said whether you know it. Its search box looks through every title; if what you want isn't
           there, it offers to search AniList, which finds anything older or less popular.
         </p>
         <p>
-          Some titles exist as both anime and manga, such as Death Note. For those, Quick sort, Duel's quick check and the title's card ask which you've seen:
+          Some titles exist as both anime and manga, such as Death Note. For those, Quick log, Duel's quick check and the title's card ask which you've seen:
           the anime, the manga, both or neither. A card is one franchise, so the answer is about the whole thing, not one season.
         </p>
       </section>
@@ -56,7 +56,7 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           Every title has one card with everything about it: your record, whether you've seen it (and which, anime or
           manga), what the title groups together, Split up and Join, and Not interested for suggestions. Open it by tapping
-          the title's name in Duel or Quick sort, the i on a cover in Browse, or the title anywhere in Ranking, For you and
+          the title's name in Duel or Quick log, the i on a cover in Browse, or the title anywhere in Ranking, For you and
           Stats.
         </p>
         <p>

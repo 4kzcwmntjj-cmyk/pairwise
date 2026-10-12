@@ -49,7 +49,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
         <div className="segmented" role="radiogroup" aria-label="Library view">
           {(
             [
-              ['single', 'Quick sort'],
+              ['single', 'Quick log'],
               ['grid', 'Browse'],
             ] as const
           ).map(([v, label]) => (
