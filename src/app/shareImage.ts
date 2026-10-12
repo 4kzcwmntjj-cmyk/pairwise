@@ -1,6 +1,6 @@
 /** Draws the top of your list as a picture to send to someone. */
 
-import { loadCover } from './coverLoader';
+import { loadCovers, type Drawable } from './coverLoader';
 
 export interface ShareRow {
   rank: number;
@@ -24,7 +24,7 @@ const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
 const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const PAD = 64;
 
-type Cover = ImageBitmap | null;
+type Cover = Drawable | null;
 
 /** Breaks text into at most `maxLines` lines that fit `width`, ending the last with an ellipsis if cut. */
 export function wrapLines(measure: (s: string) => number, text: string, width: number, maxLines: number): string[] {
@@ -60,7 +60,7 @@ function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
 }
 
 /** Draws `img` into the box, cropping the overflow instead of stretching. */
-function drawCover(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
+function drawCover(ctx: CanvasRenderingContext2D, img: Drawable, x: number, y: number, w: number, h: number) {
   const scale = Math.max(w / img.width, h / img.height);
   const sw = w / scale;
   const sh = h / scale;
@@ -191,13 +191,20 @@ function drawList(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
   });
 }
 
-export async function renderTop(rows: ShareRow[], heading: string, layout: ShareLayout = 'grid'): Promise<Blob> {
+export interface ShareResult {
+  blob: Blob;
+  /** Rows that had a cover address but no cover could be loaded. */
+  missing: number;
+}
+
+export async function renderTop(rows: ShareRow[], heading: string, layout: ShareLayout = 'grid'): Promise<ShareResult> {
   try {
     await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
   } catch {
     // Fall back to the system fonts.
   }
-  const covers = await Promise.all(rows.map((r) => loadCover(r.cover)));
+  const covers = await loadCovers(rows.map((r) => r.cover));
+  const missing = rows.filter((r, i) => r.cover && !covers[i]).length;
 
   const height = shareHeight(layout, rows.length);
   const canvas = document.createElement('canvas');
@@ -221,9 +228,9 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   ctx.fillText('Shōbu', SHARE_WIDTH - PAD, height - 44);
   ctx.textAlign = 'left';
 
-  for (const c of covers) c?.close();
+  for (const c of covers) (c as ImageBitmap | null)?.close?.();
 
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the picture.'))), 'image/png'),
+    canvas.toBlob((b) => (b ? resolve({ blob: b, missing }) : reject(new Error('Could not draw the picture.'))), 'image/png'),
   );
 }

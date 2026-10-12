@@ -16,8 +16,8 @@ interface Props {
   title: string;
   /** File name without extension. */
   filename: string;
-  /** Draws the picture. Called again when the option changes. */
-  make: (option: string) => Promise<Blob>;
+  /** Draws the picture. Called again when the option changes or Try again is pressed. `note` is shown as a warning. */
+  make: (option: string) => Promise<{ blob: Blob; note?: string }>;
   options?: ShareOption[];
   onClose: () => void;
 }
@@ -27,6 +27,8 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
   const [blob, setBlob] = useState<Blob | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const makeRef = useRef(make);
   makeRef.current = make;
@@ -42,21 +44,23 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
     let made: string | null = null;
     setBlob(null);
     setError(null);
+    setNote(null);
     setStatus(null);
     makeRef
       .current(option)
-      .then((b) => {
+      .then(({ blob: b, note: n }) => {
         if (cancelled) return;
         made = URL.createObjectURL(b);
         setBlob(b);
         setUrl(made);
+        setNote(n ?? null);
       })
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
       if (made) URL.revokeObjectURL(made);
     };
-  }, [option]);
+  }, [option, attempt]);
 
   const file = blob ? new File([blob], `${filename}.png`, { type: 'image/png' }) : null;
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
@@ -123,6 +127,14 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
           Save
         </button>
       </div>
+      {note && (
+        <p className="hint share-preview-note" role="status">
+          {note}{' '}
+          <button className="btn-link inline" onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </button>
+        </p>
+      )}
       <p className="hint share-preview-note" role="status">
         {status ?? 'You can also press and hold the picture, or take a screenshot.'}
       </p>

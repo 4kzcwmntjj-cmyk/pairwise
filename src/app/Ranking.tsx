@@ -16,14 +16,15 @@ export function Ranking({ app, onOpen }: { app: AppState; onOpen: (id: string) =
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
   const noun = app.view === 'both' ? 'anime and manga' : app.view;
-  async function drawTop(layout: string): Promise<Blob> {
+  async function drawTop(layout: string) {
     const rows = top.flatMap((id, i) => {
       const item = app.itemById.get(id);
       if (!item) return [];
       const look = app.look(item);
       return [{ rank: i + 1, title: app.title(item), meta: look.short, cover: look.coverLarge ?? look.cover, color: look.coverColor }];
     });
-    return renderTop(rows, `My top ${rows.length} ${noun}`, layout as ShareLayout);
+    const { blob, missing } = await renderTop(rows, `My top ${rows.length} ${noun}`, layout as ShareLayout);
+    return { blob, note: missing ? `${missing} of ${rows.length} covers didn't load.` : undefined };
   }
   const q = query.trim().toLowerCase();
   const shown = lists.ranked.filter(
