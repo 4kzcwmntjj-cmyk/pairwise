@@ -7,7 +7,7 @@ import { newcomerShare, nextPair, pairKey, type Newcomer, type Pair } from '../r
 import { seenModel } from '../rank/seen';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
-import { applyAnswer, clearIn, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
+import { applyAnswer, clearIn, formUnknown, formsOf, hasBoth, inView, knownIn, projectMarks, type Answer } from '../rank/medium';
 import { DEFAULT_SETTINGS, type Item, type Mark, type Outcome, type Settings, type Status, type View, type Vote } from '../types';
 
 export const store = new LocalStore();
@@ -31,7 +31,7 @@ type UndoEntry = { scope: UndoScope } & (
   | { kind: 'mark'; itemId: string; prev?: Mark; pair?: Pair | null }
   | { kind: 'skip'; itemId: string }
   /** A newcomer duel: the vote and the mark that came with it, undone together. */
-  | { kind: 'newcomer'; voteId: number; itemId: string; pair: Pair }
+  | { kind: 'newcomer'; voteId: number; itemIds: string[]; pair: Pair }
 );
 
 export interface Moved {
@@ -40,6 +40,8 @@ export interface Moved {
   to: number;
   /** A title that just joined your list from a newcomer duel. */
   isNew?: boolean;
+  /** Two titles joined at once (the first duel of a new list). */
+  both?: boolean;
 }
 
 /** Newcomer outcomes kept for working out how often to bring one in. */
@@ -71,8 +73,8 @@ export function useApp() {
   const [newcomerLog, setNewcomerLog] = useState<boolean[]>([]);
   /** Newcomers skipped this session. */
   const [passed, setPassed] = useState<Set<string>>(new Set());
-  /** A newcomer picked in the both view, whose form (watched or read) is still to be asked. */
-  const [formAsk, setFormAsk] = useState<string | null>(null);
+  /** Newcomers picked in the both view whose form (watched or read) is still to be asked, oldest first. */
+  const [formAsks, setFormAsks] = useState<string[]>([]);
   const warm = useRef<Map<string, number> | undefined>(undefined);
   /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
   const generation = useRef(0);
@@ -155,9 +157,7 @@ export function useApp() {
   const isValid = useCallback(
     (p: Pair | null) =>
       !!p &&
-      (p.newcomer
-        ? !marks.has(p.newcomer) && itemById.has(p.newcomer) && rankOf.has(p.newcomer === p.a ? p.b : p.a)
-        : rankOf.has(p.a) && rankOf.has(p.b)),
+      [p.a, p.b].every((id) => (p.fresh?.includes(id) ? !marks.has(id) && itemById.has(id) : rankOf.has(id))),
     [marks, itemById, rankOf],
   );
   useEffect(() => {
@@ -260,23 +260,38 @@ export function useApp() {
   const vote = useCallback(
     async (outcome: Outcome) => {
       if (!pair) return;
-      if (pair.newcomer) {
-        const item = itemById.get(pair.newcomer);
-        if (!item) return;
-        const mark = newcomerMark(item);
-        setMarks((m) => new Map(m).set(mark.itemId, mark));
-        await store.setMark(mark);
+      if (pair.fresh?.length) {
+        const fresh = pair.fresh.map((id) => itemById.get(id)).filter((i): i is Item => !!i);
+        if (fresh.length !== pair.fresh.length) return;
+        const newMarks = fresh.map(newcomerMark);
+        setMarks((m) => {
+          const n = new Map(m);
+          for (const mk of newMarks) n.set(mk.itemId, mk);
+          return n;
+        });
+        await Promise.all(newMarks.map((mk) => store.setMark(mk)));
         const v: Vote = { a: pair.a, b: pair.b, outcome, mode: pair.mode, at: Date.now() };
         const id = await store.addVote(v);
         const saved = { ...v, id };
         const nextVotes = [...votes, saved];
         setVotes((vs) => [...vs, saved]);
-        pushUndo({ scope: 'duel', kind: 'newcomer', voteId: id, itemId: item.id, pair });
+        pushUndo({ scope: 'duel', kind: 'newcomer', voteId: id, itemIds: fresh.map((i) => i.id), pair });
         logNewcomer(true);
-        const after = fitModel({ ids: [...seenIds, item.id], anchors: {}, votes: nextVotes, warm: warm.current });
-        const to = after.order.filter((x) => x === item.id || inViewSeen(x)).indexOf(item.id) + 1;
-        setMoved({ title: displayTitle(item, settings), from: to, to, isNew: true });
-        setFormAsk(view === 'both' && hasBoth(item) ? item.id : null);
+        const freshIds = new Set(fresh.map((i) => i.id));
+        const after = fitModel({ ids: [...seenIds, ...freshIds], anchors: {}, votes: nextVotes, warm: warm.current });
+        const order = after.order.filter((x) => freshIds.has(x) || inViewSeen(x));
+        // The one that joined; with two new titles, the winner (or the first, on a tie).
+        const shown = fresh.length === 1 ? fresh[0] : (fresh.find((i) => i.id === (outcome === 'a' ? pair.a : pair.b)) ?? fresh[0]);
+        const to = order.indexOf(shown.id) + 1;
+        setMoved({
+          title: fresh.length === 2 ? `${displayTitle(fresh[0], settings)} and ${displayTitle(fresh[1], settings)}` : displayTitle(shown, settings),
+          from: to,
+          to,
+          isNew: true,
+          both: fresh.length === 2,
+        });
+        const ask = view === 'both' ? fresh.filter(hasBoth).map((i) => i.id) : [];
+        if (ask.length) setFormAsks((q) => [...q.filter((x) => !ask.includes(x)), ...ask]);
         setPair(null);
         return;
       }
@@ -307,19 +322,30 @@ export function useApp() {
     [logNewcomer, markItem],
   );
 
-  /** Answer the watched-or-read question that follows a newcomer picked in the both view. */
+  /**
+   * Newcomers picked in the both view that have an anime and a manga, still waiting for "watched or read?".
+   * Duel asks about them a few at a time rather than after every pick.
+   */
+  const formPending = useMemo(
+    () => formAsks.filter((id) => formUnknown(itemById.get(id) ?? { formats: [] }, allMarks.get(id))),
+    [formAsks, itemById, allMarks],
+  );
+  /** Answer for one title, or `null` to leave them all for later (they stay "watched or read?" in the Library). */
   const answerForm = useCallback(
-    async (ans: Answer | null) => {
-      const id = formAsk;
-      setFormAsk(null);
-      if (id && ans) await answer(id, ans, 'duel');
+    async (id: string | null, ans: Answer | null) => {
+      if (!id || !ans) return setFormAsks([]);
+      setFormAsks((q) => q.filter((x) => x !== id));
+      await answer(id, ans, 'duel');
     },
-    [formAsk, answer],
+    [answer],
   );
 
   const skipPair = useCallback(() => {
     if (!pair) return;
-    if (pair.newcomer) setPassed((s) => new Set(s).add(pair.newcomer!));
+    if (pair.fresh) {
+      const fresh = pair.fresh;
+      setPassed((s) => new Set([...s, ...fresh]));
+    }
     setSkippedPairs((s) => new Set(s).add(pairKey(pair.a, pair.b)));
     setMoved(null);
     setPair(null);
@@ -339,13 +365,13 @@ export function useApp() {
       setVotes((vs) => vs.filter((v) => v.id !== last.voteId));
       setMarks((m) => {
         const n = new Map(m);
-        n.delete(last.itemId);
+        for (const id of last.itemIds) n.delete(id);
         return n;
       });
-      setFormAsk(null);
+      setFormAsks((q) => q.filter((x) => !last.itemIds.includes(x)));
       setPair(last.pair);
       await store.deleteVote(last.voteId);
-      await store.deleteMark(last.itemId);
+      await Promise.all(last.itemIds.map((id) => store.deleteMark(id)));
     } else if (last.kind === 'mark') {
       if (last.prev) {
         const prev = last.prev;
@@ -385,12 +411,14 @@ export function useApp() {
   }, []);
 
   const saveItems = useCallback(async (next: Item[]) => {
+    // Stored first: on first launch this is the whole catalogue, and showing it before the write finishes
+    // lets your first answers queue behind it for a few seconds.
+    await store.putItems(next);
     setItems((cur) => {
       const map = new Map(cur.map((i) => [i.id, i]));
       for (const i of next) map.set(i.id, i);
       return [...map.values()];
     });
-    await store.putItems(next);
   }, []);
 
   /**
@@ -609,7 +637,7 @@ export function useApp() {
     skipSort,
     seenGuess,
     newcomerUnseen,
-    formAsk,
+    formPending,
     answerForm,
     dismissed,
     dismiss,

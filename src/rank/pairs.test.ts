@@ -25,7 +25,7 @@ describe('newcomer duels', () => {
     for (let k = 0; k < 20; k++) {
       const p = nextPair({ fit: placed, recent: [], newcomers: [{ id: 'new', p: 0.9 }], newcomerShare: 1, random: rnd, now })!;
       expect(p.mode).toBe('new');
-      expect(p.newcomer).toBe('new');
+      expect(p.fresh).toEqual(['new']);
       const other = p.a === 'new' ? p.b : p.a;
       const rank = placed.order.indexOf(other);
       expect(rank).toBeGreaterThanOrEqual(3);
@@ -35,13 +35,40 @@ describe('newcomer duels', () => {
 
   it('leaves long shots out', () => {
     const p = nextPair({ fit: placed, recent: [], newcomers: [{ id: 'new', p: NEWCOMER_MIN_P - 0.01 }], newcomerShare: 1, random: seeded(2), now })!;
-    expect(p.newcomer).toBeUndefined();
+    expect(p.fresh).toBeUndefined();
   });
 
-  it('finishes placing a title before bringing in another', () => {
-    const f = fit({ ids: [...ids, 'fresh'], anchors: {}, votes: chain });
-    const p = nextPair({ fit: f, recent: [], newcomers: [{ id: 'new', p: 0.9 }], newcomerShare: 1, random: seeded(3), now })!;
-    expect(p.mode).toBe('place');
+  it('still brings newcomers in while a backlog of titles is being placed', () => {
+    // Twenty titles marked seen but not duelled yet.
+    const backlog = Array.from({ length: 20 }, (_, i) => `b${i}`);
+    const f = fit({ ids: [...ids, ...backlog], anchors: {}, votes: chain });
+    const rnd = seeded(3);
+    let fresh = 0;
+    for (let k = 0; k < 200; k++) {
+      const p = nextPair({ fit: f, recent: [], newcomers: [{ id: 'new', p: 0.9 }], newcomerShare: 0.3, random: rnd, now })!;
+      if (p.fresh) fresh++;
+      else expect(p.mode).toBe('place');
+    }
+    expect(fresh).toBeGreaterThan(40);
+    expect(fresh).toBeLessThan(80);
+  });
+
+  it('starts an empty list with two likely titles', () => {
+    const empty = fit({ ids: [], anchors: {}, votes: [] });
+    const cands = ['n1', 'n2', 'n3', 'n4', 'n5'].map((id, i) => ({ id, p: 0.9 - i * 0.1 }));
+    const p = nextPair({ fit: empty, recent: [], newcomers: cands, random: seeded(4), now })!;
+    expect(p.mode).toBe('new');
+    expect(p.fresh).toHaveLength(2);
+    expect(p.fresh).toContain(p.a);
+    expect(p.fresh).toContain(p.b);
+    expect(p.a).not.toBe(p.b);
+  });
+
+  it('pairs the only title on the list with a newcomer', () => {
+    const one = fit({ ids: ['solo'], anchors: {}, votes: [] });
+    const p = nextPair({ fit: one, recent: [], newcomers: [{ id: 'n1', p: 0.3 }], random: seeded(5), now })!;
+    expect(p.fresh).toEqual(['n1']);
+    expect([p.a, p.b]).toContain('solo');
   });
 
   it('takes the share from how recent newcomers went', () => {

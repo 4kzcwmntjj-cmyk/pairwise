@@ -23,7 +23,6 @@ const TABS: [Tab, string][] = [
 
 export function App() {
   const app = useApp();
-  const seen = app.fit.order.length;
   const [tab, setTab] = useState<Tab | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
@@ -40,14 +39,18 @@ export function App() {
 
   // Pick the opening screen once, when data first loads; after that only the person changes tabs.
   useEffect(() => {
-    if (app.ready && hasItems && tab === null) setTab(seen >= 2 ? 'duel' : 'sort');
-  }, [app.ready, hasItems, tab, seen]);
+    if (app.ready && hasItems && tab === null) setTab('duel');
+  }, [app.ready, hasItems, tab]);
 
   if (!app.ready) return <div className="boot" />;
   if (help) return <HowItWorks onClose={() => setHelp(false)} />;
-  if (!hasItems) return <Welcome app={app} onHelp={() => setHelp(true)} />;
+  if (!hasItems) {
+    // The welcome screen loads the catalogue itself; the launch check would only write it all again.
+    synced.current = true;
+    return <Welcome app={app} onHelp={() => setHelp(true)} />;
+  }
 
-  const current: Tab = tab ?? (seen >= 2 ? 'duel' : 'sort');
+  const current: Tab = tab ?? 'duel';
 
   return (
     <div className="shell">

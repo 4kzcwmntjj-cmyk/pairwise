@@ -5,8 +5,8 @@ export interface Pair {
   a: string;
   b: string;
   mode: DuelMode;
-  /** In a newcomer duel: the side you haven't sorted yet. */
-  newcomer?: string;
+  /** In a newcomer duel: the side (or, when your list is empty, both sides) you haven't sorted yet. */
+  fresh?: string[];
 }
 
 export interface Newcomer {
@@ -40,6 +40,9 @@ const PAIR_SETTLED_AFTER = 2;
 const REMATCH_AFTER_MS = 120 * 86_400_000;
 /** Newcomers below this chance of having been seen stay in the library. */
 export const NEWCOMER_MIN_P = 0.4;
+/** While your list is shorter than this, at least this share of duels brings someone in. */
+const EARLY_LIST = 15;
+const EARLY_SHARE = 0.6;
 
 /**
  * How often to bring in a newcomer, from how your recent newcomers went
@@ -59,12 +62,15 @@ export const pairKey = (x: string, y: string) => (x < y ? `${x}|${y}` : `${y}|${
 /**
  * Chooses the next duel.
  *
- * 1. Placement: a title with few duels meets the placed title closest to
- *    its current strength, which behaves like a binary search through the list.
- * 2. Newcomer: an unsorted title you've probably seen meets a title from the
+ * 0. Cold start: with fewer than two titles on your list, the likeliest
+ *    unsorted titles meet each other (or the one title you have).
+ * 1. Newcomer: an unsorted title you've probably seen meets a title from the
  *    middle of your list. Picking either side marks it seen and starts its
- *    placement. How often this happens follows `newcomerShare`; it is also
- *    the fallback when refinement has nothing left to ask.
+ *    placement. How often this happens follows `newcomerShare` (at least 60%
+ *    while the list is short); it is also the fallback when refinement has
+ *    nothing left to ask.
+ * 2. Placement: a title with few duels meets the placed title closest to
+ *    its current strength, which behaves like a binary search through the list.
  * 3. Exploration: one duel in ten is a random pair.
  * 4. Refinement: an uncertain title, weighted towards the top of the list,
  *    meets the neighbour whose result is hardest to predict. A pair that has
@@ -75,7 +81,21 @@ export function nextPair(ctx: PairContext): Pair | null {
   const { fit } = ctx;
   const rnd = ctx.random ?? Math.random;
   const ids = fit.order;
-  if (ids.length < 2) return null;
+  const pool = (ctx.newcomers ?? []).filter((c) => !fit.theta.has(c.id));
+
+  // Cold start: nothing or one title on your list. Duel the likeliest titles you haven't sorted.
+  if (ids.length < 2) {
+    const top = pool.slice(0, 6);
+    if (ids.length === 1) {
+      const c = top[Math.floor(rnd() * Math.min(3, top.length))];
+      return c ? { ...pickSides(rnd, c.id, ids[0], 'new'), fresh: [c.id] } : null;
+    }
+    if (top.length < 2) return null;
+    const i = Math.floor(rnd() * Math.min(4, top.length));
+    let j = Math.floor(rnd() * (Math.min(4, top.length) - 1));
+    if (j >= i) j++;
+    return { ...pickSides(rnd, top[i].id, top[j].id, 'new'), fresh: [top[i].id, top[j].id] };
+  }
 
   const recentKeys = new Set<string>();
   const recentByItem = new Map<string, Set<string>>();
@@ -88,10 +108,32 @@ export function nextPair(ctx: PairContext): Pair | null {
   }
   const blocked = (x: string, y: string) =>
     x === y || recentKeys.has(pairKey(x, y)) || (ctx.skipped?.has(pairKey(x, y)) ?? false);
-  const shuffle = (x: string, y: string, mode: DuelMode): Pair =>
-    rnd() < 0.5 ? { a: x, b: y, mode } : { a: y, b: x, mode };
+  const shuffle = (x: string, y: string, mode: DuelMode): Pair => pickSides(rnd, x, y, mode);
 
-  // 1. Placement.
+  const newcomers = pool.filter((c) => c.p >= NEWCOMER_MIN_P);
+  const newcomerPair = (): Pair | null => {
+    if (newcomers.length === 0) return null;
+    // Mostly the likeliest, with some spread so one stubborn title doesn't block the rest.
+    const c = newcomers[Math.floor(rnd() * Math.min(3, newcomers.length))];
+    const placed = ids.filter((id) => (fit.duels.get(id) ?? 0) >= PLACED_AFTER);
+    const from = placed.length >= 2 ? placed : ids;
+    // The middle of the list: the first step of a binary search.
+    const lo = Math.floor(from.length * 0.3);
+    const hi = Math.max(lo + 1, Math.ceil(from.length * 0.7));
+    const middle = from.slice(lo, hi).filter((id) => !blocked(c.id, id));
+    if (middle.length === 0) return null;
+    const opponent = middle[Math.floor(rnd() * middle.length)];
+    return { ...shuffle(c.id, opponent, 'new'), fresh: [c.id] };
+  };
+
+  // 1. Newcomer. Comes before placement, so a backlog of titles being placed doesn't shut newcomers out.
+  const share = ids.length < EARLY_LIST && ctx.newcomers ? Math.max(ctx.newcomerShare ?? 0, EARLY_SHARE) : (ctx.newcomerShare ?? 0);
+  if (rnd() < share) {
+    const p = newcomerPair();
+    if (p) return p;
+  }
+
+  // 2. Placement.
   const unplaced = ids.filter((id) => (fit.duels.get(id) ?? 0) < PLACED_AFTER);
   if (unplaced.length > 0) {
     const fewest = Math.min(...unplaced.map((id) => fit.duels.get(id) ?? 0));
@@ -107,28 +149,6 @@ export function nextPair(ctx: PairContext): Pair | null {
       const pick = opponents[Math.floor(rnd() * Math.min(3, opponents.length))];
       return shuffle(newcomer, pick, 'place');
     }
-  }
-
-  const newcomers = (ctx.newcomers ?? []).filter((c) => c.p >= NEWCOMER_MIN_P && !(fit.theta.has(c.id)));
-  const newcomerPair = (): Pair | null => {
-    if (newcomers.length === 0) return null;
-    // Mostly the likeliest, with some spread so one stubborn title doesn't block the rest.
-    const c = newcomers[Math.floor(rnd() * Math.min(3, newcomers.length))];
-    const placed = ids.filter((id) => (fit.duels.get(id) ?? 0) >= PLACED_AFTER);
-    const pool = placed.length >= 2 ? placed : ids;
-    // The middle of the list: the first step of a binary search.
-    const lo = Math.floor(pool.length * 0.3);
-    const hi = Math.max(lo + 1, Math.ceil(pool.length * 0.7));
-    const middle = pool.slice(lo, hi).filter((id) => !blocked(c.id, id));
-    if (middle.length === 0) return null;
-    const opponent = middle[Math.floor(rnd() * middle.length)];
-    return { ...shuffle(c.id, opponent, 'new'), newcomer: c.id };
-  };
-
-  // 2. Newcomer.
-  if (rnd() < (ctx.newcomerShare ?? 0)) {
-    const p = newcomerPair();
-    if (p) return p;
   }
 
   // 3. Exploration.
@@ -189,4 +209,8 @@ export function nextPair(ctx: PairContext): Pair | null {
     if (x !== y && !(ctx.skipped?.has(pairKey(x, y)) ?? false)) return shuffle(x, y, 'explore');
   }
   return null;
+}
+
+function pickSides(rnd: () => number, x: string, y: string, mode: DuelMode): Pair {
+  return rnd() < 0.5 ? { a: x, b: y, mode } : { a: y, b: x, mode };
 }

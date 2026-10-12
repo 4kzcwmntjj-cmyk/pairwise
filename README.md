@@ -41,3 +41,9 @@ Duel now brings in unsorted titles you've probably seen (`newcomer` pairs in `sr
 Refinement leaves a pair alone once it has met twice, until 120 days after its last duel. In a simulated 80-title list this cut late duels between top-10 titles from about 30% to almost none.
 
 The Sort tab is now the Library: quick sort (one at a time, likeliest first) for starting a list, Browse (cover grid narrowed by status, decade and year), Search AniList, and a queue for titles still waiting on "watched or read?". The quick sort's long-shot notice also shows when the next title's chance of having been seen is under 15%.
+
+### Cold start and fixes (12 Oct)
+
+A new list starts in Duel: with fewer than two titles ranked, the likeliest unsorted titles duel each other (`fresh` holds the side or sides not yet on your list). While the list has fewer than 15 titles, at least 60% of duels bring someone in. The newcomer roll now comes before placement; before, a backlog of titles marked seen in the Library (three placement duels each) kept newcomers out entirely. In the both view, two-form newcomers wait in a queue and Duel asks "watched or read?" about four at a time.
+
+First launch now stores the catalogue before showing the app, and skips the launch-time catalogue check right after the welcome screen loaded it. Both had been delaying the first answers by a couple of seconds.

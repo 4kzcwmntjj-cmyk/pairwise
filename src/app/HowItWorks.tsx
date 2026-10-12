@@ -21,18 +21,23 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           still close. Each duel moves the ranking straight away.
         </p>
         <p>
-          Some duels bring in a title marked New: one you haven't sorted but probably know. If you know it, pick as usual;
-          it joins your list and its next couple of duels place it. If not, press Haven't seen under it (or N). The fewer
-          you know, the less often they come. Two titles that have met twice aren't asked again for a few months, so the
-          top of your list doesn't keep replaying the same close calls.
+          Your list starts in Duel. Titles marked New aren't on your list yet; they're ones you probably know. If you know
+          it, pick as usual and it joins your list. If not, press Haven't seen under it (or N) and another takes its place.
+          New titles come often while your list is short, and less often later, depending on how many you turn out to
+          know. Two titles that have met twice aren't asked again for a few months, so the top of your list doesn't keep
+          replaying the same close calls.
+        </p>
+        <p>
+          In the both view, a new title that is both an anime and a manga could be either. Every few picks, Duel asks
+          about those together: watched, read or both. Later leaves them for the Library.
         </p>
       </section>
 
       <section>
         <h3>2. Library</h3>
         <p>
-          The Library holds every title. Quick sort shows one at a time, likeliest first, and asks if you know it; it's the
-          fastest way to start a list. Browse shows covers you can narrow by decade and year, which helps you remember what
+          The Library holds every title. Quick sort shows one at a time, likeliest first, and asks if you know it; it's a
+          fast way to add a batch at once. Browse shows covers you can narrow by decade and year, which helps you remember what
           you've seen once the obvious ones are done. Search AniList finds anything older or less popular.
         </p>
         <p>
