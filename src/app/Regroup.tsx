@@ -136,7 +136,7 @@ function Split({ app, item, onOpen, onClose }: { app: AppState; item: Item; onOp
               <li key={id} className="made-row">
                 <span>
                   {it ? app.title(it) : 'New title'}
-                  {it && <span className="hint"> · {app.look(it).meta}{m ? `, ${m.status === 'seen' ? 'marked seen' : 'marked not seen'}` : ', not marked yet'}</span>}
+                  {it && <span className="hint"> · {app.look(it).meta}{m ? `, ${m.status === 'seen' ? 'logged as seen' : 'logged as not seen'}` : ', not logged yet'}</span>}
                 </span>
                 <button className="btn btn-quiet btn-small" onClick={() => onOpen(id)}>
                   Open

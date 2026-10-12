@@ -37,7 +37,7 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
   return (
     <main className="screen for-you">
       <p className="hint">
-        Titles you haven't marked as seen, from AniList users' recommendations for the shows you rank highest, and the genres
+        Titles you haven't logged as seen, from AniList users' recommendations for the shows you rank highest, and the genres
         you rank well. They sharpen as your ranking settles.
       </p>
       {shown.length === 0 ? (
@@ -61,7 +61,7 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
                     <span className="rank-meta">{app.look(item).meta}</span>
                     <span className="rec-reason">{reason}</span>
                   </span>
-                  {status === 'unseen' && <span className="status-note">Marked not seen</span>}
+                  {status === 'unseen' && <span className="status-note">Logged as not seen</span>}
                 </button>
                 <button className="btn btn-quiet btn-small rec-hide" onClick={() => hide(item.id)}>
                   Not interested

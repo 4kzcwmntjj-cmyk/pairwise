@@ -1274,8 +1274,8 @@ main.sort {
   gap: 10px;
 }
 .sort-card .cover-lg {
-  width: min(56vw, 220px, calc((100vh - 420px - var(--safe-y)) * 2 / 3));
-  width: min(56vw, 220px, calc((100svh - 420px - var(--safe-y)) * 2 / 3));
+  width: min(56vw, 220px, calc((100vh - 470px - var(--safe-y)) * 2 / 3));
+  width: min(56vw, 220px, calc((100svh - 470px - var(--safe-y)) * 2 / 3));
   min-width: 80px;
 }
 .sort-card .item-meta {

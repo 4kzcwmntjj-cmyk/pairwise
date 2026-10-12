@@ -13,6 +13,9 @@ const PAGE = 60;
 /** Which titles the browse grid shows. */
 type Show = 'all' | 'unmarked' | 'seen' | 'unseen' | 'form';
 
+/** How the browse grid is ordered. */
+type Order = 'popular' | 'likely' | 'newest' | 'oldest' | 'recent';
+
 export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => void; onOpen: (id: string) => void }) {
   /** Searching AniList for this text, or null. */
   const [finding, setFinding] = useState<string | null>(null);
@@ -64,7 +67,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
       </div>
       {formless > 0 && !(mode === 'grid' && show === 'form') && (
         <p className="hint">
-          {formless === 1 ? '1 title is' : `${formless.toLocaleString()} titles are`} marked seen without saying whether it was
+          {formless === 1 ? '1 title is' : `${formless.toLocaleString()} titles are`} logged as seen without saying whether it was
           the anime or the manga.{' '}
           <button className="btn-link inline" onClick={() => browse('form')}>
             Go through them
@@ -101,6 +104,7 @@ function SortGrid({
   const [query, setQuery] = useState('');
   const [decade, setDecade] = useState<number | null>(null);
   const [year, setYear] = useState<number | null>(null);
+  const [orderPick, setOrderPick] = useState<Order>('popular');
   const [limit, setLimit] = useState(PAGE);
   // Titles tapped since the filters last changed stay on screen, so a tap never makes a tile vanish under your finger.
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -145,6 +149,19 @@ function SortGrid({
     for (const i of app.items) if (marksNow.current.get(i.id)?.status === 'unseen') ids.add(i.id);
     return ids;
   }, [app.items, app.ready, show, decade, year]);
+  // Likeliest seen is the quick sort's guess, which only scores titles without an answer yet.
+  const order: Order = orderPick === 'likely' && show !== 'unmarked' ? 'popular' : orderPick;
+  // Chances and answer times as they are now, read when the filters or order change (not on every tap),
+  // so a tapped tile stays where it is instead of jumping as the guess refits or its time updates.
+  const seenRef = useRef(app.seenGuess);
+  seenRef.current = app.seenGuess;
+  const frozen = useMemo(
+    () => ({
+      chance: new Map(seenRef.current.probability),
+      at: new Map([...marksNow.current].map(([id, m]) => [id, m.updatedAt] as const)),
+    }),
+    [app.items, app.ready, show, decade, year, order],
+  );
   const list = useMemo(() => {
     let items = [...app.items].sort((a, b) => b.popularity - a.popularity);
     // A search looks through every title, whatever the other filters say.
@@ -159,9 +176,22 @@ function SortGrid({
       form: (i) => formUnknown(i, app.allMarks.get(i.id)),
     };
     items = items.filter((i) => touched.has(i.id) || keep[show](i));
-    if (show === 'all') items = [...items.filter((i) => !lastInAll.has(i.id)), ...items.filter((i) => lastInAll.has(i.id))];
+    // Array.sort is stable, so ties keep their order by popularity.
+    if (order === 'likely') items.sort((a, b) => (frozen.chance.get(b.id) ?? 0) - (frozen.chance.get(a.id) ?? 0));
+    else if (order === 'newest' || order === 'oldest') {
+      const sign = order === 'newest' ? -1 : 1;
+      items.sort((a, b) => {
+        const ya = yearOf(a);
+        const yb = yearOf(b);
+        if (ya === undefined || yb === undefined) return ya === yb ? 0 : ya === undefined ? 1 : -1;
+        return sign * (ya - yb);
+      });
+    } else if (order === 'recent') items.sort((a, b) => (frozen.at.get(b.id) ?? 0) - (frozen.at.get(a.id) ?? 0));
+    if (show === 'all' && order !== 'recent') {
+      items = [...items.filter((i) => !lastInAll.has(i.id)), ...items.filter((i) => lastInAll.has(i.id))];
+    }
     return items;
-  }, [app.items, app.marks, app.allMarks, app.look, q, decade, year, show, touched, lastInAll]);
+  }, [app.items, app.marks, app.allMarks, app.look, q, decade, year, show, touched, lastInAll, order, frozen]);
 
   useEffect(() => {
     setLimit(PAGE);
@@ -178,7 +208,7 @@ function SortGrid({
     return () => io.disconnect();
   }, [list.length]);
 
-  // One tap: seen. Two: haven't seen. Three: back to unmarked. Titles waiting for watched or read open instead.
+  // One tap: seen. Two: haven't seen. Three: back to not logged. Titles waiting for watched or read open instead.
   const cycle = (item: Item) => {
     if (show === 'form') return onOpen(item.id);
     setTouched((t) => new Set(t).add(item.id));
@@ -197,7 +227,7 @@ function SortGrid({
             ? "Tap once if you've read it, twice if not, a third time to clear."
             : "Tap once if you've seen or read it, twice if not, a third time to clear."}{' '}
         Duels work out the order.
-        {show === 'all' && ` Titles marked "${viewWords(app.view).unseen}" come last.`}
+        {show === 'all' && order !== 'recent' && ` Titles you've logged as "${words.unseen}" come last.`}
       </p>
       <div className="grid-tools">
         <input
@@ -219,7 +249,7 @@ function SortGrid({
           <div className="grid-filters">
           <select id="grid-show" aria-label="Show" value={show} onChange={(e) => setShow(e.target.value as Show)}>
             <option value="all">All ({counts.all.toLocaleString()})</option>
-            <option value="unmarked">Not marked ({counts.unmarked.toLocaleString()})</option>
+            <option value="unmarked">Not logged ({counts.unmarked.toLocaleString()})</option>
             <option value="seen">
               {words.seenLabel} ({counts.seen.toLocaleString()})
             </option>
@@ -227,6 +257,13 @@ function SortGrid({
               {words.unseen} ({counts.unseen.toLocaleString()})
             </option>
             {app.view === 'both' && <option value="form">Anime or manga? ({counts.form.toLocaleString()})</option>}
+          </select>
+          <select id="grid-order" aria-label="Order" value={order} onChange={(e) => setOrderPick(e.target.value as Order)}>
+            <option value="popular">Most popular</option>
+            {show === 'unmarked' && <option value="likely">Likeliest seen</option>}
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="recent">Recently logged</option>
           </select>
           <select
             id="grid-decade"
@@ -305,7 +342,7 @@ function SortGrid({
 const MANGA_EVERY = 5;
 const MANGA_LEARNED = 8;
 
-/** Long-shot notice: shown once enough has been sorted and recent answers are nearly all "haven't seen". */
+/** Long-shot notice: shown once enough has been logged and recent answers are nearly all "haven't seen". */
 const RECENT = 25;
 const RECENT_HITS_AT_MOST = 2;
 const SORTED_AT_LEAST = 60;
@@ -366,6 +403,9 @@ function SortSingle({
   const longShots =
     !keepGoing && app.marks.size >= SORTED_AT_LEAST && (recentHits <= RECENT_HITS_AT_MOST || topChance < LIKELY_AT_LEAST);
   const likelyLeft = Math.round(model.expectedRemaining);
+  // A round figure for the progress line; nothing once only a handful are left.
+  const step = likelyLeft >= 500 ? 100 : likelyLeft >= 100 ? 50 : 10;
+  const moreLikely = likelyLeft >= 10 ? Math.round(likelyLeft / step) * step : 0;
 
   const item = queue[0];
   const next = queue[1];
@@ -396,7 +436,7 @@ function SortSingle({
   if (!item) {
     return (
       <div className="empty">
-        <h2>Everything is sorted</h2>
+        <h2>That's every title</h2>
         <p>You've been through all {app.items.length.toLocaleString()} titles.</p>
         <button className="btn btn-primary" onClick={onDone}>
           Go to duels
@@ -412,7 +452,7 @@ function SortSingle({
         <div className="notice" role="status">
           <p>
             What's left here is mostly long shots: the app expects about {likelyLeft.toLocaleString()} titles you've seen among
-            the {(app.items.length - app.marks.size).toLocaleString()} unsorted ones. Browsing by year is a quicker way to find
+            the {(app.items.length - app.marks.size).toLocaleString()} not yet logged. Browsing by year is a quicker way to find
             them, and duels bring in the likely ones as they go.
           </p>
           <div className="action-row start">
@@ -430,6 +470,9 @@ function SortSingle({
           </div>
         </div>
       )}
+      <p className="hint">
+        Say whether you know each title. The ones you've {viewWords(app.view).seen} join your duels. Likeliest come first.
+      </p>
       <div className="sort-card" key={item.id}>
         <Cover look={app.look(item)} title={title} size="lg" />
         <TitleLink title={title} onOpen={() => onOpen(item.id)} />
@@ -457,7 +500,8 @@ function SortSingle({
         </button>
       </div>
       <p className="progress-line">
-        {app.marks.size.toLocaleString()} of {app.items.length.toLocaleString()} sorted
+        {app.marks.size.toLocaleString()} logged
+        {moreLikely > 0 && ` · about ${moreLikely.toLocaleString()} more you've likely seen`}
       </p>
     </>
   );

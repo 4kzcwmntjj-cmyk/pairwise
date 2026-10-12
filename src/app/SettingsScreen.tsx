@@ -85,7 +85,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
       <section>
         <h3>Your data</h3>
         <p>
-          Everything is saved in this browser only: {app.marks.size.toLocaleString()} titles sorted and{' '}
+          Everything is saved in this browser only: {app.marks.size.toLocaleString()} titles logged and{' '}
           {app.votes.length.toLocaleString()} duels.
           {app.backup?.at ? ` Last saved to a file on ${new Date(app.backup.at).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}.` : ' Not saved to a file yet.'} Save a copy now and then. On a phone it opens the share sheet: choose Save to Files, or send it to yourself. You can also use it to move your list to another device.
         </p>
@@ -119,7 +119,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
         {pending?.kind === 'import' && (
           <div className="confirm">
             <p>
-              Replace everything here with the copy from that file ({pending.snapshot.marks.length.toLocaleString()} sorted,{' '}
+              Replace everything here with the copy from that file ({pending.snapshot.marks.length.toLocaleString()} logged,{' '}
               {pending.snapshot.votes.length.toLocaleString()} duels)?
             </p>
             <div className="action-row start">
