@@ -228,9 +228,13 @@ export async function renderTop(rows: ShareRow[], heading: string, layout: Share
   ctx.fillText('Shōbu', SHARE_WIDTH - PAD, height - 44);
   ctx.textAlign = 'left';
 
-  for (const c of covers) (c as ImageBitmap | null)?.close?.();
-
+  // Safari can hold canvas drawing back until the picture is read, so the covers
+  // are released only once the PNG exists; closing them earlier leaves blanks.
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve({ blob: b, missing }) : reject(new Error('Could not draw the picture.'))), 'image/png'),
+    canvas.toBlob((b) => {
+      for (const c of covers) (c as ImageBitmap | null)?.close?.();
+      if (b) resolve({ blob: b, missing });
+      else reject(new Error('Could not draw the picture.'));
+    }, 'image/png'),
   );
 }
