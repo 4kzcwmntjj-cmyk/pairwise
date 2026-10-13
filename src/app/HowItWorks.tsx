@@ -61,6 +61,13 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           Taste.
         </p>
         <p>
+          If a title sits in the wrong spot, Re-place it from its card. Its duels so far are set aside, and Duel asks a few
+          quick ones, each against a settled title in the middle of where it could still go, until its place is found,
+          sometimes with one or two more against its new neighbours (about 9 duels for a list of 120). Stop leaves the round early; what you've answered still counts. Set-aside
+          duels stay stored: Count its old duels again, on the card or in Settings, puts them back alongside the new ones.
+          Set-aside duels don't count anywhere else in the app either, including Taste.
+        </p>
+        <p>
           Taste opens with cards, each one finding with its number: your type, who climbed or fell this week, where you
           part from AniList's scores, the themes, era and studio your top 20 leans to, how long your #1 has held the top,
           the popular titles you haven't seen, and a few facts from your duels. Each card has its own Share. Your type

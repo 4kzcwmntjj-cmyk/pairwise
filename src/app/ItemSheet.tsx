@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDialogFocus } from './dialogFocus';
 import { PLACED_AFTER } from '../rank/pairs';
+import { EVEN_GUESS, PLACE_MAX, stepsFor } from '../rank/replace';
 import { themeTags } from '../rank/findings';
 import { Cover } from './Cover';
 import { choicesFor, chosen, formUnknown } from '../rank/medium';
@@ -12,11 +13,14 @@ export function ItemSheet({
   itemId,
   onClose,
   onOpen,
+  onDuel,
 }: {
   app: AppState;
   itemId: string;
   onClose: () => void;
   onOpen: (id: string) => void;
+  /** Goes to Duel, where a re-placed title's round runs. */
+  onDuel: () => void;
 }) {
   const item = app.itemById.get(itemId);
   // The sheet shows everything known about the title, whichever view is on.
@@ -105,6 +109,15 @@ export function ItemSheet({
         {!fullMark && app.groupOps.some((o) => o.kind === 'split' && o.id === itemId) && (
           <p className="hint">Split off from another title. Mark whether you've seen it.</p>
         )}
+        <Replace
+          app={app}
+          itemId={itemId}
+          onStart={async () => {
+            await app.replaceTitle(itemId);
+            onClose();
+            onDuel();
+          }}
+        />
         <FormsApart app={app} itemId={itemId} onOpen={onOpen} />
         <Regroup key={itemId} app={app} item={item} onOpen={onOpen} />
         {fullMark?.status !== 'seen' && item.source === 'anilist' && (
@@ -129,6 +142,50 @@ export function ItemSheet({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Re-placing a title that sits in the wrong spot: its duels so far are set aside and a short round in Duel finds its
+ * place. Afterwards the card says so and can count the old duels again.
+ */
+function Replace({ app, itemId, onStart }: { app: AppState; itemId: string; onStart: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const others = app.fit.order.length - 1;
+  if (!app.rankOf.has(itemId) || others < 4) return null;
+  const cut = app.resets[itemId];
+  const aside = app.setAsideOf(itemId);
+  const steps = Math.min(PLACE_MAX, stepsFor(others) + EVEN_GUESS);
+  const run = async (f: () => Promise<void> | void) => {
+    setBusy(true);
+    await f();
+    setBusy(false);
+  };
+  return (
+    <section className="sheet-section">
+      <h3 className="sheet-label">Its place</h3>
+      {cut !== undefined ? (
+        <p className="hint">
+          Re-placed on {new Date(cut).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}.
+          {aside > 0 ? ` ${aside} earlier ${aside === 1 ? 'duel is' : 'duels are'} set aside.` : ''}
+        </p>
+      ) : (
+        <p className="hint">
+          In the wrong spot? Re-placing sets its duels so far aside and finds its place in about {steps} duels against
+          settled titles.
+        </p>
+      )}
+      <div className="action-row start">
+        <button className="btn btn-quiet btn-small" disabled={busy} onClick={() => run(onStart)}>
+          {cut !== undefined ? 'Re-place again' : 'Re-place this title'}
+        </button>
+        {cut !== undefined && aside > 0 && (
+          <button className="btn btn-quiet btn-small" disabled={busy} onClick={() => run(() => app.restoreDuels(itemId))}>
+            Count its old duels again
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 

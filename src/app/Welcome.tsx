@@ -74,7 +74,7 @@ export function Welcome({ app, onHelp, onStart }: { app: AppState; onHelp: () =>
           </button>
           {returning && (
             <p className="hint">
-              {ranked.toLocaleString()} ranked, {app.votes.length.toLocaleString()} {app.votes.length === 1 ? 'duel' : 'duels'} so far.
+              {ranked.toLocaleString()} ranked, {app.duelsPlayed.toLocaleString()} {app.duelsPlayed === 1 ? 'duel' : 'duels'} so far.
             </p>
           )}
         </div>

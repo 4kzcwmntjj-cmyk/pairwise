@@ -156,7 +156,19 @@ export function App() {
       {!showCompare && current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
       {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} onDuel={() => setTab('duel')} />}
       {!showCompare && current === 'settings' && <SettingsScreen app={app} onHelp={() => setHelp(true)} />}
-      {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />}
+      {openId && (
+        <ItemSheet
+          app={app}
+          itemId={openId}
+          onClose={() => setOpenId(null)}
+          onOpen={setOpenId}
+          onDuel={() => {
+            setComparing(null);
+            setHome(false);
+            setTab('duel');
+          }}
+        />
+      )}
       <UpdateBar />
     </div>
   );

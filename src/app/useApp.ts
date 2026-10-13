@@ -9,6 +9,7 @@ import { isManga, storylinesOf } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { NEWCOMER_MIN_P, newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
+import { countedVotes, placementPair, placementStatus, setAsideCount, type Placement, type Resets } from '../rank/replace';
 import { afterShown, NO_TIPS, pickTip, type Tip, type TipState } from '../rank/tips';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
 import { lookOf, sideFor, type Look } from '../rank/look';
@@ -83,6 +84,10 @@ export function useApp() {
   const [rawMarks, setMarks] = useState<Map<string, Mark>>(new Map());
   const [rawVotes, setVotes] = useState<Vote[]>([]);
   const [groupOps, setGroupOps] = useState<GroupOp[]>([]);
+  /** Re-placed titles: each one's cut-off time; its duels from before it are set aside. */
+  const [resets, setResets] = useState<Resets>({});
+  /** The re-placed title whose round of duels is under way (or just finished), this session only. */
+  const [placement, setPlacement] = useState<Placement | null>(null);
   const [backup, setBackup] = useState<BackupNote | null>(null);
   /** Whether the browser has agreed to keep this data; null until checked. */
   const [persisted, setPersisted] = useState<Persistence | null>(null);
@@ -134,6 +139,8 @@ export function useApp() {
     setTips({ ...NO_TIPS, ...((s.meta.tips as Partial<TipState>) ?? {}) });
     setTip(null);
     setGroupOps((s.meta.groupOps as GroupOp[]) ?? []);
+    setResets((s.meta.resets as Resets) ?? {});
+    setPlacement(null);
     setBackup((s.meta.backup as BackupNote) ?? null);
     setCatalogueAt((s.meta.catalogueGeneratedAt as string) ?? null);
     setFriends((s.meta.friends as Friend[]) ?? []);
@@ -159,7 +166,9 @@ export function useApp() {
   const grouping = useMemo(() => applyGroupOps(baseItems, groupOps), [baseItems, groupOps]);
   const allItems = grouping.items;
   const allMarks = useMemo(() => resolveMarks(rawMarks.values(), grouping.resolve), [rawMarks, grouping]);
-  const votes = useMemo(() => resolveVotes(rawVotes, grouping.resolveSide), [rawVotes, grouping]);
+  const playedVotes = useMemo(() => resolveVotes(rawVotes, grouping.resolveSide), [rawVotes, grouping]);
+  /** The duels that count: a re-placed title's duels from before its cut-off are set aside. */
+  const votes = useMemo(() => countedVotes(playedVotes, resets), [playedVotes, resets]);
   const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
 
   // The view (anime, manga or both) decides which titles show, and how marks read: in the anime view,
@@ -229,12 +238,21 @@ export function useApp() {
       [p.a, p.b].every((id) => (p.fresh?.includes(id) ? !marks.has(id) && itemById.has(id) : rankOf.has(id))),
     [marks, itemById, rankOf],
   );
+  /** Where a re-placed title's round stands, and its next duel; null when there is no round. A round with nobody left
+   * to ask counts as over. */
+  const placing = useMemo(() => {
+    if (!placement) return null;
+    const status = placementStatus(placement, fit.order, votes);
+    const next = placementPair(placement, fit, status, skippedPairs);
+    return next ? { ...status, next } : { ...status, done: true, total: status.asked, next: null };
+  }, [placement, fit, votes, skippedPairs]);
+  const placingNow = !!placing && !placing.done;
   useEffect(() => {
     if (!ready || isValid(pair)) return;
     setPair(
-      nextPair({ fit, recent: votes, skipped: skippedPairs, newcomers, newcomerShare: newcomerShare(newcomerLog) }),
+      placing?.next ?? nextPair({ fit, recent: votes, skipped: skippedPairs, newcomers, newcomerShare: newcomerShare(newcomerLog) }),
     );
-  }, [ready, pair, isValid, fit, votes, skippedPairs, newcomers, newcomerLog]);
+  }, [ready, pair, isValid, fit, votes, skippedPairs, newcomers, newcomerLog, placing]);
 
   const logNewcomer = useCallback(
     async (hit: boolean) => {
@@ -273,7 +291,7 @@ export function useApp() {
   useEffect(() => {
     if (!ready) return;
     if (tip && (votes.length < tip.at || votes.length - tip.at >= 2)) return setTip(null);
-    if (tip || !pair || backupDue) return;
+    if (tip || !pair || backupDue || placingNow) return;
     const next = pickTip(tips, {
       duels: votes.length,
       ranked: fit.order.length,
@@ -296,7 +314,7 @@ export function useApp() {
     setTips(after);
     setTip({ ...next, at: votes.length });
     store.setMeta('tips', after).catch(() => undefined);
-  }, [ready, tip, tips, pair, votes, fit, itemById, settings, rankOf, newcomerLog, moved, knowsOneForm, backupDue]);
+  }, [ready, tip, tips, pair, votes, fit, itemById, settings, rankOf, newcomerLog, moved, knowsOneForm, backupDue, placingNow]);
 
   const changeTips = useCallback(async (next: TipState) => {
     setTips(next);
@@ -397,6 +415,9 @@ export function useApp() {
   const vote = useCallback(
     async (outcome: Outcome) => {
       if (!pair) return;
+      // A finished round's last line stays until the next ordinary duel.
+      const inRound = !!placement && pair.mode === 'place' && pair.b === placement.id;
+      if (placement && !inRound && placing?.done) setPlacement(null);
       if (pair.fresh?.length) {
         const fresh = pair.fresh.map((id) => itemById.get(id)).filter((i): i is Item => !!i);
         if (fresh.length !== pair.fresh.length) return;
@@ -438,22 +459,24 @@ export function useApp() {
         return;
       }
       const winner = outcome === 'a' ? pair.a : outcome === 'b' ? pair.b : null;
-      const before = winner ? rankOf.get(winner) : undefined;
+      // In a re-placed title's round, the line under the buttons says where it stands, so no "moved" line.
+      const focus = inRound ? placement.id : winner;
+      const before = focus ? rankOf.get(focus) : undefined;
       const v = voteFor(pair, outcome);
       const id = await store.addVote(v);
       const saved = { ...v, id };
       const nextVotes = [...votes, saved];
       setVotes((vs) => [...vs, saved]);
       pushUndo({ scope: 'duel', kind: 'vote', voteId: id, pair });
-      if (winner && before !== undefined) {
+      if (focus && before !== undefined) {
         const after = fitModel({ ids: seenIds, anchors: {}, votes: nextVotes, warm: warm.current });
         prefit.current = { ids: seenIds, votes: nextVotes, fit: after };
-        const to = after.order.filter(inViewSeen).indexOf(winner) + 1;
-        setMoved({ title: displayTitle(itemById.get(winner)!, settings), from: before, to });
+        const to = after.order.filter(inViewSeen).indexOf(focus) + 1;
+        setMoved(inRound ? null : { title: displayTitle(itemById.get(focus)!, settings), from: before, to });
       } else setMoved(null);
       setPair(null);
     },
-    [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings, view, allMarks, logNewcomer],
+    [pair, rankOf, votes, seenIds, inViewSeen, itemById, settings, view, allMarks, logNewcomer, placement, placing],
   );
 
   /**
@@ -464,12 +487,18 @@ export function useApp() {
     async (itemId: string) => {
       if (!pair) return;
       if (pair.fresh?.includes(itemId)) logNewcomer(false);
+      // In a round, the title being placed going unseen ends the round; an opponent going unseen gets replaced by
+      // the round's next pick (the effect above).
+      if (placement && pair.mode === 'place' && pair.b === placement.id) {
+        if (itemId === placement.id) setPlacement(null);
+        setPair(null);
+      }
       // Set the next duel first; the mark below records this one for undo.
-      setPair(replaceSide({ fit, recent: votes, skipped: skippedPairs, newcomers }, pair, itemId));
+      else setPair(replaceSide({ fit, recent: votes, skipped: skippedPairs, newcomers }, pair, itemId));
       setMoved(null);
       await markItem(itemId, 'unseen', 'duel');
     },
-    [pair, fit, votes, skippedPairs, newcomers, logNewcomer, markItem],
+    [pair, fit, votes, skippedPairs, newcomers, logNewcomer, markItem, placement],
   );
 
   /**
@@ -638,9 +667,9 @@ export function useApp() {
       marks: [...rawMarks.values()],
       votes: rawVotes,
       settings,
-      meta: { skipped, dismissed, newcomerLog, tips, groupOps, friends, myName, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
+      meta: { skipped, dismissed, newcomerLog, tips, groupOps, resets, friends, myName, ...(catalogueAt ? { catalogueGeneratedAt: catalogueAt } : {}) },
     }),
-    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, friends, myName, catalogueAt],
+    [baseItems, rawMarks, rawVotes, settings, skipped, dismissed, newcomerLog, tips, groupOps, resets, friends, myName, catalogueAt],
   );
 
   /** Keeps a friend's list; returns its key. */
@@ -835,6 +864,42 @@ export function useApp() {
     return animeId;
   };
 
+  /**
+   * Re-places a title: its duels so far are set aside, and Duel runs a short round to find its place. Doing it again
+   * moves the cut-off to now, so the last round's duels are set aside too.
+   */
+  const replaceTitle = async (itemId: string) => {
+    if (!rankOf.has(itemId)) return;
+    const now = Date.now();
+    const next = { ...resets, [itemId]: now };
+    await store.setMeta('resets', next);
+    setResets(next);
+    setPlacement({ id: itemId, since: now, from: rankOf.get(itemId), others: fit.order.filter((id) => id !== itemId) });
+    setMoved(null);
+    setTip(null);
+    setPair(null);
+  };
+
+  /** Counts a re-placed title's earlier duels again, alongside any played since. */
+  const restoreDuels = async (itemId: string) => {
+    if (resets[itemId] === undefined) return;
+    const { [itemId]: _gone, ...next } = resets;
+    await store.setMeta('resets', next);
+    setResets(next);
+    if (placement?.id === itemId) {
+      setPlacement(null);
+      setPair(null);
+    }
+    setMoved(null);
+  };
+
+  /** Leaves a round before it ends; the duels answered so far still count. */
+  const stopPlacement = () => {
+    setPlacement(null);
+    setMoved(null);
+    setPair(null);
+  };
+
   /** Takes a grouping change back out. A joined title gets its old mark back. */
   async function removeGroupOp(op: GroupOp) {
     if (op.kind === 'forms') {
@@ -907,6 +972,16 @@ export function useApp() {
     joinItems,
     splitItem,
     removeGroupOp,
+    resets,
+    /** How many of a title's duels its cut-off sets aside. */
+    setAsideOf: (id: string) => setAsideCount(playedVotes, resets, id),
+    replaceTitle,
+    restoreDuels,
+    placement,
+    placing,
+    stopPlacement,
+    /** Every duel played, including those set aside. */
+    duelsPlayed: playedVotes.length,
     apart: grouping.apart,
     canRankApart,
     rankApart,

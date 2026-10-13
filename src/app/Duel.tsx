@@ -206,7 +206,9 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           Undo
         </button>
       </div>
-      {app.backupDue ? (
+      {app.placement && app.placing ? (
+        <PlacingLine app={app} />
+      ) : app.backupDue ? (
         <BackupNote app={app} />
       ) : app.tip ? (
         <div className="tip" role="status">
@@ -232,7 +234,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           </div>
         </div>
       ) : null}
-      {app.backupDue || app.tip ? null : (
+      {app.placement || app.backupDue || app.tip ? null : (
         // Always present, so the lines below don't jump when a newcomer duel comes and goes.
         <p className="hint newcomer-hint">
           {fresh.length === 2 ? (
@@ -272,13 +274,47 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
         )}
       </p>
       <p className="progress-line">
-        {app.votes.length.toLocaleString()} {app.votes.length === 1 ? 'duel' : 'duels'}
+        {app.duelsPlayed.toLocaleString()} {app.duelsPlayed === 1 ? 'duel' : 'duels'}
         {placing > 0 ? `, ${placing} still being placed` : ''}
       </p>
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
   return view;
+}
+
+/**
+ * The line under the buttons while a re-placed title is being placed: which duel of how many, and a way out. Once the
+ * round is over, where it landed, until the next ordinary duel.
+ */
+function PlacingLine({ app }: { app: AppState }) {
+  const p = app.placement!;
+  const status = app.placing!;
+  const item = app.itemById.get(p.id);
+  if (!item) return <p className="hint newcomer-hint" />;
+  const title = app.title(item);
+  const rank = app.rankOf.get(p.id);
+  if (status.done) {
+    return (
+      <p className="hint newcomer-hint placing-line">
+        <span key="placed">
+          {rank === undefined
+            ? `${title} is off your list in this view.`
+            : `${title} placed at #${rank}${p.from !== undefined && p.from !== rank ? ` (was #${p.from})` : ''}.`}
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p className="hint newcomer-hint placing-line">
+      <span key="placing">
+        Placing <b>{title}</b> · {status.asked + 1} of {status.total}{' '}
+        <button className="btn-link inline" onClick={app.stopPlacement}>
+          Stop
+        </button>
+      </span>
+    </p>
+  );
 }
 
 /**

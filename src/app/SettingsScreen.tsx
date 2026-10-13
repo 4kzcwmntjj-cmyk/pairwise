@@ -61,7 +61,10 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
   }
 
   const logged = app.marks.size;
-  const duels = app.votes.length;
+  const duels = app.duelsPlayed;
+  const replaced = Object.entries(app.resets)
+    .filter(([id]) => app.itemById.has(id))
+    .sort((x, y) => y[1] - x[1]);
   const savedAt = app.backup?.at;
   const ops = [...app.groupOps].reverse().filter((op) => op.kind !== 'forms' || app.apart.has(op.id));
   const tipsShown = app.tips.seen.length;
@@ -263,6 +266,34 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
           <p className="set-foot">
             Kept on top of every catalogue update. Undo puts the titles back as they were, each with its own duels.
           </p>
+        </section>
+      )}
+
+      {replaced.length > 0 && (
+        <section aria-labelledby="set-replaced">
+          <h3 id="set-replaced">Re-placed titles</h3>
+          <div className="set-group">
+            {replaced.map(([id, at]) => {
+              const aside = app.setAsideOf(id);
+              return (
+                <div className="set-row" key={id}>
+                  <div className="set-line">
+                    <div>
+                      <p className="set-label">{app.title(app.itemById.get(id)!)}</p>
+                      <p className="set-sub">
+                        Re-placed · {new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        {aside > 0 ? ` · ${aside} ${aside === 1 ? 'duel' : 'duels'} set aside` : ''}
+                      </p>
+                    </div>
+                    <button className="btn btn-small" onClick={() => app.restoreDuels(id)}>
+                      Count again
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="set-foot">Count again puts a title's earlier duels back, alongside the ones played since.</p>
         </section>
       )}
 
