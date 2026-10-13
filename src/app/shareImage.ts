@@ -138,7 +138,7 @@ function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, s
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.fillStyle = hot ? BG : INK;
-  displayFont(ctx, `600 ${Math.round(size * 0.52)}px`);
+  displayFont(ctx, `800 ${Math.round(size * 0.52)}px`);
   ctx.textAlign = 'center';
   ctx.fillText(String(n), x + size / 2, y + size / 2 + size * 0.19);
   ctx.textAlign = 'left';
@@ -187,7 +187,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     ctx.fill();
 
     ctx.fillStyle = MUTED;
-    displayFont(ctx, `600 30px`);
+    displayFont(ctx, `800 30px`);
     ctx.textAlign = 'center';
     ctx.fillText(String(row.rank), PAD + 46, y + ROW_H / 2 + 11);
     ctx.textAlign = 'left';
@@ -287,7 +287,7 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Shar
 
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = INK;
-  displayFont(ctx, `600 52px`);
+  displayFont(ctx, `800 52px`);
   ctx.fillText(heading, PAD, 112);
 
   const boxes: Box[] = [];

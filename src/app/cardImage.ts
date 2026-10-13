@@ -88,7 +88,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   // Kicker
   let y = PAD + 30;
   ctx.fillStyle = hue !== undefined ? `hsl(${hue}, 80%, 76%)` : ACCENT;
-  displayFont(ctx, `600 28px`);
+  displayFont(ctx, `800 28px`);
   ctx.fillText(spec.kicker.toUpperCase(), colX, y);
 
   // Headline: as large as fits in three lines (four beside a cover).
@@ -97,7 +97,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   const most = side ? 4 : 3;
   for (const s of side ? [56, 48, 42] : spec.hero ? [96, 84, 72, 64] : [72, 64, 56, 48]) {
     size = s;
-    displayFont(ctx, `600 ${size}px`);
+    displayFont(ctx, `800 ${size}px`);
     lines = wrapLines(measure, spec.headline, colW, most);
     if (!lines[lines.length - 1].endsWith('…') && lines.length <= (side ? 3 : size > 56 ? 2 : 3)) break;
   }
@@ -120,7 +120,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   if (spec.tagline) {
     y += 22;
     ctx.fillStyle = INK;
-    displayFont(ctx, `500 46px`);
+    displayFont(ctx, `600 46px`);
     for (const l of wrapLines(measure, spec.tagline, colW, 3)) {
       y += 62;
       ctx.fillText(l, colX, y);
