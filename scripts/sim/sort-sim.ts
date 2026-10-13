@@ -1,10 +1,10 @@
 /**
- * Compares Sort orders on the real catalogue with simulated viewers.
+ * Compares Quick log orders on the real catalogue with simulated viewers.
  * Run with: npx vite-node scripts/sim/sort-sim.ts
  *
  * A simulated viewer's seen set comes from taste clusters: a few favourite
  * shows, spreading along AniList recommendation links, plus a popularity
- * effect. The viewer answers Sort prompts truthfully; we count how many of
+ * effect. The viewer answers Quick log prompts truthfully; we count how many of
  * their seen titles each order finds within a number of prompts.
  */
 import { readFileSync } from 'node:fs';

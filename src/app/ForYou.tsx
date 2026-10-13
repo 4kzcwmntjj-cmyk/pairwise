@@ -135,8 +135,8 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
                       <span className="rank-title">{title}</span>
                       <span className="rank-meta">{app.look(item).meta}</span>
                       <span className="rec-reason">{reasonOf(rec)}</span>
+                      {status === 'unseen' && <span className="rank-meta">Logged as not seen</span>}
                     </span>
-                    {status === 'unseen' && <span className="status-note">Logged as not seen</span>}
                   </button>
                   <button className="btn btn-quiet btn-small rec-hide" onClick={() => hide(item.id)}>
                     Not interested

@@ -200,7 +200,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
               <p className="hint">
                 Half of what you have seen is in the top {main.medianTopPercent}% of the catalogue by popularity. You have seen{' '}
                 {main.top100Seen} of the {main.top100} most popular
-                {main.top100Sorted < main.top100 ? `, and sorted ${main.top100Sorted}` : ''}.
+                {main.top100Sorted < main.top100 ? `, and logged ${main.top100Sorted}` : ''}.
               </p>
             )}
           </Section>

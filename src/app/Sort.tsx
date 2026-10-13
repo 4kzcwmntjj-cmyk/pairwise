@@ -85,7 +85,7 @@ export function Sort({ app, onDone, onOpen }: { app: AppState; onDone: () => voi
 
 /**
  * Every title as a cover grid, most popular first, narrowed by status, decade and year. Browsing by year
- * helps you remember what you've seen, which the quick sort can't guess once the obvious titles are done.
+ * helps you remember what you've seen, which Quick log can't guess once the obvious titles are done.
  * Tap marks it seen; tap again to undo.
  */
 function SortGrid({
@@ -149,7 +149,7 @@ function SortGrid({
     for (const i of app.items) if (marksNow.current.get(i.id)?.status === 'unseen') ids.add(i.id);
     return ids;
   }, [app.items, app.ready, show, decade, year]);
-  // Likeliest seen is the quick sort's guess, which only scores titles without an answer yet.
+  // Likeliest seen is Quick log's guess, which only scores titles without an answer yet.
   const order: Order = orderPick === 'likely' && show !== 'unmarked' ? 'popular' : orderPick;
   // Chances and answer times as they are now, read when the filters or order change (not on every tap),
   // so a tapped tile stays where it is instead of jumping as the guess refits or its time updates.
@@ -346,7 +346,7 @@ const MANGA_LEARNED = 8;
 const RECENT = 25;
 const RECENT_HITS_AT_MOST = 2;
 const SORTED_AT_LEAST = 60;
-/** Below this chance of having seen the next title, the quick sort is digging through long shots. */
+/** Below this chance of having seen the next title, Quick log is digging through long shots. */
 const LIKELY_AT_LEAST = 0.15;
 
 /**

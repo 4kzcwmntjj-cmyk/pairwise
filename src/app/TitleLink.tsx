@@ -1,5 +1,5 @@
 /**
- * A title that opens its details card. Used under covers in Duel and Quick sort, where tapping the cover does
+ * A title that opens its details card. Used under covers in Duel and Quick log, where tapping the cover does
  * something else. A heading rather than a button, so long titles still clamp to two lines.
  */
 export function TitleLink({ title, onOpen }: { title: string; onOpen: () => void }) {

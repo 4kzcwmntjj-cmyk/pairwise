@@ -1064,16 +1064,6 @@ a {
   color: var(--muted);
   font-weight: 600;
 }
-.stat-cols {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-@media (min-width: 560px) {
-  .stat-cols {
-    grid-template-columns: 1fr 1fr;
-  }
-}
 .plain-list {
   margin: 0;
   padding: 0;
@@ -1377,13 +1367,6 @@ a {
 /* Newcomer duels */
 .contender-rank.is-new {
   background: var(--accent);
-}
-.newcomer-slot {
-  /* Always the same height, so a hint appearing never moves the buttons. */
-  min-height: 3.3em;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
 }
 .newcomer-hint {
   text-align: center;
