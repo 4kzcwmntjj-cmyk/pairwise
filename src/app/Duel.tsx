@@ -1,30 +1,34 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PLACED_AFTER } from '../rank/pairs';
+import { useEffect, useRef, useState } from 'react';
+import { PLACED_AFTER, type Pair } from '../rank/pairs';
+import type { Look } from '../rank/look';
 import type { Item, Outcome } from '../types';
 import { BackupNote } from './BackupNote';
-import { Cover, preloadCover } from './Cover';
+import { Cover, coverSrc, preloadCover } from './Cover';
 import { TitleLink } from './TitleLink';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
 /** Titles waiting for "anime or manga?" before Duel asks about them together. */
 const FORM_BATCH = 4;
-/** When the vote is cast: as the chosen cover finishes swelling (pick-grow in styles.css). Working out the next
+/** When the vote is cast: once the chosen cover has finished swelling (160 ms in styles.css). Working out the next
  * pair keeps the page busy for a moment, so it waits until nothing is moving. */
-const VOTE_AFTER_MS = 210;
-/** The old pair's fade-out once the next one has been chosen (pick-leave in styles.css). */
-const LEAVE_MS = 140;
+const VOTE_AFTER_MS = 170;
 /** From the tap, the longest the next pair waits for its covers before it comes in anyway. */
 const MAX_WAIT_MS = 700;
 
+/**
+ * The duel is a fixed stage: the question, the vs and the buttons stay put. On a pick the chosen cover swells and
+ * the other dims; the vote is cast once that has settled; the next pair is held back until its covers are loaded;
+ * then each side's cover crossfades into the next one in place, while the swell and the dimming ease back.
+ */
 export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () => void; onOpen: (id: string) => void }) {
   const [picked, setPicked] = useState<Outcome | null>(null);
-  // The pair that was picked and when. While the next pair waits for its covers, the faded picked pair stays on
-  // screen (heldView, the last render of it).
+  // The pair that was picked, shown until the next one is ready, and when the pick was made.
+  const [heldPair, setHeldPair] = useState<Pair | null>(null);
   const pickRef = useRef<{ key: string; at: number } | null>(null);
-  const heldView = useRef<ReactNode>(null);
-  const pair = app.pair;
-  const pairKey = pair ? `${pair.a}|${pair.b}` : '';
+  const next = app.pair;
+  const nextKey = next ? `${next.a}|${next.b}` : '';
+  const pair = picked && heldPair ? heldPair : next;
   const fresh = pair?.fresh ?? [];
   // Once the watched-or-read card opens, it stays until every title on it is answered.
   const [formOpen, setFormOpen] = useState(false);
@@ -38,14 +42,15 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
 
   function choose(outcome: Outcome) {
     if (!pair || picked) return;
-    pickRef.current = { key: pairKey, at: performance.now() };
+    pickRef.current = { key: nextKey, at: performance.now() };
+    setHeldPair(pair);
     setPicked(outcome);
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.setTimeout(() => app.vote(outcome), reduced ? 0 : VOTE_AFTER_MS);
   }
 
-  // Once the next pair has been chosen: fade the old one out, and let the new one in when that is done and its
-  // covers are loaded, or at MAX_WAIT_MS from the tap. The cap also ends a pick whose vote changed nothing.
+  // Once the next pair has been chosen, let it in when its covers are loaded, or at MAX_WAIT_MS from the tap.
+  // The cap also ends a pick whose vote changed nothing.
   useEffect(() => {
     const p = pickRef.current;
     if (!picked || !p) return;
@@ -55,26 +60,20 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
       live = false;
       pickRef.current = null;
       setPicked(null);
+      setHeldPair(null);
     };
-    const now = performance.now();
-    const cap = window.setTimeout(release, Math.max(0, p.at + MAX_WAIT_MS - now));
-    let min: number | undefined;
-    if (a && b && pairKey !== p.key) {
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      // The held pair is still the one on screen; fading it here, after the busy moment, keeps the fade smooth.
-      if (!reduced) document.querySelector('.duel .arena')?.classList.add('leaving');
-      const leftAt = performance.now() + (reduced ? 0 : LEAVE_MS);
-      Promise.all([preloadCover(app.look(a)), preloadCover(app.look(b))]).then(() => {
-        if (live) min = window.setTimeout(release, Math.max(0, leftAt - performance.now()));
-      });
+    const cap = window.setTimeout(release, Math.max(0, p.at + MAX_WAIT_MS - performance.now()));
+    const na = next ? app.itemById.get(next.a) : undefined;
+    const nb = next ? app.itemById.get(next.b) : undefined;
+    if (na && nb && nextKey !== p.key) {
+      Promise.all([preloadCover(app.look(na)), preloadCover(app.look(nb))]).then(release);
     }
     return () => {
       live = false;
       window.clearTimeout(cap);
-      if (min !== undefined) window.clearTimeout(min);
     };
-    // Only the pick and the pair matter here; the covers are looked up for whichever pair has arrived.
-  }, [picked, pairKey]);
+    // Only the pick and the arrival of the next pair matter here.
+  }, [picked, nextKey]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -97,9 +96,6 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-
-  // The picked pair, faded, while the next one waits for its covers.
-  if (picked && pickRef.current && pairKey !== pickRef.current.key && heldView.current) return heldView.current;
 
   if (!a || !b) {
     return (
@@ -160,17 +156,20 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
   const placing = app.fit.order.filter((id) => (app.fit.duels.get(id) ?? 0) < PLACED_AFTER).length;
   const side = (item: Item, outcome: 'a' | 'b') => {
     const title = app.title(item);
+    const look = app.look(item);
     const isNew = fresh.includes(item.id);
     const state = picked === outcome ? 'won' : picked && picked !== 'tie' ? 'lost' : picked === 'tie' ? 'tied' : '';
     return (
       <div className={`contender ${state}`}>
         <button className="contender-pick" onClick={() => choose(outcome)} aria-label={`Pick ${title}`}>
-          <Cover look={app.look(item)} title={title} size="lg" />
-          <span className={`contender-rank${isNew ? ' is-new' : ''}`}>{isNew ? 'New' : `#${app.rankOf.get(item.id)}`}</span>
+          <DuelCover look={look} title={title} />
+          <span key={item.id} className={`contender-rank${isNew ? ' is-new' : ''}`}>
+            {isNew ? 'New' : `#${app.rankOf.get(item.id)}`}
+          </span>
         </button>
-        <div className="contender-text">
+        <div className="contender-text" key={item.id}>
           <TitleLink title={title} onOpen={() => onOpen(item.id)} />
-          <p className="item-meta">{app.look(item).meta}</p>
+          <p className="item-meta">{look.meta}</p>
         </div>
         <button
           className="btn btn-quiet btn-small"
@@ -188,7 +187,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
   const view = (
     <main className="screen duel">
       <p className="duel-question">Which do you prefer?</p>
-      <div className="arena" key={`${pair!.a}|${pair!.b}`}>
+      <div className="arena">
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
           vs
@@ -232,18 +231,22 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           </div>
         </div>
       ) : null}
-      {app.backupDue || app.tip ? null : fresh.length === 2 ? (
+      {app.backupDue || app.tip ? null : (
+        // Always present, so the lines below don't jump when a newcomer duel comes and goes.
         <p className="hint newcomer-hint">
-          {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
+          {fresh.length === 2 ? (
+            <span key="two">
+              {starting ? 'Your list starts here. ' : ''}Pick the one you prefer, or press Haven't seen under one you don't know.
+            </span>
+          ) : fresh.length === 1 ? (
+            <span key="one">New to your list. Pick as usual if you know it.</span>
+          ) : null}
         </p>
-      ) : fresh.length === 1 ? (
-        <p className="hint newcomer-hint">
-          New to your list. Pick as usual if you know it.
-        </p>
-      ) : null}
+      )}
       <p className={`moved${toTop ? ' is-top' : ''}`} aria-live="polite">
-        {app.moved &&
-          (toTop ? (
+        {app.moved && (
+          <span key={`${app.votes.length}|${app.moved.title}|${app.moved.to}`}>
+            {(toTop ? (
             <span className="top-burst" key={`${app.moved.title}|${app.moved.from}`}>
               {app.moved.isNew ? `${app.moved.title} joins your list at #1.` : `${app.moved.title} takes the top spot (was #${app.moved.from}).`}
             </span>
@@ -256,6 +259,8 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
             : app.moved.to > app.moved.from
               ? `${app.moved.title} moved down to #${app.moved.to}.`
               : `${app.moved.title} stays at #${app.moved.to}.`)}
+          </span>
+        )}
       </p>
       <p className="progress-line">
         {app.votes.length.toLocaleString()} {app.votes.length === 1 ? 'duel' : 'duels'}
@@ -264,7 +269,31 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
-  // Kept so the faded pick can stay on screen while the next pair waits for its covers.
-  if (picked) heldView.current = view;
   return view;
+}
+
+/**
+ * A duel cover that turns into the next title's cover in place: the new picture fades in over the old one, then
+ * the old one is dropped. The first cover just appears.
+ */
+function DuelCover({ look, title }: { look: Look; title: string }) {
+  const src = coverSrc(look, 'lg') ?? '';
+  const [layers, setLayers] = useState(() => [{ id: 0, look, title, src }]);
+  const top = layers[layers.length - 1];
+  if (top.src !== src || top.title !== title) setLayers([top, { id: top.id + 1, look, title, src }]);
+  return (
+    <div className="duel-cover">
+      {layers.map((l, i) => (
+        <div
+          key={l.id}
+          className={`duel-cover-layer${l.id > 0 && i === layers.length - 1 ? ' is-entering' : ''}`}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && i === layers.length - 1) setLayers((ls) => ls.slice(-1));
+          }}
+        >
+          <Cover look={l.look} title={l.title} size="lg" />
+        </div>
+      ))}
+    </div>
+  );
 }

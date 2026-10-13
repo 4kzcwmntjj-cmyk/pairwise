@@ -496,61 +496,67 @@ a {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
-/* A pick, in three steps that never overlap the moment the page is busy working out the next pair:
-   1. the chosen cover swells for 200 ms while the other fades (nothing else runs);
-   2. the vote is cast (Duel.tsx, VOTE_AFTER_MS) and the next pair is chosen, with the picture standing still;
-   3. once it has arrived, the old pair fades out (.arena.leaving) while the next covers load, and the next pair
-      fades in (arena-in).
-   Only transform and opacity change. */
-.contender-pick {
-  will-change: transform;
+/* A pick on a fixed stage. The chosen cover swells for 160 ms and the other dims; the vote is cast once that has
+   settled (Duel.tsx, VOTE_AFTER_MS), since working out the next pair keeps the page busy for a moment; when the
+   next pair's covers are loaded, each cover crossfades into the next one in place (.duel-cover-layer) while the
+   swell and the dimming ease back. The question, the vs and the buttons never move. Only transform and opacity
+   change. */
+.duel .contender-pick {
+  will-change: transform, opacity;
+  transition:
+    transform 220ms cubic-bezier(0.33, 0, 0.25, 1),
+    opacity 220ms ease;
 }
-.contender.won .contender-pick {
-  animation: pick-grow 200ms cubic-bezier(0.33, 0, 0.25, 1) forwards;
+.duel .contender.won .contender-pick {
+  transform: scale(1.05);
+  transition-duration: 160ms;
 }
-.contender.lost {
-  animation: pick-dim 200ms ease-out forwards;
+.duel .contender.lost .contender-pick {
+  opacity: 0.35;
+  transition-duration: 160ms;
 }
-.contender.tied {
-  animation: pick-dim-tied 200ms ease-out forwards;
+.duel .contender.tied .contender-pick {
+  opacity: 0.7;
+  transition-duration: 160ms;
 }
-.arena.leaving {
-  animation: pick-leave 140ms ease-in forwards;
+.duel-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
 }
-@keyframes pick-grow {
-  to {
-    transform: scale(1.05);
-  }
+.duel-cover-layer {
+  position: absolute;
+  inset: 0;
 }
-@keyframes pick-dim {
-  to {
-    opacity: 0.3;
-  }
+.duel-cover-layer .cover {
+  width: 100%;
+  height: 100%;
 }
-@keyframes pick-dim-tied {
-  to {
-    opacity: 0.7;
-  }
+.duel-cover-layer.is-entering {
+  animation: cover-swap 220ms ease-out;
 }
-@keyframes pick-leave {
-  to {
-    opacity: 0.15;
-  }
-}
-/* Each new pair fades in, settling from just under full size. The covers can be tapped at once,
-   and the buttons below don't move. */
-.arena {
-  animation: arena-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-@keyframes arena-in {
+@keyframes cover-swap {
   from {
-    opacity: 0.15;
-    transform: scale(0.985);
+    opacity: 0;
   }
-  to {
-    opacity: 1;
-    transform: none;
+}
+/* Text that changes with the pair (title, details, rank badge, the hint) comes in with a short fade; the old text
+   simply gives way, since crossfading text smears. */
+.duel .contender-text,
+.duel .contender-rank,
+.newcomer-hint > span,
+.moved > * {
+  animation: text-in 180ms ease-out;
+}
+@keyframes text-in {
+  from {
+    opacity: 0;
   }
+}
+.newcomer-hint {
+  min-height: 1.45em;
 }
 .contender .item-title {
   font-size: 0.98rem;
@@ -638,9 +644,14 @@ a {
   .bar-fill {
     transition: none;
   }
-  .arena,
-  .contender,
-  .contender .contender-pick,
+  .duel .contender-pick {
+    transition: none;
+  }
+  .duel-cover-layer.is-entering,
+  .duel .contender-text,
+  .duel .contender-rank,
+  .newcomer-hint > span,
+  .moved > *,
   .top-burst::before,
   .top-burst::after {
     animation: none;
