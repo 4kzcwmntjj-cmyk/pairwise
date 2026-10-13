@@ -2,7 +2,7 @@
 
 import { CARD_HUES, type CardSpec } from './cards';
 import { loadCovers } from './coverLoader';
-import { ACCENT, BG, BODY, DISPLAY, INK, drawSignature, LINE, MUTED, SHARE_WIDTH, SURFACE, coverBox, fixBlankCovers, round, wrapLines, type Box, type Cover } from './shareImage';
+import { ACCENT, BG, BODY, DISPLAY, INK, LOGO, drawSignature, LINE, MUTED, SHARE_WIDTH, SURFACE, coverBox, fixBlankCovers, round, wrapLines, type Box, type Cover } from './shareImage';
 
 export interface CardArt {
   title: string;
@@ -24,7 +24,7 @@ export function stripWidth(count: number, gap = 24): number {
 
 export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): Promise<{ blob: Blob; missing: number; details: string[] }> {
   try {
-    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
+    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`), document.fonts.load(`800 34px ${LOGO}`, 'SHŌBU')]);
   } catch {
     // Fall back to the system fonts.
   }

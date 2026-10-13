@@ -19,8 +19,10 @@ export const LINE = '#353459';
 export const INK = '#f2f1fb';
 export const MUTED = '#a3a1c2';
 export const ACCENT = '#8f93ff';
-/** The tangerine spark, as in the app's dark mode: the top three badges. */
-export const SPARK = '#ffa64d';
+/** Medal colours for the top three badges, as in the app's dark mode. */
+export const MEDALS = ['#ffd34d', '#c9cde0', '#e5975a'];
+/** The name's typeface: condensed Archivo cut down to the letters of Shōbu (`@font-face` in styles.css). */
+export const LOGO = '"Shobu Logo", "Arial Narrow", sans-serif';
 
 export const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
 export const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
@@ -57,7 +59,7 @@ export function wrapLines(measure: (s: string) => number, text: string, width: n
   });
 }
 
-/** The mark (two cards crossed on indigo, the back one tangerine), drawn as public/icon.svg is, `size` px square at x, y. */
+/** The mark (two cards crossed on indigo, the back one gold), drawn as public/icon.svg is, `size` px square at x, y. */
 export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const k = size / 512;
   ctx.save();
@@ -78,15 +80,15 @@ export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, si
     ctx.stroke();
     ctx.restore();
   };
-  card(318, 259, 10, '#ffa64d');
+  card(318, 259, 10, '#ffd34d');
   card(190, 249, -10, '#ffffff');
   ctx.restore();
 }
 
-/** The mark and the name at the foot of a picture, right-aligned at `right`, the name sitting on `baseline`. */
+/** The mark and SHŌBU at the foot of a picture, right-aligned at `right`, the name sitting on `baseline`. */
 export function drawSignature(ctx: CanvasRenderingContext2D, right: number, baseline: number) {
-  ctx.font = `700 28px ${DISPLAY}`;
-  const word = 'Shōbu';
+  ctx.font = `800 34px ${LOGO}`;
+  const word = 'SHŌBU';
   const w = ctx.measureText(word).width;
   const mark = 38;
   ctx.fillStyle = INK;
@@ -124,7 +126,7 @@ export function coverBox(ctx: CanvasRenderingContext2D, row: { color?: string },
 }
 
 function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, size: number, hot: boolean) {
-  ctx.fillStyle = hot ? SPARK : BG;
+  ctx.fillStyle = hot ? MEDALS[n - 1] ?? ACCENT : BG;
   ctx.globalAlpha = hot ? 1 : 0.85;
   round(ctx, x, y, size, size, size / 3);
   ctx.fill();
@@ -261,7 +263,7 @@ export async function fixBlankCovers(
 
 export async function renderTop(rows: ShareRow[], heading: string): Promise<ShareResult> {
   try {
-    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`)]);
+    await Promise.all([document.fonts.load(`600 40px ${DISPLAY}`), document.fonts.load(`24px ${BODY}`), document.fonts.load(`800 34px ${LOGO}`, 'SHŌBU')]);
   } catch {
     // Fall back to the system fonts.
   }

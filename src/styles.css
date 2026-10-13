@@ -1,3 +1,10 @@
+@font-face {
+  font-family: 'Shobu Logo';
+  src: url('./fonts/shobu-logo.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+
 /* Layout: one centred column, 720px max. Tabs sit at the top on wide screens and at the bottom on phones.
    The duel screen is the loud part: big covers either side of a heavy "vs". Everything else stays quiet. */
 :root {
@@ -10,12 +17,16 @@
   --accent-ink: #ffffff;
   --accent-soft: rgba(59, 63, 216, 0.12);
   --danger: #b4233c;
-  /* The spark: tangerine for the moments (the vs, the top three, New, a new #1). Buttons, tabs and links stay indigo.
-     --spark is for text, dark enough for large type on the ground; --spark-fill sits behind --spark-ink. */
-  --spark: #cc610a;
-  --spark-fill: #ffa64d;
-  --spark-ink: #1c1a33;
+  /* Medals for the top three rank numbers (and a new #1). Light-mode values are dark enough for large bold type
+     only. --gold-fill is the bright gold of the mark's back card and the #1 burst. */
+  --gold: #a87a00;
+  --silver: #7c8196;
+  --bronze: #a8622a;
+  --gold-fill: #ffd34d;
   --shade: 20, 19, 40;
+  /* The name only: Archivo at width 75 and weight 800, cut down to the letters of Shōbu (src/fonts/shobu-logo.woff2,
+     about 2 KB; Archivo is under the SIL Open Font License, public/fonts/OFL-Archivo.txt). */
+  --font-logo: 'Shobu Logo', 'Arial Narrow', sans-serif;
   --font-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --radius: 14px;
@@ -44,9 +55,9 @@
     --accent-ink: #15142a;
     --accent-soft: rgba(143, 147, 255, 0.16);
     --danger: #ff8597;
-    --spark: #ffa64d;
-    --spark-fill: #ffa64d;
-    --spark-ink: #15142a;
+    --gold: #ffd34d;
+    --silver: #c9cde0;
+    --bronze: #e5975a;
     --shade: 8, 7, 22;
     color-scheme: dark;
   }
@@ -107,10 +118,11 @@ a {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
+  font-family: var(--font-logo);
+  text-transform: uppercase;
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
   background: none;
   border: 0;
   padding: 0;
@@ -357,10 +369,11 @@ a {
   justify-content: center;
 }
 .welcome h1 {
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 9vw, 3.2rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-logo);
+  text-transform: uppercase;
+  font-size: clamp(2.8rem, 12vw, 4rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
   line-height: 1;
 }
 .lede {
@@ -475,26 +488,30 @@ a {
   font-variant-numeric: tabular-nums;
 }
 .contender.won .contender-pick {
-  transform: scale(1.03);
-  animation: pick-pop 220ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  transform: scale(1.035);
+  transition-duration: 0.18s;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* The chosen cover swells a little past its resting size and settles, inside the existing 220 ms. */
-@keyframes pick-pop {
-  0% {
-    transform: scale(1);
+/* Each new pair eases in rather than snapping, so the hand-off after a pick feels smooth. Opacity and a few
+   pixels only: the buttons below don't move, and the covers can be tapped at once. */
+.arena {
+  animation: arena-in 0.16s ease-out;
+}
+@keyframes arena-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(4px);
   }
-  60% {
-    transform: scale(1.07);
-  }
-  100% {
-    transform: scale(1.03);
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 .contender.won .cover {
   box-shadow: 0 0 0 4px var(--accent);
 }
 .contender.lost {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 .contender.tied .cover {
   box-shadow: 0 0 0 3px var(--muted);
@@ -510,7 +527,7 @@ a {
   font-weight: 800;
   font-style: italic;
   font-size: clamp(1.1rem, 5vw, 2rem);
-  color: var(--spark);
+  color: var(--accent);
   letter-spacing: -0.04em;
   padding-right: 0.1em;
 }
@@ -519,10 +536,10 @@ a {
   text-align: center;
   font-weight: 600;
 }
-/* A title that has just taken the top spot: the line in the spark colour, with the mark's two cards flicking
+/* A title that has just taken the top spot: the line in gold, with the mark's two cards flicking
    out from either side once. */
 .moved.is-top {
-  color: var(--spark);
+  color: var(--gold);
 }
 .top-burst {
   position: relative;
@@ -547,7 +564,7 @@ a {
 }
 .top-burst::after {
   right: -16px;
-  background: var(--spark-fill);
+  background: var(--gold-fill);
   animation: burst-right 900ms ease-out 1;
 }
 @keyframes burst-left {
@@ -585,7 +602,7 @@ a {
   .bar-fill {
     transition: none;
   }
-  .contender.won .contender-pick,
+  .arena,
   .top-burst::before,
   .top-burst::after {
     animation: none;
@@ -664,8 +681,14 @@ a {
   font-size: 1.3rem;
   line-height: 1;
 }
-.rank-list li:nth-child(-n + 3) .rank-num {
-  color: var(--spark);
+.rank-list li:nth-child(1) .rank-num {
+  color: var(--gold);
+}
+.rank-list li:nth-child(2) .rank-num {
+  color: var(--silver);
+}
+.rank-list li:nth-child(3) .rank-num {
+  color: var(--bronze);
 }
 .rank-body {
   flex: 1;
@@ -1497,8 +1520,8 @@ a {
 
 /* Newcomer duels */
 .contender-rank.is-new {
-  background: var(--spark-fill);
-  color: var(--spark-ink);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 .newcomer-hint {
