@@ -19,8 +19,6 @@ export const LINE = '#353459';
 export const INK = '#f2f1fb';
 export const MUTED = '#a3a1c2';
 export const ACCENT = '#8f93ff';
-/** Medal colours for the top three badges, as in the app's dark mode. */
-export const MEDALS = ['#ffd34d', '#c9cde0', '#e5975a'];
 /** The name's typeface: condensed Archivo cut down to the letters of Shōbu (`@font-face` in styles.css). */
 export const LOGO = '"Shobu Logo", "Arial Narrow", sans-serif';
 
@@ -59,7 +57,7 @@ export function wrapLines(measure: (s: string) => number, text: string, width: n
   });
 }
 
-/** The mark (two cards crossed on indigo, the back one gold), drawn as public/icon.svg is, `size` px square at x, y. */
+/** The mark (two cards crossed on indigo, the back one pale indigo), drawn as public/icon.svg is, `size` px square at x, y. */
 export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const k = size / 512;
   ctx.save();
@@ -80,7 +78,7 @@ export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, si
     ctx.stroke();
     ctx.restore();
   };
-  card(318, 259, 10, '#ffd34d');
+  card(318, 259, 10, '#9fa2ff');
   card(190, 249, -10, '#ffffff');
   ctx.restore();
 }
@@ -126,7 +124,7 @@ export function coverBox(ctx: CanvasRenderingContext2D, row: { color?: string },
 }
 
 function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, size: number, hot: boolean) {
-  ctx.fillStyle = hot ? MEDALS[n - 1] ?? ACCENT : BG;
+  ctx.fillStyle = hot ? ACCENT : BG;
   ctx.globalAlpha = hot ? 1 : 0.85;
   round(ctx, x, y, size, size, size / 3);
   ctx.fill();
@@ -158,7 +156,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     if (i < 3) {
       const x = PAD + i * (TOP_W + 24);
       const y = GRID_TOP;
-      coverBox(ctx, row, covers[i], x, y, TOP_W, TOP_H, 20, boxes, i);
+      coverBox(ctx, row, covers[i], x, y, TOP_W, TOP_H, 17, boxes, i);
       badge(ctx, row.rank, x + 10, y + 10, 56, true);
       ctx.fillStyle = INK;
       ctx.font = `600 28px ${BODY}`;
@@ -177,7 +175,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
 
     const y = GRID_TOP_END + 30 + (i - 3) * (ROW_H + ROW_GAP);
     ctx.fillStyle = SURFACE;
-    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, ROW_H, 24);
+    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, ROW_H, 21);
     ctx.fill();
 
     ctx.fillStyle = MUTED;
@@ -189,7 +187,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     const ch = ROW_H - 16;
     const cw = Math.round((ch * 2) / 3);
     const cx = PAD + 92;
-    coverBox(ctx, row, covers[i], cx, y + 8, cw, ch, 10, boxes, i);
+    coverBox(ctx, row, covers[i], cx, y + 8, cw, ch, 9, boxes, i);
 
     const tx = cx + cw + 24;
     const tw = SHARE_WIDTH - PAD - 24 - tx;
@@ -248,7 +246,7 @@ export async function fixBlankCovers(
       details[i] += '; drew blank';
       const alt = await decodeAsImage(row.cover);
       if (alt) {
-        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, box.r ?? 20);
+        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, box.r ?? 17);
         if (!isFlat(ctx, box)) {
           details[i] += '; fixed by redrawing from an image element';
           continue;

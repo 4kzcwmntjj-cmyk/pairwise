@@ -17,19 +17,15 @@
   --accent-ink: #ffffff;
   --accent-soft: rgba(59, 63, 216, 0.12);
   --danger: #b4233c;
-  /* Medals for the top three rank numbers (and a new #1). Light-mode values are dark enough for large bold type
-     only. --gold-fill is the bright gold of the mark's back card and the #1 burst. */
-  --gold: #a87a00;
-  --silver: #7c8196;
-  --bronze: #a8622a;
-  --gold-fill: #ffd34d;
+  /* The pale indigo of the mark's back card, also the second card of the new-#1 burst. */
+  --accent-pale: #9fa2ff;
   --shade: 20, 19, 40;
   /* The name only: Archivo at width 75 and weight 800, cut down to the letters of Shōbu (src/fonts/shobu-logo.woff2,
      about 2 KB; Archivo is under the SIL Open Font License, public/fonts/OFL-Archivo.txt). */
   --font-logo: 'Shobu Logo', 'Arial Narrow', sans-serif;
   --font-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --radius: 14px;
+  --radius: 12px;
   --nav-h: 60px;
   /* Room above the top bar. Saved to the iPhone home screen, the page runs under the status bar, and iOS blurs
      a band a little deeper than the status bar itself, so the top bar sits further down there. */
@@ -55,9 +51,6 @@
     --accent-ink: #15142a;
     --accent-soft: rgba(143, 147, 255, 0.16);
     --danger: #ff8597;
-    --gold: #ffd34d;
-    --silver: #c9cde0;
-    --bronze: #e5975a;
     --shade: 8, 7, 22;
     color-scheme: dark;
   }
@@ -328,7 +321,7 @@ a {
 }
 .cover-sm {
   width: 44px;
-  border-radius: 8px;
+  border-radius: 7px;
 }
 .cover-sm .cover-fallback {
   font-size: 0.75rem;
@@ -470,10 +463,6 @@ a {
 .contender-pick:hover {
   transform: translateY(-2px);
 }
-.contender-pick .cover {
-  box-shadow: 0 0 0 0 var(--accent);
-  transition: box-shadow 0.2s;
-}
 .contender-rank {
   position: absolute;
   left: 8px;
@@ -507,14 +496,12 @@ a {
     transform: none;
   }
 }
-.contender.won .cover {
-  box-shadow: 0 0 0 4px var(--accent);
-}
 .contender.lost {
   opacity: 0.4;
 }
-.contender.tied .cover {
-  box-shadow: 0 0 0 3px var(--muted);
+/* Too close to call: both fade a little. No outlines on a pick. */
+.contender.tied {
+  opacity: 0.7;
 }
 .contender .item-title {
   font-size: 0.98rem;
@@ -536,10 +523,10 @@ a {
   text-align: center;
   font-weight: 600;
 }
-/* A title that has just taken the top spot: the line in gold, with the mark's two cards flicking
+/* A title that has just taken the top spot: the line in the accent, with the mark's two cards flicking
    out from either side once. */
 .moved.is-top {
-  color: var(--gold);
+  color: var(--accent);
 }
 .top-burst {
   position: relative;
@@ -564,7 +551,7 @@ a {
 }
 .top-burst::after {
   right: -16px;
-  background: var(--gold-fill);
+  background: var(--accent-pale);
   animation: burst-right 900ms ease-out 1;
 }
 @keyframes burst-left {
@@ -681,14 +668,8 @@ a {
   font-size: 1.3rem;
   line-height: 1;
 }
-.rank-list li:nth-child(1) .rank-num {
-  color: var(--gold);
-}
-.rank-list li:nth-child(2) .rank-num {
-  color: var(--silver);
-}
-.rank-list li:nth-child(3) .rank-num {
-  color: var(--bronze);
+.rank-list li:nth-child(-n + 3) .rank-num {
+  color: var(--accent);
 }
 .rank-body {
   flex: 1;

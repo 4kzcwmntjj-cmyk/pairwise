@@ -74,7 +74,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
     let below = 0;
     spec.covers.forEach((c, i) => {
       const x = PAD + i * (sideCw + sideGap);
-      coverBox(ctx, pictured[i], covers[i], x, top, sideCw, sideCh, 22, boxes, i);
+      coverBox(ctx, pictured[i], covers[i], x, top, sideCw, sideCh, 19, boxes, i);
       if (c.caption) {
         ctx.fillStyle = MUTED;
         ctx.font = `26px ${BODY}`;
@@ -166,7 +166,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
     let below = 0;
     spec.covers.forEach((c, i) => {
       const x = PAD + i * (cw + gap);
-      coverBox(ctx, pictured[i], covers[i], x, y, cw, ch, count > 3 ? 14 : 22, boxes, i);
+      coverBox(ctx, pictured[i], covers[i], x, y, cw, ch, count > 3 ? 12 : 19, boxes, i);
       let ty = y + ch;
       if (count > 1) {
         ctx.fillStyle = INK;
@@ -195,11 +195,11 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
     spec.rows.forEach((r, k) => {
       const i = count + k;
       ctx.fillStyle = SURFACE;
-      round(ctx, PAD, y, INNER, rh, 24);
+      round(ctx, PAD, y, INNER, rh, 21);
       ctx.fill();
       const coverH = rh - 20;
       const coverW = Math.round((coverH * 2) / 3);
-      coverBox(ctx, pictured[i], covers[i], PAD + 12, y + 10, coverW, coverH, 10, boxes, i);
+      coverBox(ctx, pictured[i], covers[i], PAD + 12, y + 10, coverW, coverH, 9, boxes, i);
       const tx = PAD + 12 + coverW + 24;
       const tw = PAD + INNER - 24 - tx;
       ctx.fillStyle = INK;
