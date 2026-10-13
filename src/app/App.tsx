@@ -13,6 +13,7 @@ import { useApp } from './useApp';
 import { ViewSwitch } from './ViewSwitch';
 import { Welcome } from './Welcome';
 import { useUpdateReady } from './update';
+import { Mark } from './Mark';
 
 type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
 const TABS: [Tab, string][] = [
@@ -114,7 +115,8 @@ export function App() {
           aria-label="Shōbu: front page"
           title="Front page"
         >
-          Shōbu
+          <Mark size={22} />
+          <span>Shōbu</span>
         </button>
         <ViewSwitch app={app} compact />
         <nav className="tabs" aria-label="Sections">

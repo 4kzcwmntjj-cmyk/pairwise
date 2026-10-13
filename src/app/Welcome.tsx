@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fromExport } from '../store/store';
+import { Mark } from './Mark';
 import type { AppState } from './useApp';
 
 /**
@@ -47,11 +48,7 @@ export function Welcome({ app, onHelp, onStart }: { app: AppState; onHelp: () =>
 
   return (
     <main className="welcome">
-      <div className="welcome-mark" aria-hidden="true">
-        <span>A</span>
-        <span className="welcome-vs">vs</span>
-        <span>B</span>
-      </div>
+      <Mark size={88} />
       <h1>Shōbu</h1>
       <p className="lede">
         Rank the anime you've watched and the manga you've read by picking between two at a time. Your list sorts itself as you go.

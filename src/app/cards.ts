@@ -59,9 +59,9 @@ export interface CardSpec {
  * behind the card, on screen and in the share picture. Cards not listed here (Compare, Tonight's pick) keep the app's accent.
  */
 export const CARD_HUES: Record<string, number> = {
-  type: 255,
+  type: 10,
   week: 140,
-  takes: 22,
+  takes: 255,
   themes: 190,
   era: 95,
   studio: 315,

@@ -13,14 +13,62 @@ export interface ShareRow {
 
 export const SHARE_WIDTH = 1080;
 
-export const BG = '#15142a';
-export const SURFACE = '#1f1e3a';
-export const LINE = '#353459';
-export const INK = '#f2f1fb';
-export const MUTED = '#a3a1c2';
-export const ACCENT = '#8f93ff';
+export const BG = '#1c1916';
+export const SURFACE = '#26221e';
+export const LINE = '#3a342d';
+export const INK = '#f5f0e8';
+export const MUTED = '#a89e91';
+export const ACCENT = '#ff6a4d';
 
-export const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
+export const DISPLAY = '"Archivo", "Arial Narrow", system-ui, sans-serif';
+
+/**
+ * Sets a display font (`spec` is weight and size, e.g. "600 40px"), narrowed as in the app where the browser
+ * supports `fontStretch` on a canvas; elsewhere Archivo draws at its normal width. Setting `ctx.font` resets the
+ * width, so body fonts need nothing.
+ */
+export function displayFont(ctx: CanvasRenderingContext2D, spec: string, stretch: 'semi-condensed' | 'condensed' = 'semi-condensed') {
+  ctx.font = `${spec} ${DISPLAY}`;
+  if ('fontStretch' in ctx) (ctx as CanvasRenderingContext2D & { fontStretch: string }).fontStretch = stretch;
+}
+
+/** The mark (two cards crossed on vermilion), drawn as public/icon.svg is, `size` px square at x, y. */
+export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  const k = size / 512;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.fillStyle = '#d63b25';
+  round(ctx, 0, 0, 512, 512, 112);
+  ctx.fill();
+  const card = (cx: number, cy: number, deg: number, fill: string) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((deg * Math.PI) / 180);
+    round(ctx, -82, -123, 164, 246, 20);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 22;
+    ctx.strokeStyle = '#d63b25';
+    ctx.stroke();
+    ctx.restore();
+  };
+  card(318, 259, 10, '#1b1814');
+  card(190, 249, -10, '#fbf9f5');
+  ctx.restore();
+}
+
+/** The mark and SHŌBU at the foot of a picture, right-aligned at `right`, text sitting on `baseline`. */
+export function drawSignature(ctx: CanvasRenderingContext2D, right: number, baseline: number) {
+  displayFont(ctx, '800 34px', 'condensed');
+  const word = 'SHŌBU';
+  const w = ctx.measureText(word).width;
+  const mark = 40;
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'left';
+  ctx.fillText(word, right - w, baseline);
+  drawMark(ctx, right - w - 12 - mark, baseline - mark + 4, mark);
+}
 export const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const PAD = 64;
 
@@ -77,7 +125,7 @@ export function coverBox(ctx: CanvasRenderingContext2D, row: { color?: string },
   ctx.clip();
   if (img) drawCover(ctx, img, x, y, w, h);
   else {
-    ctx.fillStyle = row.color ?? '#353459';
+    ctx.fillStyle = row.color ?? LINE;
     ctx.fillRect(x, y, w, h);
   }
   ctx.restore();
@@ -90,7 +138,7 @@ function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, s
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.fillStyle = hot ? BG : INK;
-  ctx.font = `600 ${Math.round(size * 0.52)}px ${DISPLAY}`;
+  displayFont(ctx, `600 ${Math.round(size * 0.52)}px`);
   ctx.textAlign = 'center';
   ctx.fillText(String(n), x + size / 2, y + size / 2 + size * 0.19);
   ctx.textAlign = 'left';
@@ -139,7 +187,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     ctx.fill();
 
     ctx.fillStyle = MUTED;
-    ctx.font = `600 30px ${DISPLAY}`;
+    displayFont(ctx, `600 30px`);
     ctx.textAlign = 'center';
     ctx.fillText(String(row.rank), PAD + 46, y + ROW_H / 2 + 11);
     ctx.textAlign = 'left';
@@ -239,7 +287,7 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Shar
 
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = INK;
-  ctx.font = `600 52px ${DISPLAY}`;
+  displayFont(ctx, `600 52px`);
   ctx.fillText(heading, PAD, 112);
 
   const boxes: Box[] = [];
@@ -247,11 +295,7 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Shar
 
   const missing = await fixBlankCovers(ctx, rows, covers, boxes, details);
 
-  ctx.fillStyle = MUTED;
-  ctx.font = `600 26px ${DISPLAY}`;
-  ctx.textAlign = 'right';
-  ctx.fillText('Shōbu', SHARE_WIDTH - PAD, height - 44);
-  ctx.textAlign = 'left';
+  drawSignature(ctx, SHARE_WIDTH - PAD, height - 44);
 
   // Safari can hold canvas drawing back until the picture is read, so the covers
   // are released only once the PNG exists; closing them earlier leaves blanks.

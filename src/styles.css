@@ -1,16 +1,20 @@
 /* Layout: one centred column, 720px max. Tabs sit at the top on wide screens and at the bottom on phones.
    The duel screen is the loud part: big covers either side of a heavy "vs". Everything else stays quiet. */
 :root {
-  --bg: #ecebf3;
-  --surface: #f9f9fd;
-  --ink: #1c1a33;
-  --muted: #5d5a78;
-  --line: #d2d0e2;
-  --accent: #3b3fd8;
+  /* Paper, ink and vermilion. Dark mode mirrors it below. The indigo palette before 13 Oct 2026 is recorded in
+     claude/roadmap.md; another palette would be one more block like these. */
+  --bg: #f3efe7;
+  --surface: #fbf9f5;
+  --ink: #1b1814;
+  --muted: #6b6359;
+  --line: #ddd5c8;
+  --accent: #c9361f;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(59, 63, 216, 0.12);
-  --danger: #b4233c;
-  --font-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
+  --accent-soft: rgba(201, 54, 31, 0.11);
+  --danger: #a3123a;
+  --shade: 27, 24, 20;
+  /* Archivo is a variable font with a width axis; display text sets font-stretch (semi-condensed, the wordmark condensed). */
+  --font-display: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --radius: 10px;
   --nav-h: 60px;
@@ -29,15 +33,16 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #15142a;
-    --surface: #1f1e3a;
-    --ink: #ecebf7;
-    --muted: #a3a1c2;
-    --line: #353459;
-    --accent: #8f93ff;
-    --accent-ink: #15142a;
-    --accent-soft: rgba(143, 147, 255, 0.16);
-    --danger: #ff8597;
+    --bg: #1c1916;
+    --surface: #26221e;
+    --ink: #efe9df;
+    --muted: #a89e91;
+    --line: #3a342d;
+    --accent: #ff6a4d;
+    --accent-ink: #1c1916;
+    --accent-soft: rgba(255, 106, 77, 0.16);
+    --danger: #ff8fa3;
+    --shade: 10, 8, 6;
     color-scheme: dark;
   }
 }
@@ -94,15 +99,24 @@ a {
   padding-block: calc(var(--top-gap) + env(safe-area-inset-top, 0px)) 14px;
 }
 .wordmark {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
+  font-stretch: condensed;
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   background: none;
   border: 0;
   padding: 0;
   color: inherit;
   cursor: pointer;
+}
+.mark {
+  display: block;
+  flex: none;
 }
 .tabs {
   display: flex;
@@ -292,6 +306,7 @@ a {
   display: grid;
   place-items: center;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 700;
   font-size: 1.6rem;
   color: #fff;
@@ -339,36 +354,13 @@ a {
   gap: 20px;
   justify-content: center;
 }
-.welcome-mark {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-.welcome-mark span:not(.welcome-vs) {
-  width: 56px;
-  aspect-ratio: 2 / 3;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 1.4rem;
-}
-.welcome-mark span:last-child {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line);
-}
-.welcome-vs {
-  color: var(--muted);
-}
 .welcome h1 {
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 9vw, 3.2rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-stretch: condensed;
+  font-size: clamp(2.8rem, 12vw, 4rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   line-height: 1;
 }
 .lede {
@@ -433,6 +425,7 @@ a {
 .duel-question {
   text-align: center;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 500;
   font-size: 1rem;
 }
@@ -475,9 +468,10 @@ a {
   top: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(20, 19, 40, 0.78);
+  background: rgba(var(--shade), 0.78);
   color: #fff;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 500;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
@@ -502,6 +496,7 @@ a {
   align-self: center;
   margin-top: -40%;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 700;
   font-size: clamp(1.1rem, 5vw, 2rem);
   color: var(--accent);
@@ -590,6 +585,7 @@ a {
   flex: none;
   text-align: right;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   font-size: 0.95rem;
@@ -652,6 +648,7 @@ a {
 }
 .empty h2 {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.3rem;
   font-weight: 600;
 }
@@ -673,7 +670,7 @@ a {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(15, 14, 30, 0.5);
+  background: rgba(var(--shade), 0.5);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -731,6 +728,7 @@ a {
 }
 .big-rank {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 700;
   font-size: 1.6rem;
   color: var(--ink);
@@ -838,6 +836,7 @@ a {
 }
 .set-counts b {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 600;
 }
 .set-message {
@@ -1080,6 +1079,7 @@ a {
 }
 .stat-value {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 600;
   font-size: 1.6rem;
   font-variant-numeric: tabular-nums;
@@ -1133,6 +1133,7 @@ a {
 }
 .big-line {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.3rem;
   font-weight: 600;
 }
@@ -1763,6 +1764,7 @@ main.sort {
 }
 .find-kicker {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1772,6 +1774,7 @@ main.sort {
 .find-headline {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.45rem;
   font-weight: 600;
   line-height: 1.2;
@@ -1898,6 +1901,7 @@ main.sort {
 }
 .find-tagline {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.18rem;
   font-weight: 500;
   line-height: 1.35;
@@ -1985,6 +1989,7 @@ main.sort {
 .more-detail > summary {
   cursor: pointer;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-weight: 600;
   font-size: 1rem;
   padding: 10px 4px 10px 0;
@@ -2131,6 +2136,7 @@ main.sort {
   border: 0;
   background: none;
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.3rem;
   font-weight: 600;
   line-height: 1.2;
@@ -2141,6 +2147,7 @@ main.sort {
 }
 .row-heading {
   font-family: var(--font-display);
+  font-stretch: semi-condensed;
   font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.25;
@@ -2214,7 +2221,7 @@ main.sort {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(20, 19, 40, 0.62);
+  background: rgba(var(--shade), 0.62);
   color: #fff;
   font-size: 1.1rem;
   line-height: 1;
@@ -2242,7 +2249,7 @@ main.sort {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 6px 24px rgba(15, 14, 30, 0.18);
+  box-shadow: 0 6px 24px rgba(var(--shade), 0.18);
   font-weight: 600;
 }
 .update-bar span {
