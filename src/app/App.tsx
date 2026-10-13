@@ -12,6 +12,7 @@ import { Stats } from './Stats';
 import { useApp } from './useApp';
 import { ViewSwitch } from './ViewSwitch';
 import { Welcome } from './Welcome';
+import { useUpdateReady } from './update';
 
 type Tab = 'duel' | 'sort' | 'ranking' | 'stats' | 'foryou' | 'settings';
 const TABS: [Tab, string][] = [
@@ -154,6 +155,25 @@ export function App() {
       {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} />}
       {!showCompare && current === 'settings' && <SettingsScreen app={app} onHelp={() => setHelp(true)} />}
       {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />}
+      <UpdateBar />
+    </div>
+  );
+}
+
+/** Shown once a new version has taken over; the page keeps running the old one until it reloads. */
+function UpdateBar() {
+  const ready = useUpdateReady();
+  const [later, setLater] = useState(false);
+  if (!ready || later) return null;
+  return (
+    <div className="update-bar" role="status">
+      <span>A new version is ready.</span>
+      <button className="btn btn-primary btn-small" onClick={() => location.reload()}>
+        Reload
+      </button>
+      <button className="btn btn-quiet btn-small" onClick={() => setLater(true)}>
+        Later
+      </button>
     </div>
   );
 }

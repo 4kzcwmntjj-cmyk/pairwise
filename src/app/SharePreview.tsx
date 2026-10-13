@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from './dialogFocus';
 
 /**
  * Full-screen preview of a picture to share. Built to be reused by every card:
@@ -17,7 +18,7 @@ interface Props {
   /** File name without extension. */
   filename: string;
   /** Draws the picture. Called again when the option changes or Try again is pressed. `note` is shown as a warning. */
-  make: (option: string) => Promise<{ blob: Blob; note?: string; details?: string[] }>;
+  make: (option: string) => Promise<{ blob: Blob; note?: string }>;
   options?: ShareOption[];
   onClose: () => void;
 }
@@ -28,11 +29,12 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [details, setDetails] = useState<string[] | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const makeRef = useRef(make);
   makeRef.current = make;
+  const dialog = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialog);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -46,17 +48,15 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
     setBlob(null);
     setError(null);
     setNote(null);
-    setDetails(null);
     setStatus(null);
     makeRef
       .current(option)
-      .then(({ blob: b, note: n, details: d }) => {
+      .then(({ blob: b, note: n }) => {
         if (cancelled) return;
         made = URL.createObjectURL(b);
         setBlob(b);
         setUrl(made);
         setNote(n ?? null);
-        setDetails(d ?? null);
       })
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
@@ -91,7 +91,7 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
   }
 
   return (
-    <div className="share-preview" role="dialog" aria-modal="true" aria-label={title}>
+    <div ref={dialog} tabIndex={-1} className="share-preview" role="dialog" aria-modal="true" aria-label={title}>
       <div className="share-preview-head">
         <h2>{title}</h2>
         <button className="btn btn-small" onClick={onClose}>
@@ -141,16 +141,6 @@ export function SharePreview({ title, filename, make, options, onClose }: Props)
       <p className="hint share-preview-note" role="status">
         {status ?? 'You can also press and hold the picture, or take a screenshot.'}
       </p>
-      {details && (
-        <details className="hint share-preview-details">
-          <summary>Details</summary>
-          <ul>
-            {details.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   );
 }

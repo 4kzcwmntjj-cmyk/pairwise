@@ -21,8 +21,27 @@ function stampServiceWorker(): Plugin {
   };
 }
 
+/**
+ * Writes catalogue-version.json (the catalogue's generatedAt) next to the built catalogue, so a launch can
+ * check whether there is a newer catalogue without downloading the whole file. Made from the catalogue being
+ * deployed, so the two can't disagree. The dev server has no such file; the app then loads the catalogue itself.
+ */
+function catalogueVersion(): Plugin {
+  return {
+    name: 'catalogue-version',
+    apply: 'build',
+    generateBundle() {
+      const file = resolve(__dirname, 'public/catalogue.json');
+      if (!existsSync(file)) return;
+      const { generatedAt } = JSON.parse(readFileSync(file, 'utf8')) as { generatedAt?: string };
+      if (!generatedAt) return;
+      this.emitFile({ type: 'asset', fileName: 'catalogue-version.json', source: JSON.stringify({ generatedAt }) });
+    },
+  };
+}
+
 export default defineConfig({
   base: './',
-  plugins: [react(), stampServiceWorker()],
+  plugins: [react(), stampServiceWorker(), catalogueVersion()],
   test: { environment: 'node' },
 });

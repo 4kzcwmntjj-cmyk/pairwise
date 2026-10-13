@@ -29,6 +29,17 @@ export async function loadCatalogueFile(): Promise<CatalogueFile> {
   return body;
 }
 
+/**
+ * When the deployed catalogue was built, from the small file written beside it at build time. Null when this
+ * site has no such file (the dev server), so the caller loads the catalogue itself; throws when offline.
+ */
+export async function loadCatalogueVersion(): Promise<string | null> {
+  const res = await fetch('./catalogue-version.json', { cache: 'no-cache' });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { generatedAt?: unknown } | null;
+  return typeof body?.generatedAt === 'string' ? body.generatedAt : null;
+}
+
 /** Fills in each title's tags from its entries; the file leaves them out to save space. */
 export function withTags(items: Item[]): Item[] {
   for (const item of items) {

@@ -23,8 +23,8 @@ export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id
       const look = app.look(item);
       return [{ rank: i + 1, title: app.title(item), meta: look.short, cover: look.coverLarge ?? look.cover, color: look.coverColor }];
     });
-    const { blob, missing, details } = await renderTop(rows, `My top ${rows.length} ${noun}`);
-    return { blob, note: missing ? `${missing} of ${rows.length} covers didn't load.` : undefined, details };
+    const { blob, missing } = await renderTop(rows, `My top ${rows.length} ${noun}`);
+    return { blob, note: missing ? `${missing} of ${rows.length} covers didn't load.` : undefined };
   }
   const q = query.trim().toLowerCase();
   const shown = lists.ranked.filter(

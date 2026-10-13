@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDialogFocus } from './dialogFocus';
 import { PLACED_AFTER } from '../rank/pairs';
 import { themeTags } from '../rank/findings';
 import { Cover } from './Cover';
@@ -20,6 +21,8 @@ export function ItemSheet({
   const item = app.itemById.get(itemId);
   // The sheet shows everything known about the title, whichever view is on.
   const fullMark = app.allMarks.get(itemId);
+  const sheet = useRef<HTMLDivElement>(null);
+  useDialogFocus(sheet, itemId);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -54,7 +57,7 @@ export function ItemSheet({
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div ref={sheet} tabIndex={-1} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <button className="sheet-close btn btn-quiet btn-small" onClick={onClose}>
           Close
         </button>

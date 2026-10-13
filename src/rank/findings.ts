@@ -240,8 +240,24 @@ export function typicalText(n: number, expected: number): string {
   return `${top} has about ${Math.round(expected)}.`;
 }
 
-/** Popularity-weighted share of the catalogue that passes `test`: how often it turns up in a typical list. */
-function baseRate(catalogue: Item[], test: (i: Item) => boolean): number {
+const baseRates = new WeakMap<Item[], Map<string, number>>();
+
+/**
+ * Popularity-weighted share of the catalogue that passes `test`: how often it turns up in a typical list.
+ * Kept per catalogue array and `key` (which names the test), since the catalogue rarely changes and each
+ * rate is a pass over every title.
+ */
+function baseRate(catalogue: Item[], key: string, test: (i: Item) => boolean): number {
+  let kept = baseRates.get(catalogue);
+  if (!kept) baseRates.set(catalogue, (kept = new Map()));
+  const hit0 = kept.get(key);
+  if (hit0 !== undefined) return hit0;
+  const rate = rawBaseRate(catalogue, test);
+  kept.set(key, rate);
+  return rate;
+}
+
+function rawBaseRate(catalogue: Item[], test: (i: Item) => boolean): number {
   let all = 0;
   let hit = 0;
   for (const i of catalogue) {
@@ -281,8 +297,8 @@ export function pickType(input: TypeInput): TypeFinding {
   const isNew = (i: Item) => i.startYear !== undefined && i.startYear >= NEW_FROM;
   const old = top.filter(isOld);
   const recent = top.filter(isNew);
-  const pOld = baseRate(catalogue, isOld);
-  const pNew = baseRate(catalogue, isNew);
+  const pOld = baseRate(catalogue, 'old', isOld);
+  const pNew = baseRate(catalogue, 'new', isNew);
   candidates.push({
     id: 'old',
     name: 'The Old Soul',
@@ -306,8 +322,8 @@ export function pickType(input: TypeInput): TypeFinding {
   const top500 = new Set(byPop.slice(0, 500).map((i) => i.id));
   const popular = top.filter((i) => top100.has(i.id));
   const deep = top.filter((i) => !top500.has(i.id));
-  const pPopular = baseRate(catalogue, (i) => top100.has(i.id));
-  const pDeep = baseRate(catalogue, (i) => !top500.has(i.id));
+  const pPopular = baseRate(catalogue, 'popular', (i) => top100.has(i.id));
+  const pDeep = baseRate(catalogue, 'deep', (i) => !top500.has(i.id));
   candidates.push({
     id: 'popular',
     name: 'The Crowd Pleaser',
@@ -332,7 +348,7 @@ export function pickType(input: TypeInput): TypeFinding {
   for (const g of genreNames) {
     const has = (i: Item) => !!i.genres?.includes(g);
     const hits = wide.filter(has);
-    const p = baseRate(catalogue, has);
+    const p = baseRate(catalogue, `genre:${g}`, has);
     if (p === 0 || hits.length === 0) continue;
     const s = hits.length >= 5 ? surprise(nw, p, hits.length, genreNames.length) : 0;
     const lift = hits.length / Math.max(nw * p, 0.5);
@@ -359,7 +375,7 @@ export function pickType(input: TypeInput): TypeFinding {
     const has = (i: Item) => hasTag(i, t);
     const hits = wide.filter(has);
     if (hits.length < 5) continue;
-    const p = baseRate(catalogue, has);
+    const p = baseRate(catalogue, `tag:${t}`, has);
     if (p === 0) continue;
     candidates.push({
       id: `tag:${t}`,
@@ -376,7 +392,7 @@ export function pickType(input: TypeInput): TypeFinding {
   for (const i of wide) for (const t of themeTags(i)) wideTags.set(t, (wideTags.get(t) ?? 0) + 1);
   for (const [t, count] of wideTags) {
     if (count < 3) continue;
-    const p = baseRate(catalogue, (i) => hasTag(i, t));
+    const p = baseRate(catalogue, `tag:${t}`, (i) => hasTag(i, t));
     const s = surprise(nw, p, count, wideTags.size);
     if (s > bestTag) {
       bestTag = s;
@@ -391,7 +407,7 @@ export function pickType(input: TypeInput): TypeFinding {
   for (const [name, hits] of studios) {
     if (!studioTrait || hits.length > studioTrait.count) studioTrait = { name, count: hits.length, of: nw };
     if (hits.length < 3) continue;
-    const p = baseRate(catalogue, (i) => i.studio === name);
+    const p = baseRate(catalogue, `studio:${name}`, (i) => i.studio === name);
     candidates.push({
       id: `studio:${name}`,
       name: 'The Loyalist',

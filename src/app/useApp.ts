@@ -4,7 +4,7 @@ import { saveCopy } from './saveCopy';
 import { backupIsDue, snoozed, type BackupNote } from './backup';
 import { useInstall } from './install';
 import { askPersistence, checkPersisted, PERSIST_AFTER, type Persistence } from './storage';
-import { loadCatalogueFile, mergeCatalogue } from '../anilist/catalogueFile';
+import { loadCatalogueFile, loadCatalogueVersion, mergeCatalogue } from '../anilist/catalogueFile';
 import { isManga, storylinesOf } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
 import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
@@ -53,6 +53,18 @@ const friendKey = (l: SentList) => (l.name ? `n:${l.name.toLowerCase()}` : `l:${
 /** Newcomer outcomes kept for working out how often to bring one in. */
 const NEWCOMER_LOG = 20;
 
+/** Whether a fit already made covers exactly these titles and votes (in any order of titles). */
+function sameFitInput(pre: { ids: string[]; votes: Vote[] }, ids: string[], votes: Vote[]): boolean {
+  if (pre.votes.length !== votes.length) return false;
+  for (let i = 0; i < votes.length; i++) {
+    const a = pre.votes[i];
+    const b = votes[i];
+    if (a.a !== b.a || a.b !== b.b || a.outcome !== b.outcome) return false;
+  }
+  const mine = new Set(pre.ids);
+  return mine.size === new Set(ids).size && ids.every((id) => mine.has(id));
+}
+
 export function displayTitle(item: Item, settings: Settings) {
   return settings.titleLanguage === 'romaji'
     ? item.titleRomaji ?? item.title
@@ -99,6 +111,8 @@ export function useApp() {
   const friendsRef = useRef<Friend[]>([]);
   friendsRef.current = friends;
   const warm = useRef<Map<string, number> | undefined>(undefined);
+  /** The fit a duel just made for its "moved to #N" line, so the ranking doesn't fit the same votes again. */
+  const prefit = useRef<{ ids: string[]; votes: Vote[]; fit: Fit } | null>(null);
   /** Goes up whenever all data is replaced, so slow background work can tell its data is gone. */
   const generation = useRef(0);
 
@@ -163,7 +177,10 @@ export function useApp() {
   );
 
   const fullFit: Fit = useMemo(() => {
-    const f = fitModel({ ids: seenIds, anchors: {}, votes, warm: warm.current });
+    // A fit from the duel that was just played counts only if it covers exactly these titles and votes; a
+    // render in between (marks saved before the vote, say) leaves it waiting for the one that does.
+    const pre = prefit.current;
+    const f = pre && sameFitInput(pre, seenIds, votes) ? pre.fit : fitModel({ ids: seenIds, anchors: {}, votes, warm: warm.current });
     warm.current = f.theta;
     return f;
   }, [seenIds, votes]);
@@ -395,7 +412,9 @@ export function useApp() {
         pushUndo({ scope: 'duel', kind: 'newcomer', voteId: id, itemIds: fresh.map((i) => i.id), pair });
         logNewcomer(true);
         const freshIds = new Set(fresh.map((i) => i.id));
-        const after = fitModel({ ids: [...seenIds, ...freshIds], anchors: {}, votes: nextVotes, warm: warm.current });
+        const ids = [...seenIds, ...freshIds];
+        const after = fitModel({ ids, anchors: {}, votes: nextVotes, warm: warm.current });
+        prefit.current = { ids, votes: nextVotes, fit: after };
         const order = after.order.filter((x) => freshIds.has(x) || inViewSeen(x));
         // The one that joined; with two new titles, the winner (or the first, on a tie).
         const shown = fresh.length === 1 ? fresh[0] : (fresh.find((i) => i.id === (outcome === 'a' ? pair.a : pair.b)) ?? fresh[0]);
@@ -422,6 +441,7 @@ export function useApp() {
       pushUndo({ scope: 'duel', kind: 'vote', voteId: id, pair });
       if (winner && before !== undefined) {
         const after = fitModel({ ids: seenIds, anchors: {}, votes: nextVotes, warm: warm.current });
+        prefit.current = { ids: seenIds, votes: nextVotes, fit: after };
         const to = after.order.filter(inViewSeen).indexOf(winner) + 1;
         setMoved({ title: displayTitle(itemById.get(winner)!, settings), from: before, to });
       } else setMoved(null);
@@ -553,6 +573,11 @@ export function useApp() {
   const syncCatalogue = useCallback(
     async (force = false) => {
       const gen = generation.current;
+      // Most launches have nothing new: check the small version file before downloading the catalogue.
+      if (!force && catalogueAt) {
+        const version = await loadCatalogueVersion();
+        if (version && version <= catalogueAt) return 0;
+      }
       const file = await loadCatalogueFile();
       if (!force && catalogueAt && file.generatedAt <= catalogueAt) return 0;
       // A copy was loaded or everything deleted while the file downloaded: this merge is for data that's gone.

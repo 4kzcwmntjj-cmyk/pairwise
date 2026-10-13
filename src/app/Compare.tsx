@@ -256,13 +256,13 @@ export function Compare({
           title={`${sharing.kicker}: ${sharing.headline}`}
           filename={`shobu-compare-${sharing.id}`}
           make={async () => {
-            const { blob, missing, details } = await renderCard(sharing, (id) => {
+            const { blob, missing } = await renderCard(sharing, (id) => {
               const item = app.itemById.get(id);
               if (!item) return { title: id };
               const look = app.look(item);
               return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
             });
-            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined, details };
+            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined };
           }}
           onClose={() => setSharing(null)}
         />

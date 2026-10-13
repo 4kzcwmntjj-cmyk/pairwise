@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
 import { fit } from './solver';
-import { crowdView, dayKey, duelStats, extremes, history, mainstream, movers, overview, recordOf, settledBands, tasteBy, topSpell } from './stats';
+import { clearReplayFits, crowdView, dayKey, duelStats, extremes, history, mainstream, movers, overview, recordOf, Replay, settledBands, tasteBy, topSpell } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
   id,
@@ -242,5 +242,31 @@ describe('topSpell', () => {
   it('is null when the title is not #1 in the replay', () => {
     expect(topSpell([...day(0, 4, 'b')], ids, 'a', t0)).toBeNull();
     expect(topSpell([], ids, 'a', t0)).toBeNull();
+  });
+});
+
+describe('Replay', () => {
+  const ids = ['a', 'b', 'c'];
+  const votes = [vote('a', 'b', 'a', t0), vote('b', 'c', 'a', t0 + 1), vote('a', 'c', 'b', t0 + DAY)];
+
+  it('fits the same duels once and reuses the fit', () => {
+    clearReplayFits();
+    const r = new Replay(votes, ids);
+    const f = r.through(2);
+    expect(new Replay([...votes], [...ids].reverse()).through(2)).toBe(f);
+    // A new duel after these leaves the earlier fit as it was.
+    expect(new Replay([...votes, vote('c', 'b', 'a', t0 + 2 * DAY)], ids).through(2)).toBe(f);
+    expect(f.order).toEqual(fit({ ids, anchors: {}, votes: votes.slice(0, 2) }).order);
+  });
+
+  it('fits again when the duels or the titles differ', () => {
+    clearReplayFits();
+    const f = new Replay(votes, ids).through(2);
+    expect(new Replay([votes[0], vote('b', 'c', 'b', t0 + 1), votes[2]], ids).through(2)).not.toBe(f);
+    expect(new Replay(votes, ['a', 'b']).through(2)).not.toBe(f);
+  });
+
+  it('lists the last duel of each day', () => {
+    expect(new Replay(votes, ids).dayEnds()).toEqual([1, 2]);
   });
 });

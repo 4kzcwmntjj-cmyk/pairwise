@@ -116,8 +116,10 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(networkFirst(request, DATA, 10000));
     } else if (request.mode === 'navigate') {
       event.respondWith(networkFirst(request, APP, 4000, './index.html'));
-    } else if (path.endsWith('/sw.js')) {
-      return; // let the browser check for a new worker itself
+    } else if (path.endsWith('/sw.js') || path.endsWith('/catalogue-version.json')) {
+      // The worker file: the browser checks it for a new worker itself. The version file: only worth asking
+      // the network; offline there is nothing new to bring in.
+      return;
     } else {
       event.respondWith(cacheFirst(request, APP));
     }

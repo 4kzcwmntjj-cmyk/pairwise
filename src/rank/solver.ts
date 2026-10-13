@@ -82,35 +82,94 @@ export function fit(input: FitInput): Fit {
     k++;
   }
 
-  const s = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const warm = input.warm?.get(ids[i]);
-    s[i] = Math.exp(warm ?? anchors[ids[i]] ?? 0);
-  }
+  // Work on the log scale, u = log strength.
+  const u = new Float64Array(n);
+  for (let i = 0; i < n; i++) u[i] = input.warm?.get(ids[i]) ?? anchors[ids[i]] ?? 0;
 
   const denom = new Float64Array(n);
-  let iterations = 0;
-  for (; iterations < 2000; iterations++) {
-    for (let i = 0; i < n; i++) denom[i] = w / (s[i] + anchor[i]);
+  const e = new Float64Array(n);
+  /** One minorise-maximise step from `from` into `to`; returns the largest change on the log scale. */
+  const step = (from: Float64Array, to: Float64Array): number => {
+    for (let i = 0; i < n; i++) {
+      e[i] = Math.exp(from[i]);
+      denom[i] = w / (e[i] + anchor[i]);
+    }
     for (let p = 0; p < pn.length; p++) {
       const i = pi[p];
       const j = pj[p];
-      const d = pn[p] / (s[i] + s[j]);
+      const d = pn[p] / (e[i] + e[j]);
       denom[i] += d;
       denom[j] += d;
     }
     let maxChange = 0;
     for (let i = 0; i < n; i++) {
-      const next = wins[i] / denom[i];
-      const change = Math.abs(Math.log(next / s[i]));
+      const next = Math.log(wins[i] / denom[i]);
+      const change = Math.abs(next - from[i]);
       if (change > maxChange) maxChange = change;
-      s[i] = next;
+      to[i] = next;
     }
-    if (maxChange < 1e-8) {
-      iterations++;
+    return maxChange;
+  };
+  /** The log-likelihood the steps climb (real games plus the virtual ones against each anchor). */
+  const loglik = (x: Float64Array): number => {
+    let l = 0;
+    for (let i = 0; i < n; i++) {
+      e[i] = Math.exp(x[i]);
+      l += wins[i] * x[i] - w * Math.log(e[i] + anchor[i]);
+    }
+    for (let p = 0; p < pn.length; p++) l -= pn[p] * Math.log(e[pi[p]] + e[pj[p]]);
+    return l;
+  };
+
+  // Plain steps converge slowly when a list is long and duels are spread thin. Each round takes two steps and
+  // extrapolates along them (SQUAREM, Varadhan & Roland 2008), then one more step from the extrapolated point.
+  // If that ends lower than where the round started, the round keeps the second plain step instead, so the
+  // likelihood never falls and the answer is the same maximum the plain steps reach.
+  const u1 = new Float64Array(n);
+  const u2 = new Float64Array(n);
+  const ux = new Float64Array(n);
+  const u3 = new Float64Array(n);
+  const TOL = 1e-8;
+  let iterations = 0;
+  let current = loglik(u);
+  while (iterations < 2000) {
+    iterations++;
+    if (step(u, u1) < TOL) {
+      u.set(u1);
       break;
     }
+    iterations++;
+    if (step(u1, u2) < TOL) {
+      u.set(u2);
+      break;
+    }
+    let rr = 0;
+    let vv = 0;
+    for (let i = 0; i < n; i++) {
+      const r = u1[i] - u[i];
+      const v = u2[i] - 2 * u1[i] + u[i];
+      rr += r * r;
+      vv += v * v;
+    }
+    const alpha = vv > 0 ? Math.min(-1, -Math.sqrt(rr / vv)) : -1;
+    for (let i = 0; i < n; i++) {
+      const r = u1[i] - u[i];
+      const v = u2[i] - 2 * u1[i] + u[i];
+      ux[i] = u[i] - 2 * alpha * r + alpha * alpha * v;
+    }
+    iterations++;
+    step(ux, u3);
+    const l3 = loglik(u3);
+    if (Number.isFinite(l3) && l3 >= current) {
+      u.set(u3);
+      current = l3;
+    } else {
+      u.set(u2);
+      current = loglik(u2);
+    }
   }
+  const s = new Float64Array(n);
+  for (let i = 0; i < n; i++) s[i] = Math.exp(u[i]);
 
   // Fisher information on the log scale gives a standard error per item.
   const info = new Float64Array(n);

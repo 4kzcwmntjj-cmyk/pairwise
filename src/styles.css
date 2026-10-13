@@ -1550,16 +1550,6 @@ main.sort {
   text-align: center;
   margin: 0;
 }
-.share-preview-details {
-  max-height: 28vh;
-  overflow: auto;
-  font-size: 0.8rem;
-}
-.share-preview-details ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  text-align: left;
-}
 
 /* Stats cards: one finding each, with covers and a Share button. The detailed charts fold away below. */
 .find-cards {
@@ -2012,4 +2002,38 @@ main.sort {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* New version ready: a line above the tab bar on phones, at the bottom on wide screens. */
+.update-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 15;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgba(15, 14, 30, 0.18);
+  font-weight: 600;
+}
+.update-bar span {
+  margin-right: 4px;
+}
+@media (max-width: 719px) {
+  .update-bar {
+    bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* The title card and share preview take focus when they open; the card itself needs no ring. */
+.sheet:focus,
+.share-preview:focus {
+  outline: none;
 }

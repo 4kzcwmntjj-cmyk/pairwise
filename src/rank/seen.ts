@@ -46,7 +46,18 @@ const PRIOR_STRENGTH: Vec = [2, 200, 2, 2, 5, 2];
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
 
-export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
+interface CatalogueParts {
+  links: Map<string, Map<string, number>>;
+  mean: number;
+  sd: number;
+  mangaOnly: Set<string>;
+}
+const partsOf = new WeakMap<Item[], CatalogueParts>();
+
+/** The parts of the model that depend only on the titles, not on your marks: kept per titles array. */
+function catalogueParts(items: Item[]): CatalogueParts {
+  const kept = partsOf.get(items);
+  if (kept) return kept;
   // Undirected link weights between titles.
   const links = new Map<string, Map<string, number>>();
   const link = (a: string, b: string, w: number) => {
@@ -61,15 +72,16 @@ export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
       link(target, it.id, w);
     }
   }
+  const logs = items.map((i) => Math.log1p(i.popularity));
+  const mean = logs.reduce((a, b) => a + b, 0) / Math.max(1, logs.length);
+  const sd = Math.sqrt(logs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, logs.length)) || 1;
+  const parts = { links, mean, sd, mangaOnly: new Set(items.filter(isMangaOnly).map((i) => i.id)) };
+  partsOf.set(items, parts);
+  return parts;
+}
 
-  const scale = (group: Item[]) => {
-    const logs = group.map((i) => Math.log1p(i.popularity));
-    const mean = logs.reduce((a, b) => a + b, 0) / Math.max(1, logs.length);
-    const sd = Math.sqrt(logs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, logs.length)) || 1;
-    return { mean, sd };
-  };
-  const mangaOnly = new Set(items.filter(isMangaOnly).map((i) => i.id));
-  const { mean, sd } = scale(items);
+export function seenModel(items: Item[], marks: Map<string, Mark>): SeenModel {
+  const { links, mean, sd, mangaOnly } = catalogueParts(items);
 
   const seenYears = items
     .filter((i) => marks.get(i.id)?.status === 'seen' && i.startYear)

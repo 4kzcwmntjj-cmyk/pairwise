@@ -35,6 +35,18 @@ const shortDate = (at: number | string) => {
 };
 const n = (x: number) => x.toLocaleString();
 
+let lastCatalogue: { items: Item[]; look: AppState['look']; out: Item[] } | null = null;
+/**
+ * Every title in the view as you know it. Kept between visits to Taste: it only changes with the view or your
+ * marks, and keeping the same array lets the type card's base rates (kept per array) carry over too.
+ */
+function lookedCatalogue(items: Item[], look: AppState['look']): Item[] {
+  if (lastCatalogue?.items === items && lastCatalogue.look === look) return lastCatalogue.out;
+  const out = items.map((i) => withLook(i, look(i)));
+  lastCatalogue = { items, look, out };
+  return out;
+}
+
 export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
   const { fit, votes, marks } = app;
 
@@ -80,7 +92,7 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
   );
   const noun = app.view === 'both' ? 'titles' : app.view;
   // Every title in the view, as you know it: the base for "typical" and popularity positions.
-  const catalogue = useMemo(() => app.items.map((i) => withLook(i, app.look(i))), [app.items, app.look]);
+  const catalogue = useMemo(() => lookedCatalogue(app.items, app.look), [app.items, app.look]);
   const cards = useMemo(
     () =>
       ranked.length < 10
@@ -313,13 +325,13 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
           title={`${sharing.kicker}: ${sharing.headline}`}
           filename={`shobu-${sharing.id}`}
           make={async () => {
-            const { blob, missing, details } = await renderCard(sharing, (id) => {
+            const { blob, missing } = await renderCard(sharing, (id) => {
               const item = app.itemById.get(id);
               if (!item) return { title: id };
               const look = app.look(item);
               return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
             });
-            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined, details };
+            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined };
           }}
           onClose={() => setSharing(null)}
         />

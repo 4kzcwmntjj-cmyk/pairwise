@@ -344,6 +344,85 @@ export interface HistoryPoint {
 
 const byTime = (votes: Vote[]) => [...votes].sort((a, b) => a.at - b.at || (a.id ?? 0) - (b.id ?? 0));
 
+// ----------------------------------------------------------------- replay
+
+/** Two 32-bit FNV-1a hashes carried along a string, giving a 64-bit fingerprint. */
+function fnv(h: [number, number], s: string): [number, number] {
+  let [x, y] = h;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    x = Math.imul(x ^ c, 16777619);
+    y = Math.imul(y ^ c, 2246822519);
+  }
+  return [x >>> 0, y >>> 0];
+}
+const FNV_START: [number, number] = [2166136261, 3266489917];
+
+/** How many past fits to keep. Taste uses about 12 for the history, 2 for this week and up to 40 for #1. */
+const REPLAY_KEEP = 160;
+const replayFits = new Map<string, Fit>();
+
+/**
+ * The vote log in time order, with a fingerprint of every prefix, so the ranking as it stood after any duel
+ * can be fitted once and reused. Past days don't change when new duels are played, so Taste only fits what's
+ * new; undoing a duel, regrouping a title or changing which titles count gives new fingerprints.
+ */
+export class Replay {
+  readonly sorted: Vote[];
+  private readonly prefix: string[];
+  private readonly idsKey: string;
+
+  constructor(votes: Vote[], private readonly ids: string[]) {
+    this.sorted = byTime(votes);
+    let h = FNV_START;
+    this.prefix = this.sorted.map((v) => {
+      h = fnv(h, `${v.a}|${v.b}|${v.outcome};`);
+      return `${h[0].toString(36)}.${h[1].toString(36)}`;
+    });
+    const k = fnv(FNV_START, [...ids].sort().join('|'));
+    this.idsKey = `${ids.length}.${k[0].toString(36)}.${k[1].toString(36)}`;
+  }
+
+  /** The fit of the first `count` duels (in time order). */
+  through(count: number, warm?: Map<string, number>): Fit {
+    const key = `${this.idsKey}:${count}:${count ? this.prefix[count - 1] : ''}`;
+    const hit = replayFits.get(key);
+    if (hit) {
+      replayFits.delete(key);
+      replayFits.set(key, hit);
+      return hit;
+    }
+    const f = fitModel({ ids: this.ids, anchors: {}, votes: this.sorted.slice(0, count), warm });
+    replayFits.set(key, f);
+    if (replayFits.size > REPLAY_KEEP) replayFits.delete(replayFits.keys().next().value!);
+    return f;
+  }
+
+  /** Indexes of the last duel of each day played, oldest first. */
+  dayEnds(): number[] {
+    const out: number[] = [];
+    this.sorted.forEach((v, i) => {
+      if (i === this.sorted.length - 1 || dayKey(this.sorted[i + 1].at) !== dayKey(v.at)) out.push(i);
+    });
+    return out;
+  }
+}
+
+let lastReplay: { votes: Vote[]; ids: string[]; replay: Replay } | null = null;
+/** One Replay per vote log and title list, shared by the history, this week and #1. */
+export function replayOf(votes: Vote[], ids: string[]): Replay {
+  if (lastReplay?.votes === votes && lastReplay.ids === ids) return lastReplay.replay;
+  const replay = new Replay(votes, ids);
+  lastReplay = { votes, ids, replay };
+  return replay;
+}
+
+/** Forgets every kept fit (for tests). */
+export function clearReplayFits() {
+  replayFits.clear();
+  lastReplay = null;
+}
+
 /** Order of titles that have played at least one duel, best first, optionally only those in `within`. */
 function playedOrder(f: Fit, within?: Set<string>): string[] {
   return f.order.filter((id) => (f.duels.get(id) ?? 0) > 0 && (!within || within.has(id)));
@@ -355,12 +434,10 @@ function playedOrder(f: Fit, within?: Set<string>): string[] {
  * evenly spread over the days you voted, always ending with the latest.
  */
 export function history(votes: Vote[], seenIds: string[], track: string[], points = 12, within?: Set<string>): HistoryPoint[] {
-  const sorted = byTime(votes);
+  const replay = replayOf(votes, seenIds);
+  const sorted = replay.sorted;
   if (sorted.length === 0) return [];
-  const dayEnds: number[] = [];
-  sorted.forEach((v, i) => {
-    if (i === sorted.length - 1 || dayKey(sorted[i + 1].at) !== dayKey(v.at)) dayEnds.push(i);
-  });
+  const dayEnds = replay.dayEnds();
   let picks = dayEnds;
   if (dayEnds.length > points) {
     picks = Array.from({ length: points }, (_, k) => dayEnds[Math.round((k * (dayEnds.length - 1)) / (points - 1))]);
@@ -368,7 +445,7 @@ export function history(votes: Vote[], seenIds: string[], track: string[], point
   }
   let warm: Map<string, number> | undefined;
   return picks.map((end) => {
-    const f = fitModel({ ids: seenIds, anchors: {}, votes: sorted.slice(0, end + 1), warm });
+    const f = replay.through(end + 1, warm);
     warm = f.theta;
     const order = playedOrder(f, within);
     const ranks = new Map<string, number>();
@@ -388,12 +465,15 @@ export interface Move {
 
 /** Who climbed and who fell since `since`, comparing the ranking then with now. Null if too little was played by then. */
 export function movers(votes: Vote[], seenIds: string[], since: number, count = 3, minDuelsBefore = 30, within?: Set<string>) {
-  const sorted = byTime(votes);
-  const before = sorted.filter((v) => v.at <= since);
-  const after = sorted.filter((v) => v.at > since);
-  if (before.length < minDuelsBefore || after.length === 0) return null;
-  const then = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: before }), within);
-  const now = playedOrder(fitModel({ ids: seenIds, anchors: {}, votes: sorted }), within);
+  const replay = replayOf(votes, seenIds);
+  const sorted = replay.sorted;
+  // Sorted by time, so the duels up to `since` are the first ones.
+  const before = sorted.filter((v) => v.at <= since).length;
+  const after = sorted.length - before;
+  if (before < minDuelsBefore || after === 0) return null;
+  const nowFit = replay.through(sorted.length);
+  const then = playedOrder(replay.through(before, nowFit.theta), within);
+  const now = playedOrder(nowFit, within);
   const thenRank = new Map(then.map((id, i) => [id, i + 1]));
   const moves: Move[] = [];
   now.forEach((id, i) => {
@@ -405,7 +485,7 @@ export function movers(votes: Vote[], seenIds: string[], since: number, count = 
     climbers: moves.filter((m) => m.from > m.to).sort((a, b) => b.from - b.to - (a.from - a.to)).slice(0, count),
     fallers: moves.filter((m) => m.from < m.to).sort((a, b) => b.to - b.from - (a.to - a.from)).slice(0, count),
     newlyPlayed,
-    duelsSince: after.length,
+    duelsSince: after,
   };
 }
 
@@ -431,12 +511,10 @@ const calendarDay = (at: number) => {
  * Null when `id` isn't #1 in this replay (the replay ignores anchors, as `history` does).
  */
 export function topSpell(votes: Vote[], seenIds: string[], id: string, now: number, within?: Set<string>, maxDays = 40): TopSpell | null {
-  const sorted = byTime(votes);
+  const replay = replayOf(votes, seenIds);
+  const sorted = replay.sorted;
   if (sorted.length === 0) return null;
-  const dayEnds: number[] = [];
-  sorted.forEach((v, i) => {
-    if (i === sorted.length - 1 || dayKey(sorted[i + 1].at) !== dayKey(v.at)) dayEnds.push(i);
-  });
+  const dayEnds = replay.dayEnds();
   let held = dayEnds.length;
   let warm: Map<string, number> | undefined;
   let stopped = false;
@@ -445,7 +523,7 @@ export function topSpell(votes: Vote[], seenIds: string[], id: string, now: numb
       stopped = true;
       break;
     }
-    const f = fitModel({ ids: seenIds, anchors: {}, votes: sorted.slice(0, dayEnds[d] + 1), warm });
+    const f = replay.through(dayEnds[d] + 1, warm);
     warm = f.theta;
     if (playedOrder(f, within)[0] !== id) break;
     held = d;
