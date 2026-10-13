@@ -70,17 +70,20 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           Taste opens with cards, each one finding with its number: your type, who climbed or fell this week, where you
           part from AniList's scores, the themes, era and studio your top 20 leans to, how long your #1 has held the top,
-          the popular titles you haven't seen, and a few facts from your duels. Each card has its own Share. Your type
+          the popular titles you haven't seen, and a few facts from your duels. Each card's Share sends a link to your page that
+          opens at that card; Picture shares it as a picture instead. Your type
           is the pattern in your top titles least likely to happen by chance; when a second one also stands out, it shows
           as "with a streak of". It needs 30 ranked titles and 100 duels; Hot takes needs 30 ranked, Guilty pleasure 40. Below the cards, Taste in
           numbers shows where each genre, theme, studio and decade sits in your list, and Your duels has the counts, the
           top-10 chart, how settled the list is and your duel records.
         </p>
         <p>
-          Compare, at the top of Ranking, makes a link that holds your whole list. Send it to a friend: when they open it,
-          they see a match score (how often you'd both pick the same title of two you've both ranked), what you both love,
-          where you disagree most, and what's in your top 10 that they haven't ranked. If they send theirs back, you see the
-          same. Nothing goes to a server; the list is inside the link, and the lists you receive are kept on this device.
+          Share my page, at the top of Ranking, makes a link to your page: your ranking in the view you're in and your Taste
+          cards, as you see them now. A friend who opens it sees your top 10, your cards and the rest of your list, each title
+          marked with where they rank it. Once they've ranked 10 titles they also see a match score (how often you'd both
+          pick the same title of two you've both ranked) and what you both love. If they send theirs back, it's under
+          Ranking → Friends. Nothing goes to a server; the page is inside the link, and the pages you receive are kept on
+          this device.
         </p>
       </section>
 
@@ -117,8 +120,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
         <p>
           Suggestions come from AniList users' recommendations for the titles you rank highest, plus the genres and tags
           (themes such as Found Family or Time Skip) you rank well. The recommendations count for most.
-          Tonight's pick is one of the best of them, the same all day until you press Another; Share makes a picture of
-          it. Below are rows: one for each of your top three ("Because you rank … highly"), Hidden gems (strongly
+          Tonight's pick is one of the best of them, the same all day until you press Another; Share sends it as a
+          picture. Below are rows: one for each of your top three ("Because you rank … highly"), Hidden gems (strongly
           recommended from your list, but not among the 300 most popular titles), and Read the manga or Watch the anime (titles you
           know in one form, have ruled out in the other and rank in the top third; Read shows in the Anime and Both views,
           Watch in the Manga and Both views). A title shows in one row only. Press Not interested, or

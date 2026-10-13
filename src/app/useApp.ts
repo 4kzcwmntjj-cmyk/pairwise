@@ -675,7 +675,9 @@ export function useApp() {
   /** Keeps a friend's list; returns its key. */
   const addFriend = useCallback(async (list: SentList) => {
     const key = friendKey(list);
-    const friend: Friend = { ...list, key, received: Date.now() };
+    // Where the link opened is about that visit, not the list.
+    const { at: _at, ...kept } = list;
+    const friend: Friend = { ...kept, key, received: Date.now() };
     const next = [friend, ...friendsRef.current.filter((f) => f.key !== key)].slice(0, MAX_FRIENDS);
     friendsRef.current = next;
     setFriends(next);

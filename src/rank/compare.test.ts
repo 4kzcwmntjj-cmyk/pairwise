@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry, Item } from '../types';
 import { compareLists, pairAgreement, placeList } from './compare';
-import { cleanName, decodeList, encodeList, entryOf, listLink, MAX_NAME } from './listLink';
+import { cleanName, decodeList, encodeList, entryOf, listLink, MAX_NAME, packCards, unpackCards, type SharedCard } from './listLink';
 
 const item = (id: string, entryIds: number[], entries?: Entry[]): Pick<Item, 'id' | 'entryIds' | 'entries'> => ({ id, entryIds, entries });
 const entry = (id: number, format: string, year: number): Entry => ({ id, format, year, popularity: 1000 });
@@ -33,7 +33,7 @@ describe('list links', () => {
     expect(decodeList('#top')).toBeNull();
     expect(decodeList('v=1&w=3&list=AB')).toBeNull(); // not a whole id
     expect(decodeList('v=1&w=3&list=AB*')).toBeNull(); // not base64url
-    expect(decodeList('v=2&w=3&list=ABC')).toBeNull(); // unknown version
+    expect(decodeList('v=3&w=3&list=ABC')).toBeNull(); // unknown version
   });
 
   it('keeps names short and plain, and encodes them safely', () => {
@@ -55,6 +55,68 @@ describe('list links', () => {
     // A manga part ranked apart is named after the anime: its own representative (a manga entry) stands for it.
     expect(entryOf(item('f-10', [50, 60], [entry(60, 'MANGA', 2001), entry(50, 'MANGA', 1999)]))).toBe(50);
     expect(entryOf(item('custom', [9]))).toBe(9);
+  });
+});
+
+describe('page links (version 2)', () => {
+  const cards: SharedCard[] = [
+    {
+      id: 'type',
+      kicker: 'Your type',
+      headline: 'The Overthinker',
+      subhead: 'with a streak of The Thrill Seeker',
+      tagline: 'A line.',
+      hero: true,
+      lines: ['18 of your top 20 are Psychological.', 'A typical top 20 has 3.'],
+      covers: [{ entry: 9253, caption: '#1' }, { entry: 1535 }],
+      facts: [{ label: 'Era', value: 'Top 10 started 2011 (median)' }],
+    },
+    {
+      id: 'takes',
+      kicker: 'Hot takes',
+      headline: 'Steins;Gate',
+      lines: ['You rank higher'],
+      covers: [{ entry: 9253 }],
+      side: true,
+      rows: [{ entry: 1535, line: 'You rank lower · yours #90, AniList\'s #6' }],
+      rowsLabel: 'More',
+    },
+  ];
+
+  it('carries the view, the cards and a card to open at', () => {
+    const frag = encodeList({ name: 'Ryan', made: '2026-10-13', entries: [9253, 1535, 5114], view: 'anime', cards, at: 'takes' });
+    expect(frag).toContain('v=2');
+    const back = decodeList(frag)!;
+    expect(back.view).toBe('anime');
+    expect(back.at).toBe('takes');
+    expect(back.entries).toEqual([9253, 1535, 5114]);
+    expect(back.cards).toEqual(cards);
+  });
+
+  it('keeps the list when the cards are damaged', () => {
+    const frag = encodeList({ entries: [1, 2, 3], view: 'both', cards });
+    const broken = frag.replace(/c=[^&]+/, 'c=AAAA');
+    const back = decodeList(broken)!;
+    expect(back.entries).toEqual([1, 2, 3]);
+    expect(back.cards).toBeUndefined();
+  });
+
+  it('drops malformed cards and keeps the rest', () => {
+    const packed = packCards(cards);
+    expect(unpackCards(packed)).toHaveLength(2);
+    expect(unpackCards('not base64 !!')).toBeNull();
+  });
+
+  it('ignores an unknown view and a strange card id', () => {
+    const back = decodeList('v=2&vw=films&at=../x&w=3&list=AAB')!;
+    expect(back.view).toBeUndefined();
+    expect(back.at).toBeUndefined();
+  });
+
+  it('still writes version 1 for a plain list, and reads it', () => {
+    const frag = encodeList({ entries: [1, 2, 3] });
+    expect(frag).toContain('v=1');
+    expect(decodeList(frag)!.entries).toEqual([1, 2, 3]);
   });
 });
 

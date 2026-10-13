@@ -4,29 +4,26 @@ import {
   MIN_DUELS_FOR_TASTE,
   MIN_RANKED_FOR_CROWD,
   MIN_RANKED_FOR_TASTE,
-  crowdView,
   decadeOf,
-  duelStats,
-  enoughForTaste,
   extremes,
   history,
   mainstream,
-  movers,
-  overview,
   settledBands,
   tasteBy,
-  topSpell,
   type HistoryPoint,
   type HotTake,
   type TasteGroup,
 } from '../rank/stats';
+import type { SentList } from '../rank/listLink';
 import type { Item } from '../types';
 import { Cover } from './Cover';
-import { withLook, type Look } from '../rank/look';
+import type { Look } from '../rank/look';
 import type { AppState } from './useApp';
-import { buildCards, CARD_HUES, type CardSpec } from './cards';
-import { renderCard } from './cardImage';
-import { SharePreview } from './SharePreview';
+import { CARD_HUES, type CardSpec } from './cards';
+import { myPage, myPageLink } from './page';
+import { SendList } from './SendList';
+import { CardShare } from './ShareButtons';
+import { useTaste } from './useTaste';
 import { wrapLines } from './shareImage';
 
 const shortDate = (at: number | string) => {
@@ -35,42 +32,22 @@ const shortDate = (at: number | string) => {
 };
 const n = (x: number) => x.toLocaleString();
 
-let lastCatalogue: { items: Item[]; look: AppState['look']; out: Item[] } | null = null;
-/**
- * Every title in the view as you know it. Kept between visits to Taste: it only changes with the view or your
- * marks, and keeping the same array lets the type card's base rates (kept per array) carry over too.
- */
-function lookedCatalogue(items: Item[], look: AppState['look']): Item[] {
-  if (lastCatalogue?.items === items && lastCatalogue.look === look) return lastCatalogue.out;
-  const out = items.map((i) => withLook(i, look(i)));
-  lastCatalogue = { items, look, out };
-  return out;
-}
-
-export function Stats({ app, onOpen, onDuel }: { app: AppState; onOpen: (id: string) => void; onDuel: () => void }) {
+export function Stats({
+  app,
+  onOpen,
+  onDuel,
+  onPreview,
+}: {
+  app: AppState;
+  onOpen: (id: string) => void;
+  onDuel: () => void;
+  onPreview: (page: SentList) => void;
+}) {
   const { fit, votes, marks } = app;
+  const { ranked, seenIds, within, over, week, unlocked, crowd, duels, cards } = useTaste(app);
 
-  // Titles that have played at least one duel, best first. Unplayed ones sit at the midpoint and would blur the groups.
-  const ranked: Item[] = useMemo(
-    () =>
-      fit.order
-        .filter((id) => (fit.duels.get(id) ?? 0) > 0)
-        .map((id) => app.itemById.get(id)!)
-        .filter(Boolean)
-        // Years, studio and AniList score of the side you know: in the manga view, the manga's.
-        .map((i) => withLook(i, app.look(i))),
-    [fit, app.itemById, app.look],
-  );
-  // The fit runs over everything you've seen; ranks are counted within the current view.
-  const seenIds = app.seenIds;
-  const within = useMemo(() => new Set(fit.order), [fit]);
-  const now = useMemo(() => Date.now(), [votes]);
-
-  const over = useMemo(() => overview(votes, marks, now), [votes, marks, now]);
   const top10 = useMemo(() => ranked.slice(0, 10).map((i) => i.id), [ranked]);
   const points = useMemo(() => history(votes, seenIds, top10, 12, within), [votes, seenIds, top10, within]);
-  const week = useMemo(() => movers(votes, seenIds, now - 7 * 86_400_000, 3, 30, within), [votes, seenIds, now, within]);
-  const unlocked = enoughForTaste(ranked.length, votes.length);
   const taste = useMemo(() => {
     if (!unlocked) return null;
     const pick = (keys: (i: Item) => string[], min: number) => extremes(tasteBy(ranked, keys, min));
@@ -81,43 +58,14 @@ export function Stats({ app, onOpen, onDuel }: { app: AppState; onOpen: (id: str
       decades: pick(decadeOf, 4),
     };
   }, [unlocked, ranked]);
-  const crowd = useMemo(() => crowdView(ranked), [ranked]);
   const main = useMemo(() => mainstream(app.items, marks), [app.items, marks]);
-  const duels = useMemo(() => duelStats(votes, fit.order), [votes, fit.order]);
   const bands = useMemo(() => settledBands(fit), [fit]);
-  // How long the title at #1 has held the top spot: a replay of the votes, so only when there are cards to show.
-  const spell = useMemo(
-    () => (ranked.length >= 10 ? topSpell(votes, seenIds, ranked[0].id, now, within) : null),
-    [ranked, votes, seenIds, now, within],
+  // Each card's Share sends a link to your page at that card. Until you've given a name, the share sheet asks first.
+  const page = useMemo(
+    () => (app.myName.trim() ? myPage({ name: app.myName, view: app.view, order: fit.order, itemById: app.itemById, cards }) : null),
+    [app.myName, app.view, fit.order, app.itemById, cards],
   );
-  const noun = app.view === 'both' ? 'titles' : app.view;
-  // Every title in the view, as you know it: the base for "typical" and popularity positions.
-  const catalogue = useMemo(() => lookedCatalogue(app.items, app.look), [app.items, app.look]);
-  const cards = useMemo(
-    () =>
-      ranked.length < 10
-        ? []
-        : buildCards({
-            ranked,
-            catalogue,
-            marks,
-            votes,
-            order: fit.order,
-            crowd,
-            tieShare: over.tieShare,
-            enoughForType: unlocked,
-            noun,
-            week,
-            topSpell: spell,
-            undefeated: duels.undefeated[0] ?? null,
-            title: (id) => {
-              const item = app.itemById.get(id);
-              return item ? app.title(item) : id;
-            },
-          }),
-    [ranked, catalogue, marks, votes, fit.order, crowd, over.tieShare, unlocked, noun, week, spell, duels, app.itemById, app.title],
-  );
-  const [sharing, setSharing] = useState<CardSpec | null>(null);
+  const [askingAt, setAskingAt] = useState<string | null>(null);
 
   if (votes.length === 0) {
     return (
@@ -161,7 +109,21 @@ export function Stats({ app, onOpen, onDuel }: { app: AppState; onOpen: (id: str
       {cards.length > 0 && (
         <div className="find-cards">
           {cards.map((c) => (
-            <FindCard key={c.id} card={c} app={app} onOpen={onOpen} onShare={() => setSharing(c)} />
+            <FindCard
+              key={c.id}
+              card={c}
+              app={app}
+              onOpen={onOpen}
+              actions={
+                <CardShare
+                  card={c}
+                  app={app}
+                  link={page ? (at) => myPageLink(page, at) : null}
+                  shareTitle={`${app.myName.trim()}'s Shōbu`}
+                  onNoLink={setAskingAt}
+                />
+              }
+            />
           ))}
         </div>
       )}
@@ -321,22 +283,7 @@ export function Stats({ app, onOpen, onDuel }: { app: AppState; onOpen: (id: str
           </Section>
         </div>
       </details>
-      {sharing && (
-        <SharePreview
-          title={`${sharing.kicker}: ${sharing.headline}`}
-          filename={`shobu-${sharing.id}`}
-          make={async () => {
-            const { blob, missing } = await renderCard(sharing, (id) => {
-              const item = app.itemById.get(id);
-              if (!item) return { title: id };
-              const look = app.look(item);
-              return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
-            });
-            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined };
-          }}
-          onClose={() => setSharing(null)}
-        />
-      )}
+      {askingAt && <SendList app={app} at={askingAt} onClose={() => setAskingAt(null)} onPreview={onPreview} />}
     </main>
   );
 }
@@ -385,7 +332,7 @@ function CaptionTitle({ text }: { text: string }) {
   );
 }
 
-export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; onShare: () => void }) {
+export function FindCard({ card, app, onOpen, actions }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; actions?: ReactNode }) {
   const itemOf = (id: string) => app.itemById.get(id);
   const hue = CARD_HUES[card.id];
   // One or two covers at the left, with the text beside them.
@@ -424,6 +371,7 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
   );
   return (
     <article
+      id={`card-${card.id}`}
       className={`find-card find-${card.id}${hue !== undefined ? ' toned' : ''}${card.hero ? ' hero' : ''}`}
       style={hue !== undefined ? ({ '--card-h': hue } as CSSProperties) : undefined}
     >
@@ -459,11 +407,7 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
           ))}
         </dl>
       )}
-      <div className="action-row start">
-        <button className="btn btn-small" onClick={onShare}>
-          Share
-        </button>
-      </div>
+      {actions}
     </article>
   );
 }

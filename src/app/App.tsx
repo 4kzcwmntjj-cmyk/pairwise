@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { decodeList } from '../rank/listLink';
+import { decodeList, type SentList } from '../rank/listLink';
 import { Compare } from './Compare';
 import { Duel } from './Duel';
 import { ForYou } from './ForYou';
@@ -42,8 +42,12 @@ export function App() {
   const [help, setHelp] = useState(false);
   /** The front page: shown on a first visit until Start, and whenever the Shōbu name is tapped. */
   const [home, setHome] = useState<boolean | null>(null);
-  /** The Compare screen, open over the tabs, with the friend's list to show first. */
-  const [comparing, setComparing] = useState<{ key?: string } | null>(null);
+  /**
+   * A person's page, open over the tabs: a friend's (by key, optionally at one of their cards), your own as a
+   * friend would see it (`self`), or with neither, the list of friends' pages.
+   */
+  const [comparing, setComparing] = useState<{ key?: string; at?: string; self?: SentList } | null>(null);
+  const preview = (self: SentList) => setComparing({ self });
 
   const hasItems = app.items.length > 0;
 
@@ -60,7 +64,7 @@ export function App() {
     if (app.ready && hasItems && tab === null) setTab('duel');
   }, [app.ready, hasItems, tab]);
 
-  // A friend's list arrives in the link's fragment: keep it, take it out of the address bar, and open Compare.
+  // A friend's page arrives in the link's fragment: keep it, take it out of the address bar, and open it.
   // Pasting a link into a tab that's already open changes only the fragment, hence the hashchange listener.
   const addFriend = useRef(app.addFriend);
   addFriend.current = app.addFriend;
@@ -70,7 +74,7 @@ export function App() {
       const list = decodeList(location.hash);
       if (!list) return;
       history.replaceState(null, '', location.pathname + location.search);
-      addFriend.current(list).then((key) => setComparing({ key }));
+      addFriend.current(list).then((key) => setComparing({ key, at: list.at }));
     };
     take();
     window.addEventListener('hashchange', take);
@@ -140,7 +144,11 @@ export function App() {
       {showCompare && (
         <Compare
           app={app}
+          key={comparing.self ? 'self' : 'friends'}
           initialKey={comparing.key}
+          at={comparing.at}
+          self={comparing.self}
+          onPreview={preview}
           onOpen={setOpenId}
           onClose={() => setComparing(null)}
           onStart={() => {
@@ -152,9 +160,9 @@ export function App() {
       )}
       {!showCompare && current === 'duel' && <Duel app={app} onLibrary={() => setTab('sort')} onOpen={setOpenId} />}
       {!showCompare && current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onOpen={setOpenId} />}
-      {!showCompare && current === 'stats' && <Stats app={app} onOpen={setOpenId} onDuel={() => setTab('duel')} />}
+      {!showCompare && current === 'stats' && <Stats app={app} onOpen={setOpenId} onDuel={() => setTab('duel')} onPreview={preview} />}
       {!showCompare && current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
-      {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} onDuel={() => setTab('duel')} />}
+      {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} onDuel={() => setTab('duel')} onPreview={preview} />}
       {!showCompare && current === 'settings' && <SettingsScreen app={app} onHelp={() => setHelp(true)} />}
       {openId && (
         <ItemSheet

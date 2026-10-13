@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { isSettled as isSettledIn } from '../rank/stats';
+import { MIN_RANKED } from '../rank/compare';
+import type { SentList } from '../rank/listLink';
 import { Cover } from './Cover';
-import { renderTop } from './shareImage';
-import { SharePreview } from './SharePreview';
+import { SendList } from './SendList';
 import type { AppState } from './useApp';
 
 export function Ranking({
@@ -10,14 +11,16 @@ export function Ranking({
   onOpen,
   onCompare,
   onDuel,
+  onPreview,
 }: {
   app: AppState;
   onOpen: (id: string) => void;
   onCompare: () => void;
   onDuel: () => void;
+  onPreview: (page: SentList) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [previewing, setPreviewing] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const lists = useMemo(() => {
     return { ranked: app.fit.order.map((id) => app.itemById.get(id)!).filter(Boolean) };
@@ -25,17 +28,6 @@ export function Ranking({
 
   const top = app.fit.order.slice(0, 10);
   const settled = top.filter((id) => isSettledIn(app.fit, id)).length;
-  const noun = app.view === 'both' ? 'anime and manga' : app.view;
-  async function drawTop() {
-    const rows = top.flatMap((id, i) => {
-      const item = app.itemById.get(id);
-      if (!item) return [];
-      const look = app.look(item);
-      return [{ rank: i + 1, title: app.title(item), meta: look.short, cover: look.coverLarge ?? look.cover, color: look.coverColor }];
-    });
-    const { blob, missing } = await renderTop(rows, `My top ${rows.length} ${noun}`);
-    return { blob, note: missing ? `${missing} of ${rows.length} covers didn't load.` : undefined };
-  }
   const q = query.trim().toLowerCase();
   const shown = lists.ranked.filter(
     (i) => !q || [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)),
@@ -70,13 +62,13 @@ export function Ranking({
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="action-row start">
-          {top.length >= 3 && (
-            <button className="btn btn-small" onClick={() => setPreviewing(true)}>
-              Share top {Math.min(top.length, 10)}
+          {app.fit.order.length >= MIN_RANKED && (
+            <button className="btn btn-small" onClick={() => setSending(true)}>
+              Share my page
             </button>
           )}
           <button className="btn btn-small" onClick={onCompare}>
-            Compare{app.friends.length > 0 ? ` (${app.friends.length})` : ' with a friend'}
+            {app.friends.length > 0 ? `Friends (${app.friends.length})` : 'Compare with a friend'}
           </button>
         </div>
         {anySettled && (
@@ -122,12 +114,14 @@ export function Ranking({
           })}
         </ol>
       )}
-      {previewing && (
-        <SharePreview
-          title={`My top ${top.length} ${noun}`}
-          filename={`shobu-top-${top.length}`}
-          make={drawTop}
-          onClose={() => setPreviewing(false)}
+      {sending && (
+        <SendList
+          app={app}
+          onClose={() => setSending(false)}
+          onPreview={(p) => {
+            setSending(false);
+            onPreview(p);
+          }}
         />
       )}
     </main>

@@ -3,18 +3,16 @@ import { lookOf } from '../rank/look';
 import { MIN_RANKED, recommend, type Recommendation } from '../rank/recommend';
 import { buildRows, dayNumber, tonightOrder, type RowPick, type SuggestionRow } from '../rank/rows';
 import type { Item } from '../types';
-import type { CardSpec } from './cards';
-import { renderCard } from './cardImage';
 import { Cover } from './Cover';
 import { tonightCard } from './forYouCards';
-import { SharePreview } from './SharePreview';
+import { PictureButton, drawCard } from './ShareButtons';
 import type { AppState } from './useApp';
 
 export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: string) => void; onSort: () => void }) {
   const [justHidden, setJustHidden] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [rerolls, setRerolls] = useState(0);
-  const [sharing, setSharing] = useState<CardSpec | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const hiddenKeys = useMemo(() => new Set(app.dismissed), [app.dismissed]);
   const isHidden = (entryIds: number[]) => entryIds.some((e) => hiddenKeys.has(String(e)));
   const recs = useMemo(() => recommend(app.items, app.fit, app.marks, 400), [app.items, app.fit, app.marks]);
@@ -96,16 +94,24 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
             <button className="btn btn-primary btn-small" onClick={() => setRerolls(rerolls + 1)} disabled={order.length < 2}>
               Another
             </button>
-            <button
-              className="btn btn-small"
-              onClick={() => setSharing(tonightCard(pick.item.id, app.title(pick.item), reasonOf(pick), app.look(pick.item).meta))}
-            >
-              Share
-            </button>
+            <PictureButton
+              make={drawCard(tonightCard(pick.item.id, app.title(pick.item), reasonOf(pick), app.look(pick.item).meta), app)}
+              drawKey={pick.item.id}
+              filename="shobu-tonights-pick"
+              title={`Tonight's pick: ${app.title(pick.item)}`}
+              label="Share"
+              quiet={false}
+              onStatus={setShareStatus}
+            />
             <button className="btn btn-quiet btn-small" onClick={() => hide(pick.item.id)}>
               Not interested
             </button>
           </div>
+          {shareStatus && (
+            <p className="hint share-status" role="status">
+              {shareStatus}
+            </p>
+          )}
         </article>
       )}
 
@@ -185,22 +191,6 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
             </ul>
           )}
         </section>
-      )}
-      {sharing && (
-        <SharePreview
-          title={`${sharing.kicker}: ${sharing.headline}`}
-          filename="shobu-tonights-pick"
-          make={async () => {
-            const { blob, missing } = await renderCard(sharing, (id) => {
-              const item = app.itemById.get(id);
-              if (!item) return { title: id };
-              const look = app.look(item);
-              return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
-            });
-            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined };
-          }}
-          onClose={() => setSharing(null)}
-        />
       )}
     </main>
   );

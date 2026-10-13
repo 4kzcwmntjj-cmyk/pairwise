@@ -1,82 +1,140 @@
-import { useEffect, useMemo, useState } from 'react';
-import { compareLists, MIN_RANKED, placeList } from '../rank/compare';
-import { decodeList, listLink } from '../rank/listLink';
-import { renderCard } from './cardImage';
-import type { CardSpec } from './cards';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { compareLists, MIN_RANKED, placeList, type Placed } from '../rank/compare';
+import { decodeList, type SentList } from '../rank/listLink';
 import { compareCards, namesFor } from './compareCards';
 import { Cover } from './Cover';
-import { pageUrl, SendList } from './SendList';
-import { SharePreview } from './SharePreview';
+import { fromSharedCards, possessive, viewNoun } from './page';
+import { PictureButton, drawCard } from './ShareButtons';
+import { SendList } from './SendList';
 import { FindCard } from './Stats';
 import type { AppState, Friend } from './useApp';
 
 const sentOn = (made?: string) =>
   made ? new Date(`${made}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
-const friendLabel = (f: Friend) => f.name ?? `List sent ${sentOn(f.made) ?? 'without a name'}`;
+const friendLabel = (f: Friend) => f.name ?? `Page sent ${sentOn(f.made) ?? 'without a name'}`;
 
 /**
- * Comparing your list with a friend's, from a link they sent. With 10 or more ranked titles of your own you
- * see the comparison; with fewer, their top 10 and a way into duels. Also where you send your own list.
+ * A person's page, from a link they sent: their top 10, how your lists compare, their Taste cards as they see
+ * them, and the rest of their ranking. With `self`, your own page as a friend would see it. Also where friends'
+ * pages are kept and links are pasted.
  */
 export function Compare({
   app,
   initialKey,
+  at,
+  self,
   onClose,
   onStart,
   onOpen,
+  onPreview,
 }: {
   app: AppState;
   initialKey?: string;
+  /** A card to scroll to on opening. */
+  at?: string;
+  /** Your own page, shown as a friend would see it. */
+  self?: SentList;
   onClose: () => void;
   onStart: () => void;
   onOpen: (id: string) => void;
+  onPreview: (page: SentList) => void;
 }) {
   const [key, setKey] = useState(initialKey);
   useEffect(() => {
     if (initialKey) setKey(initialKey);
   }, [initialKey]);
-  const friend = app.friends.find((f) => f.key === key) ?? app.friends[0] ?? null;
+  const friend: SentList | null = self ?? app.friends.find((f) => f.key === key) ?? app.friends[0] ?? null;
+  const stored = self ? null : (friend as Friend | null);
   const [sending, setSending] = useState(false);
-  const [sharing, setSharing] = useState<CardSpec | null>(null);
   const [removing, setRemoving] = useState(false);
   const [pasted, setPasted] = useState('');
   const [pasteNote, setPasteNote] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const ranked = app.fullOrder.length;
   const fresh = app.allMarks.size === 0 && app.votes.length === 0;
   const names = namesFor(friend?.name);
+  // Your own page uses the name a friend will see.
+  const whose = friend?.name ? possessive(friend.name) : self ? 'Your' : 'Their';
 
   const placed = useMemo(() => (friend ? placeList(friend.entries, (e) => app.itemOfEntry.get(e)) : null), [friend, app.itemOfEntry]);
   const result = useMemo(
-    () => (friend && placed && ranked >= MIN_RANKED ? compareLists(app.fullOrder, placed.placed, friend.entries.length) : null),
-    [friend, placed, ranked, app.fullOrder],
+    () => (!self && friend && placed && ranked >= MIN_RANKED ? compareLists(app.fullOrder, placed.placed, friend.entries.length) : null),
+    [self, friend, placed, ranked, app.fullOrder],
   );
-  const cards = useMemo(() => (result ? compareCards(result, names) : []), [result, names.name]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only the match: their top 10 sits just above, with what you haven't ranked marked on it.
+  const match = useMemo(() => (result ? compareCards(result, names).filter((c) => c.id === 'match') : []), [result, names.name]); // eslint-disable-line react-hooks/exhaustive-deps
+  const taste = useMemo(() => (friend?.cards ? fromSharedCards(friend.cards, app.itemOfEntry) : []), [friend, app.itemOfEntry]);
+
+  // Open at the card the link pointed to, once it is on screen.
+  const scrolled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!at || scrolled.current === at) return;
+    const el = document.getElementById(`card-${at}`);
+    if (!el) return;
+    scrolled.current = at;
+    el.scrollIntoView({ block: 'start' });
+  }, [at, taste]);
+  useEffect(() => {
+    if (!at) window.scrollTo(0, 0);
+  }, [key, self, at]);
 
   async function openPasted() {
     setPasteNote(null);
     const text = pasted.trim();
     const hash = text.includes('#') ? text.slice(text.indexOf('#')) : text;
     const list = decodeList(hash);
-    if (!list) return setPasteNote("That doesn't look like a Shōbu list link.");
+    if (!list) return setPasteNote("That doesn't look like a Shōbu link.");
     const k = await app.addFriend(list);
     setKey(k);
     setPasted('');
     window.scrollTo(0, 0);
   }
 
-  async function copyTheirLink() {
-    if (!friend) return;
-    try {
-      await navigator.clipboard.writeText(listLink(pageUrl(), friend));
-      setCopied('Link copied.');
-    } catch {
-      setCopied("Couldn't copy the link here.");
-    }
-  }
-
+  const fullRank = useMemo(() => new Map(app.fullOrder.map((id, i) => [id, i + 1])), [app.fullOrder]);
+  /** What you think of one of their titles, for the line under it. */
+  const yours = (id: string): string | null => {
+    if (self || fresh) return null;
+    const r = fullRank.get(id);
+    if (r) return `You #${r}`;
+    return app.allMarks.get(id)?.status === 'unseen' ? "You haven't seen it" : 'Not on your list';
+  };
+  const row = (p: Placed) => {
+    const item = app.itemById.get(p.id);
+    if (!item) return null;
+    const title = app.title(item);
+    const mine = yours(p.id);
+    return (
+      <li key={p.id}>
+        <button className="rank-row" onClick={() => onOpen(p.id)}>
+          <span className="rank-num">{p.rank}</span>
+          <Cover look={app.look(item)} title={title} size="sm" />
+          <span className="rank-body">
+            <span className="rank-title">{title}</span>
+            <span className="rank-meta">
+              {app.look(item).short}
+              {mine && (
+                <>
+                  {' · '}
+                  <span className={`nowrap${mine.startsWith('You #') ? ' page-yours' : ''}`}>{mine}</span>
+                </>
+              )}
+            </span>
+          </span>
+        </button>
+      </li>
+    );
+  };
   const theirTen = (placed?.placed ?? []).filter((p) => p.rank <= 10);
+  const rest = (placed?.placed ?? []).filter((p) => p.rank > 10);
+  const noun = viewNoun(friend?.view);
+
+  const section = (title: string, body: ReactNode, cls = '') => (
+    <section className={`page-section ${cls}`}>
+      <h3>{title}</h3>
+      {body}
+    </section>
+  );
 
   return (
     <main className="screen settings compare">
@@ -85,152 +143,179 @@ export function Compare({
           Back
         </button>
       </div>
-      <h2>{friend?.name ? `Compare with ${friend.name}` : 'Compare with a friend'}</h2>
 
-      {app.friends.length > 1 && (
-        <label className="field compare-pick">
-          <span>Comparing with</span>
-          <select
-            value={friend?.key}
-            onChange={(e) => {
-              setKey(e.target.value);
-              setRemoving(false);
-            }}
-          >
-            {app.friends.map((f) => (
-              <option key={f.key} value={f.key}>
-                {friendLabel(f)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
-      {friend && placed && (
-        <p className="hint">
-          {friend.name ? `${friend.name} has` : 'They have'} ranked {friend.entries.length.toLocaleString()}{' '}
-          {friend.entries.length === 1 ? 'title' : 'titles'}
-          {friend.made ? ` (link made ${sentOn(friend.made)})` : ''}.
-          {placed.missing > 0 &&
-            ` ${placed.missing} of them ${placed.missing === 1 ? "isn't" : "aren't"} in your title list yet, so ${placed.missing === 1 ? "it's" : "they're"} left out.`}
-          {result && app.view !== 'both' && ' Ranks here count anime and manga together, as in the Both view.'}
-        </p>
-      )}
-
-      {!friend && (
-        <p>
-          Send your list to a friend as a link. When they open it, they see how your rankings compare: a match score, what
-          you both love and where you disagree most. If they send theirs back, you see the same here.
-        </p>
-      )}
-
-      {result && (
-        <div className="find-cards">
-          {cards.map((c) => (
-            <FindCard key={c.id} card={c} app={app} onOpen={onOpen} onShare={() => setSharing(c)} />
-          ))}
-        </div>
-      )}
-
-      {friend && !result && (
-        <section className="compare-theirs">
-          <h3>{friend.name ? `${friend.name}'s top 10` : 'Their top 10'}</h3>
-          {theirTen.length === 0 ? (
-            <p className="hint">None of their top 10 are in your title list yet.</p>
-          ) : (
-            <ol className="rank-list">
-              {theirTen.map((p) => {
-                const item = app.itemById.get(p.id);
-                if (!item) return null;
-                const title = app.title(item);
-                return (
-                  <li key={p.id}>
-                    <button className="rank-row" onClick={() => onOpen(p.id)}>
-                      <span className="rank-num">{p.rank}</span>
-                      <Cover look={app.look(item)} title={title} size="sm" />
-                      <span className="rank-body">
-                        <span className="rank-title">{title}</span>
-                        <span className="rank-meta">{app.look(item).short}</span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <p>
-            Once you've ranked {MIN_RANKED} titles of your own, this page shows how your lists compare. You'll find it again
-            under Ranking → Compare.{ranked > 0 && ` You have ${ranked} so far.`}
-          </p>
-          <div className="action-row start">
-            <button className="btn btn-primary" onClick={onStart}>
-              {fresh ? 'Start ranking' : 'Back to duels'}
-            </button>
-          </div>
+      {friend ? (
+        <>
+          <h2>{self ? 'Your page' : friend.name ? `${possessive(friend.name)} page` : "A friend's page"}</h2>
           <p className="hint">
-            Your list stays in the browser you made it in. If it's in another browser or the Home Screen app, copy this link and
-            open it there; in the Home Screen app, paste it under Ranking → Compare.
+            {self
+              ? 'This is what a friend sees when they open your link.'
+              : `${friend.entries.length.toLocaleString()} ${noun} ranked${friend.made ? `, sent ${sentOn(friend.made)}` : ''}.`}
+            {placed && placed.missing > 0 &&
+              ` ${placed.missing} of them ${placed.missing === 1 ? "isn't" : "aren't"} in your title list yet, so ${placed.missing === 1 ? "it's" : "they're"} left out.`}
           </p>
-          <div className="action-row start">
-            <button className="btn btn-small" onClick={copyTheirLink}>
-              Copy link
-            </button>
-            {copied && (
-              <span className="hint" role="status">
-                {copied}
-              </span>
+
+          {!self && app.friends.length > 1 && (
+            <label className="field compare-pick">
+              <span>Showing</span>
+              <select
+                value={stored?.key}
+                onChange={(e) => {
+                  setKey(e.target.value);
+                  setRemoving(false);
+                }}
+              >
+                {app.friends.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {friendLabel(f)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {section(
+            `${whose} top ${Math.min(10, theirTen.length) || 10}`,
+            theirTen.length === 0 ? (
+              <p className="hint">None of these titles are in your title list yet.</p>
+            ) : (
+              <ol className="rank-list">{theirTen.map(row)}</ol>
+            ),
+          )}
+
+          {match.length > 0 && (
+            <div className="find-cards">
+              {match.map((c) => (
+                <FindCard
+                  key={c.id}
+                  card={c}
+                  app={app}
+                  onOpen={onOpen}
+                  actions={
+                    <div className="action-row start">
+                      <PictureButton
+                        make={drawCard(c, app)}
+                        drawKey={`${c.headline}|${c.lines.join('|')}`}
+                        filename="shobu-match"
+                        title={`${c.kicker}: ${c.headline}`}
+                        label="Share as a picture"
+                        onStatus={setStatus}
+                      />
+                    </div>
+                  }
+                />
+              ))}
+              {status && (
+                <p className="hint" role="status">
+                  {status}
+                </p>
+              )}
+            </div>
+          )}
+
+          {!self && !result && (
+            <section className="page-section">
+              <p>
+                Once you've ranked {MIN_RANKED} titles of your own, this page also shows how your lists compare.
+                {ranked > 0 && ` You have ${ranked} so far.`}
+              </p>
+              <div className="action-row start">
+                <button className="btn btn-primary" onClick={onStart}>
+                  {fresh ? 'Rank your own' : 'Back to duels'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {taste.length > 0 &&
+            section(
+              `${whose} Taste cards`,
+              <div className="find-cards">
+                <p className="hint">As {friend.name ?? (self ? 'you see them' : 'they see them')}{friend.name ? ' sees them' : ''} in Shōbu.</p>
+                {taste.map((c) => (
+                  <FindCard key={c.id} card={c} app={app} onOpen={onOpen} />
+                ))}
+              </div>,
+              'page-taste',
             )}
-          </div>
+          {!friend.cards && !self && (
+            <p className="hint">This link is from an older version of Shōbu and holds only the ranking.</p>
+          )}
+
+          {rest.length > 0 && (
+            <details className="more-detail page-rest">
+              <summary>
+                The rest of {friend.name ? possessive(friend.name) : self ? 'your' : 'their'} list ({rest.length.toLocaleString()} more)
+              </summary>
+              <div className="more-detail-body">
+                <ol className="rank-list">{rest.map(row)}</ol>
+              </div>
+            </details>
+          )}
+          {!self && result && app.view !== 'both' && (
+            <p className="hint">Your ranks here count anime and manga together, as in the Both view.</p>
+          )}
+        </>
+      ) : (
+        <>
+          <h2>Friends</h2>
+          <p>
+            Send a friend the link to your page: your ranking and your Taste cards. When they open it, they see how your lists
+            compare, and they can send theirs back.
+          </p>
+        </>
+      )}
+
+      {!self && (
+        <section className="compare-send">
+          <h3>{friend ? 'Send yours back' : 'Share my page'}</h3>
+          {app.fit.order.length >= MIN_RANKED ? (
+            <div className="action-row start">
+              <button className="btn btn-primary" onClick={() => setSending(true)}>
+                Share my page
+              </button>
+            </div>
+          ) : (
+            <p className="hint">Rank at least {MIN_RANKED} titles first{ranked > 0 ? ` (you have ${ranked})` : ''}.</p>
+          )}
         </section>
       )}
 
-      {(!friend || result) && (
-      <section className="compare-send">
-        <h3>{friend ? 'Send yours back' : 'Send my list'}</h3>
-        {ranked >= MIN_RANKED ? (
-          <div className="action-row start">
-            <button className="btn btn-primary" onClick={() => setSending(true)}>
-              Send my list
+      {!self && (
+        <section className="compare-paste">
+          <h3>Have a link from a friend?</h3>
+          <p className="hint">
+            Opening it in this browser brings it here. Your list stays in the browser you made it in, so in the Home Screen app,
+            paste the link here.
+          </p>
+          <div className="search-form">
+            <input
+              id="paste-link"
+              className="search"
+              type="url"
+              placeholder="Paste the link"
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && pasted.trim() && openPasted()}
+            />
+            <button className="btn" disabled={!pasted.trim()} onClick={openPasted}>
+              Open
             </button>
           </div>
-        ) : (
-          <p className="hint">
-            Rank at least {MIN_RANKED} titles first{ranked > 0 ? ` (you have ${ranked})` : ''}.
-          </p>
-        )}
-      </section>
+          {pasteNote && <p className="error">{pasteNote}</p>}
+        </section>
       )}
 
-      <section className="compare-paste">
-        <h3>Have a link from a friend?</h3>
-        <p className="hint">Opening it in this browser brings it here. You can also paste it.</p>
-        <div className="search-form">
-          <input
-            id="paste-link"
-            className="search"
-            type="url"
-            placeholder="Paste the link"
-            value={pasted}
-            onChange={(e) => setPasted(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && pasted.trim() && openPasted()}
-          />
-          <button className="btn" disabled={!pasted.trim()} onClick={openPasted}>
-            Open
-          </button>
-        </div>
-        {pasteNote && <p className="error">{pasteNote}</p>}
-      </section>
-
-      {friend && (
+      {stored && (
         <section className="compare-remove">
           {removing ? (
             <div className="confirm">
-              <p>Remove {friend.name ? `${friend.name}'s` : 'this'} list from this device? Opening the link again brings it back.</p>
+              <p>Remove {stored.name ? possessive(stored.name) : 'this'} page from this device? Opening the link again brings it back.</p>
               <div className="action-row start">
                 <button
                   className="btn btn-danger btn-small"
                   onClick={async () => {
-                    await app.removeFriend(friend.key);
+                    await app.removeFriend(stored.key);
                     setKey(undefined);
                     setRemoving(false);
                   }}
@@ -244,29 +329,13 @@ export function Compare({
             </div>
           ) : (
             <button className="btn btn-quiet btn-small" onClick={() => setRemoving(true)}>
-              Remove this list
+              Remove this page
             </button>
           )}
         </section>
       )}
 
-      {sending && <SendList app={app} onClose={() => setSending(false)} />}
-      {sharing && (
-        <SharePreview
-          title={`${sharing.kicker}: ${sharing.headline}`}
-          filename={`shobu-compare-${sharing.id}`}
-          make={async () => {
-            const { blob, missing } = await renderCard(sharing, (id) => {
-              const item = app.itemById.get(id);
-              if (!item) return { title: id };
-              const look = app.look(item);
-              return { title: app.title(item), cover: look.coverLarge ?? look.cover, color: look.coverColor };
-            });
-            return { blob, note: missing ? `${missing} ${missing === 1 ? 'cover' : 'covers'} didn't load.` : undefined };
-          }}
-          onClose={() => setSharing(null)}
-        />
-      )}
+      {sending && <SendList app={app} onClose={() => setSending(false)} onPreview={(p) => { setSending(false); onPreview(p); }} />}
     </main>
   );
 }

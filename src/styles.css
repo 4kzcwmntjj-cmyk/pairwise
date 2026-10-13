@@ -1812,75 +1812,7 @@ main.sort {
   font-variant-numeric: tabular-nums;
 }
 
-/* Share preview: full-screen picture with Share and Save below it. */
-.share-preview {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: calc(var(--top-gap) + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px));
-}
-.share-preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.share-preview-head h2 {
-  font-size: 1rem;
-}
-.share-preview-options {
-  display: flex;
-  gap: 6px;
-}
-.share-preview-options button {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  cursor: pointer;
-}
-.share-preview-options button.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-.share-preview-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.share-preview-stage img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 10px;
-  /* Lets a long-press on iPhone offer Save to Photos. */
-  -webkit-touch-callout: default;
-  user-select: auto;
-}
-.share-preview-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-.share-preview-actions .btn {
-  flex: 1;
-  max-width: 220px;
-}
-.share-preview-note {
-  text-align: center;
-  margin: 0;
-}
-
-/* Stats cards: one finding each, with covers and a Share button. The detailed charts fold away below. */
+/* Stats cards: one finding each, with covers, Share (a link to your page at the card) and Picture. The detailed charts fold away below. */
 .find-cards {
   display: flex;
   flex-direction: column;
@@ -2219,7 +2151,24 @@ main.sort {
 }
 .compare .find-cards {
   padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+}
+/* A person's page: top 10, the match, their Taste cards, then the rest of the list folded. */
+.compare .page-taste .find-cards {
+  padding-bottom: 0;
+}
+.page-yours {
+  color: var(--accent);
+  font-weight: 600;
+}
+.compare .page-rest {
+  margin: 4px 0 20px;
+}
+.share-status {
+  margin: 6px 0 0;
+}
+.send-picture {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 .compare .action-row .hint {
   align-self: center;
@@ -2391,8 +2340,12 @@ main.sort {
   }
 }
 
-/* The title card and share preview take focus when they open; the card itself needs no ring. */
-.sheet:focus,
-.share-preview:focus {
+/* The title card takes focus when it opens; the card itself needs no ring. */
+.sheet:focus {
   outline: none;
+}
+
+/* A link that opens at a card scrolls it to just below the top of the screen. */
+.find-card {
+  scroll-margin-top: 16px;
 }
