@@ -496,63 +496,45 @@ a {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
-/* A pick, in one 260 ms piece (MIN_PICK_MS in Duel.tsx; the next pair also waits for its covers): the chosen cover grows a little and the other
-   fades, then the whole pair fades nearly out, and the next pair fades in from there (arena-in), so there is no
-   empty frame between them. Nothing is cut off half way, and
-   only transform and opacity change, so the browser can run it off the main thread. */
-.contender.won .contender-pick {
-  animation: pick-grow 260ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+/* A pick, in three steps that never overlap the moment the page is busy working out the next pair:
+   1. the chosen cover swells for 200 ms while the other fades (nothing else runs);
+   2. the vote is cast (Duel.tsx, VOTE_AFTER_MS) and the next pair is chosen, with the picture standing still;
+   3. once it has arrived, the old pair fades out (.arena.leaving) while the next covers load, and the next pair
+      fades in (arena-in).
+   Only transform and opacity change. */
+.contender-pick {
+  will-change: transform;
 }
-.contender.won {
-  animation: pick-out-won 260ms ease-in forwards;
+.contender.won .contender-pick {
+  animation: pick-grow 200ms cubic-bezier(0.33, 0, 0.25, 1) forwards;
 }
 .contender.lost {
-  animation: pick-out-lost 260ms ease-out forwards;
+  animation: pick-dim 200ms ease-out forwards;
 }
 .contender.tied {
-  animation: pick-out-tied 260ms ease-out forwards;
+  animation: pick-dim-tied 200ms ease-out forwards;
 }
-.arena.picking .vs {
-  animation: pick-out-won 260ms ease-in forwards;
+.arena.leaving {
+  animation: pick-leave 140ms ease-in forwards;
 }
 @keyframes pick-grow {
-  from {
-    transform: scale(1);
-  }
-  60%,
   to {
-    transform: scale(1.04);
+    transform: scale(1.05);
   }
 }
-@keyframes pick-out-won {
-  0%,
-  55% {
-    opacity: 1;
-  }
+@keyframes pick-dim {
   to {
-    opacity: 0.2;
-  }
-}
-@keyframes pick-out-lost {
-  0% {
-    opacity: 1;
-  }
-  50% {
     opacity: 0.3;
   }
-  to {
-    opacity: 0.12;
-  }
 }
-@keyframes pick-out-tied {
-  0% {
-    opacity: 1;
-  }
-  50% {
+@keyframes pick-dim-tied {
+  to {
     opacity: 0.7;
   }
+}
+@keyframes pick-leave {
   to {
-    opacity: 0.2;
+    opacity: 0.15;
   }
 }
 /* Each new pair fades in, settling from just under full size. The covers can be tapped at once,
@@ -562,7 +544,7 @@ a {
 }
 @keyframes arena-in {
   from {
-    opacity: 0.2;
+    opacity: 0.15;
     transform: scale(0.985);
   }
   to {
@@ -657,7 +639,6 @@ a {
     transition: none;
   }
   .arena,
-  .arena .vs,
   .contender,
   .contender .contender-pick,
   .top-burst::before,

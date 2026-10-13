@@ -9,10 +9,13 @@ import type { AppState } from './useApp';
 
 /** Titles waiting for "anime or manga?" before Duel asks about them together. */
 const FORM_BATCH = 4;
-/** A pick's animation (the keyframes in styles.css): the next pair never comes in sooner. */
-const MIN_PICK_MS = 260;
+/** When the vote is cast: as the chosen cover finishes swelling (pick-grow in styles.css). Working out the next
+ * pair keeps the page busy for a moment, so it waits until nothing is moving. */
+const VOTE_AFTER_MS = 210;
+/** The old pair's fade-out once the next one has been chosen (pick-leave in styles.css). */
+const LEAVE_MS = 140;
 /** From the tap, the longest the next pair waits for its covers before it comes in anyway. */
-const MAX_WAIT_MS = 550;
+const MAX_WAIT_MS = 700;
 
 export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () => void; onOpen: (id: string) => void }) {
   const [picked, setPicked] = useState<Outcome | null>(null);
@@ -37,12 +40,12 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     if (!pair || picked) return;
     pickRef.current = { key: pairKey, at: performance.now() };
     setPicked(outcome);
-    // Vote once the pick has painted: the next pair is worked out while the animation runs, not after it.
-    requestAnimationFrame(() => window.setTimeout(() => app.vote(outcome), 0));
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(() => app.vote(outcome), reduced ? 0 : VOTE_AFTER_MS);
   }
 
-  // Let the next pair in once the pick's animation has run and its covers are loaded, or at MAX_WAIT_MS.
-  // The cap also ends a pick whose vote changed nothing.
+  // Once the next pair has been chosen: fade the old one out, and let the new one in when that is done and its
+  // covers are loaded, or at MAX_WAIT_MS from the tap. The cap also ends a pick whose vote changed nothing.
   useEffect(() => {
     const p = pickRef.current;
     if (!picked || !p) return;
@@ -57,9 +60,12 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     const cap = window.setTimeout(release, Math.max(0, p.at + MAX_WAIT_MS - now));
     let min: number | undefined;
     if (a && b && pairKey !== p.key) {
-      const minEnd = p.at + (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : MIN_PICK_MS);
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // The held pair is still the one on screen; fading it here, after the busy moment, keeps the fade smooth.
+      if (!reduced) document.querySelector('.duel .arena')?.classList.add('leaving');
+      const leftAt = performance.now() + (reduced ? 0 : LEAVE_MS);
       Promise.all([preloadCover(app.look(a)), preloadCover(app.look(b))]).then(() => {
-        if (live) min = window.setTimeout(release, Math.max(0, minEnd - performance.now()));
+        if (live) min = window.setTimeout(release, Math.max(0, leftAt - performance.now()));
       });
     }
     return () => {
@@ -182,7 +188,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
   const view = (
     <main className="screen duel">
       <p className="duel-question">Which do you prefer?</p>
-      <div className={`arena${picked ? ' picking' : ''}`} key={`${pair!.a}|${pair!.b}`}>
+      <div className="arena" key={`${pair!.a}|${pair!.b}`}>
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
           vs
