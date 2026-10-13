@@ -3,7 +3,7 @@
  * as the only link between two series, and which titles have two or more storylines.
  *
  * Get the data from the latest catalogue run first:
- *   gh run download -R 4kzcwmntjj-cmyk/shobu -n raw-media -D /tmp/raw
+ *   gh run download -R doomedcommercialarea/shobu -n raw-media -D /tmp/raw
  * Then: npx vite-node scripts/sim/grouping-report.ts /tmp/raw/raw-media.json.gz [title filter…]
  */
 import { readFileSync } from 'node:fs';

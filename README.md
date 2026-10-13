@@ -1,6 +1,6 @@
 # Shōbu
 
-Rank the anime you've watched and the manga you've read by picking between two at a time (勝負, shōbu: a match or contest). Live at https://4kzcwmntjj-cmyk.github.io/shobu/.
+Rank the anime you've watched and the manga you've read by picking between two at a time (勝負, shōbu: a match or contest). Live at https://doomedcommercialarea.github.io/shobu/.
 
 - **Duel**: pick the one you prefer. The ranking is a Bradley-Terry fit over every vote, and the app picks pairs that help settle it. Titles you've probably seen join your list through duels.
 - **Ranking**: your list, with Share top 10 (a picture) and Compare with a friend (the whole list travels in a link; no server).
