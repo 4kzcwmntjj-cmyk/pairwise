@@ -46,8 +46,16 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
 
   // Each kind of card has its own hue: a faint tint over the background and the kicker's colour.
   const hue = CARD_HUES[spec.id];
-  if (hue !== undefined) {
+  if (hue !== undefined && !spec.hero) {
     ctx.fillStyle = `hsla(${hue}, 70%, 60%, 0.1)`;
+    ctx.fillRect(0, 0, W, SCRATCH_H);
+  }
+  // The type card: a stronger tint at the top, fading over the first 1,300 px, then the usual faint tint.
+  if (hue !== undefined && spec.hero) {
+    const g = ctx.createLinearGradient(0, 0, W * 0.18, 1300);
+    g.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.3)`);
+    g.addColorStop(1, `hsla(${hue}, 70%, 60%, 0.08)`);
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, SCRATCH_H);
   }
 
@@ -87,7 +95,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   let size = 72;
   let lines: string[] = [];
   const most = side ? 4 : 3;
-  for (const s of side ? [56, 48, 42] : [72, 64, 56, 48]) {
+  for (const s of side ? [56, 48, 42] : spec.hero ? [96, 84, 72, 64] : [72, 64, 56, 48]) {
     size = s;
     ctx.font = `600 ${size}px ${DISPLAY}`;
     lines = wrapLines(measure, spec.headline, colW, most);
@@ -96,8 +104,28 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   ctx.fillStyle = INK;
   y += 28;
   for (const l of lines) {
-    y += Math.round(size * 1.2);
+    y += Math.round(size * (spec.hero ? 1.1 : 1.2));
     ctx.fillText(l, colX, y);
+  }
+
+  // The runner-up, in the card's colour, then the one-line description, larger than the finding.
+  if (spec.subhead) {
+    ctx.fillStyle = hue !== undefined ? `hsl(${hue}, 80%, 76%)` : ACCENT;
+    ctx.font = `600 34px ${BODY}`;
+    for (const l of wrapLines(measure, spec.subhead, colW, 2)) {
+      y += 56;
+      ctx.fillText(l, colX, y);
+    }
+  }
+  if (spec.tagline) {
+    y += 22;
+    ctx.fillStyle = INK;
+    ctx.font = `500 46px ${DISPLAY}`;
+    for (const l of wrapLines(measure, spec.tagline, colW, 3)) {
+      y += 62;
+      ctx.fillText(l, colX, y);
+    }
+    y += 16;
   }
 
   // The finding, then its context in a quieter style.

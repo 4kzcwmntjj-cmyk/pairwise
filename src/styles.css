@@ -1694,6 +1694,41 @@ main.sort {
     border-color: hsl(var(--card-h) 50% 60% / 0.4);
   }
 }
+/* The type card opens Taste: a stronger tint that fades down the card, a larger name, and its one-line description. */
+.find-card.hero {
+  padding: 22px 18px 18px;
+  gap: 10px;
+}
+.find-card.toned.hero {
+  background: linear-gradient(170deg, hsl(var(--card-h) 70% 55% / 0.26), hsl(var(--card-h) 70% 55% / 0.07) 70%), var(--surface);
+  border-color: hsl(var(--card-h) 45% 50% / 0.5);
+}
+.find-card.hero .find-headline {
+  font-size: 2.05rem;
+  line-height: 1.1;
+}
+.find-subhead {
+  margin-top: -4px !important;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--tone, var(--muted));
+}
+.find-tagline {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 500;
+  line-height: 1.35;
+  margin: 4px 0 2px !important;
+}
+.find-card.hero .find-line {
+  font-size: 0.95rem;
+}
+@media (prefers-color-scheme: dark) {
+  .find-card.toned.hero {
+    background: linear-gradient(170deg, hsl(var(--card-h) 70% 60% / 0.3), hsl(var(--card-h) 70% 60% / 0.08) 70%), var(--surface);
+    border-color: hsl(var(--card-h) 50% 60% / 0.55);
+  }
+}
 /* A card with one or two covers: covers at the left, about a third of the width, text beside them. */
 .find-side {
   display: grid;

@@ -6,6 +6,7 @@
 
 import {
   HOT_TAKES_MIN_RANKED,
+  TYPE_LINES,
   blindSpots,
   eraLean,
   guiltyPleasure,
@@ -35,6 +36,12 @@ export interface CardSpec {
   /** Small label above the headline: what kind of finding this is. */
   kicker: string;
   headline: string;
+  /** A short line straight under the headline, e.g. the type's runner-up. */
+  subhead?: string;
+  /** A one-line description, set larger than the finding (the type card). */
+  tagline?: string;
+  /** Drawn larger, with a stronger tint: the type card, which opens Taste. */
+  hero?: boolean;
   /** The finding, then any context for it. */
   lines: string[];
   covers: CardTitle[];
@@ -157,6 +164,9 @@ export function buildCards(input: CardInput): CardSpec[] {
       id: 'type',
       kicker: 'Your type',
       headline: t.type.name,
+      subhead: t.runnerUp ? `with a streak of ${t.runnerUp.name}` : undefined,
+      tagline: TYPE_LINES[t.type.name],
+      hero: true,
       lines: [t.type.sentence, ...(t.type.typical ? [t.type.typical] : [])],
       covers: ranked5(t.type.ids.length ? t.type.ids : ranked.slice(0, 5).map((i) => i.id)),
       facts: typeFacts(t),

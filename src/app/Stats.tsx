@@ -382,6 +382,8 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
     <>
       <p className="find-kicker">{card.kicker}</p>
       <h3 className="find-headline">{card.headline}</h3>
+      {card.subhead && <p className="find-subhead">{card.subhead}</p>}
+      {card.tagline && <p className="find-tagline">{card.tagline}</p>}
       {card.lines.map((l, k) => (
         <p key={l} className={k === 0 ? 'find-line' : 'hint'}>
           {l}
@@ -409,7 +411,7 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
   );
   return (
     <article
-      className={`find-card find-${card.id}${hue !== undefined ? ' toned' : ''}`}
+      className={`find-card find-${card.id}${hue !== undefined ? ' toned' : ''}${card.hero ? ' hero' : ''}`}
       style={hue !== undefined ? ({ '--card-h': hue } as CSSProperties) : undefined}
     >
       {side ? (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
-import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, themeTags, GUILTY_MIN_RANKED, QUALIFY } from './findings';
+import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, themeTags, GENRE_TYPES, GUILTY_MIN_RANKED, QUALIFY, TAG_TYPES, TYPE_LINES } from './findings';
 import { crowdView } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
@@ -90,6 +90,42 @@ describe('pickType', () => {
     expect(t.type.name).toBe('The All-Rounder');
     expect(t.traits.agreement).toBe(0.4);
     expect(t.traits.mainstream.of).toBe(10);
+    expect(t.runnerUp).toBeNull();
+  });
+
+  it('gives the next qualifying type as a runner-up', () => {
+    const isRomance = (i: Item) => i.genres![0] === 'Romance';
+    const ranked = [...spread(catalogue.filter(isRomance), 14), ...neutral(26, isRomance)];
+    const t = pickType({ ...base, ranked, tieShare: 0.4 });
+    expect([t.type.name, t.runnerUp?.name].sort()).toEqual(['The Fence-Sitter', 'The Romantic']);
+    // Only one qualifies: no runner-up.
+    expect(pickType({ ...base, ranked }).runnerUp).toBeNull();
+  });
+
+  it('never gives a runner-up with the same name', () => {
+    const two = (i: Item) => i.studio === 'S7' || i.studio === 'S8';
+    const ranked = [...spread(catalogue.filter((i) => i.studio === 'S7'), 7), ...spread(catalogue.filter((i) => i.studio === 'S8'), 7), ...neutral(26, two)];
+    const t = pickType({ ...base, ranked });
+    expect(t.type.name).toBe('The Loyalist');
+    expect(t.runnerUp?.name).not.toBe('The Loyalist');
+  });
+
+  it('has a line for every type name, and none spare', () => {
+    const names = [
+      ...Object.values(GENRE_TYPES),
+      ...Object.values(TAG_TYPES),
+      'The Old Soul',
+      'The New Wave',
+      'The Crowd Pleaser',
+      'The Crate Digger',
+      'The Loyalist',
+      'The Contrarian',
+      'The Canon Keeper',
+      'The Fence-Sitter',
+      'The All-Rounder',
+    ];
+    expect(Object.keys(TYPE_LINES).sort()).toEqual([...names].sort());
+    for (const line of Object.values(TYPE_LINES)) expect(line).toMatch(/^[A-Z"].*\.$/);
   });
 });
 

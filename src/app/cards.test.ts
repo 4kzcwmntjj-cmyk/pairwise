@@ -103,6 +103,21 @@ describe('the type card', () => {
     expect(t.type.id).toBe('popular');
     expect(typeFacts(t).map((f) => f.label)).not.toContain('Mainstream');
   });
+
+  it('leads as the hero, with its line and a runner-up', () => {
+    // Psychological crowds the top 20 and Crime is tagged on most of it: two types qualify.
+    const ranked = Array.from({ length: 40 }, (_, i) =>
+      item(`h${i}`, { genres: i < 18 ? ['Psychological'] : ['Action'], tags: i < 16 ? ['Crime'] : ['Sports'], startYear: 2000 + (i % 15), popularity: 2000 - i }),
+    );
+    const catalogue = [...ranked, ...Array.from({ length: 300 }, (_, i) => item(`v${i}`, { genres: ['Action'], tags: ['Sports'], startYear: 2010, popularity: 10_000 - i }))];
+    const card = buildCards(input(ranked, { catalogue, enoughForType: true, votes: Array.from({ length: 120 }, () => vote('h0', 'h1', 'a')) }))[0];
+    expect(card.id).toBe('type');
+    expect(card.hero).toBe(true);
+    expect([card.headline, card.subhead?.replace('with a streak of ', '')].sort()).toEqual(['The Crime Buff', 'The Overthinker']);
+    expect(card.tagline).toBe(card.headline === 'The Overthinker' ? "You like a story that's still bothering you a week later." : "You want to know how they got away with it, and how they didn't.");
+    // Other cards are not heroes.
+    expect(buildCards(input(ranked, { catalogue })).some((c) => c.hero)).toBe(false);
+  });
 });
 
 describe('Hardest call wording', () => {

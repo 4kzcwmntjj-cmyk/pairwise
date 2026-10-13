@@ -74,6 +74,67 @@ export const TAG_TYPES: Record<string, string> = {
   Work: 'The Nine-to-Fiver',
 };
 
+/** One line per type, shown under its name on the type card. Every name a type can have is here (a test checks). */
+export const TYPE_LINES: Record<string, string> = {
+  'The Old Soul': 'Your favourites have already stood the test of time.',
+  'The New Wave': 'Your favourites are still fresh enough to argue about online.',
+  'The Crowd Pleaser': "The big hits are big for a reason, and you'll say so.",
+  'The Crate Digger': 'Your favourites are the ones you have to explain to people.',
+  'The Loyalist': 'When a studio gets it right, you follow it.',
+  'The Contrarian': "AniList's scores are a suggestion you mostly ignore.",
+  'The Canon Keeper': "You and the crowd mostly agree on what's best.",
+  'The Fence-Sitter': "Asked to choose, you'd often rather not.",
+  'The All-Rounder': 'You like a good story, whatever shape it comes in.',
+  // Genres
+  'The Adrenaline Seeker': 'You like a story that moves, and a fight that lands.',
+  'The Wanderer': "You want to see what's over the next hill.",
+  'The Class Clown': "If it doesn't make you laugh, it has to work twice as hard.",
+  'The Heartstring': 'You like a story that knows how to hurt a little.',
+  'The Dreamer': "You'd take another world over this one most nights.",
+  'The Night Owl': 'You like the lights off and the dread slow.',
+  'The Magical Girl': 'Transformation sequences are not skippable.',
+  'The Pilot': "It's better with a giant robot in it.",
+  'The Front Row': 'You watch with the volume up.',
+  'The Detective': "You're working out who did it before the episode does.",
+  'The Overthinker': "You like a story that's still bothering you a week later.",
+  'The Romantic': "You're in it for the moment they finally say it.",
+  'The Futurist': 'You like a story built around a good "what if".',
+  'The Comfort Seeker': "You don't need a plot when the people are this good company.",
+  'The Team Player': "You know the rules of sports you've never played.",
+  'The Medium': 'You like the world with a few ghosts in it.',
+  'The Thrill Seeker': "You like not knowing if they'll make it to the next episode.",
+  // Tags
+  'The Rebel': "You root for the ones who don't play nice.",
+  'The Late Bloomer': 'You like watching someone work out who they are.',
+  'The Crime Buff': "You want to know how they got away with it, and how they didn't.",
+  'The Netrunner': "Neon, rain and a corporation that owns everything. You're home.",
+  'The Softie': 'Low stakes, high charm, no complaints.',
+  'The Contestant': 'You like the rules explained just before everyone breaks them.',
+  'The Homebody': 'The best scenes in your favourites happen at the dinner table.',
+  'The Foodie': "You've finished an episode hungry more than once.",
+  'The Kindred Spirit': 'You like a crew that chose each other.',
+  'The Strong Stomach': "You don't look away.",
+  'The History Buff': 'You like a story set somewhere the textbooks went.',
+  'The World-Hopper': "You've been sent to a lot of other worlds, and you keep going back.",
+  'The Unwinder': 'You watch to slow down, not to be thrilled.',
+  'The Fighter': "You'll sit through a training arc for as long as it takes.",
+  'The Philosopher': 'You like a story that leaves you with a question.',
+  'The Power Broker': 'You enjoy the scheming more than the fighting.',
+  'The Wastelander': "You want to see what's left after the end.",
+  'The Grown-Up': 'You like your leads with jobs, rent and regrets.',
+  'The Healer': 'You like watching someone put themselves back together.',
+  'The Avenger': 'You like a slow, well-planned payback.',
+  'The Stargazer': 'The further from Earth, the better.',
+  'The Powerhouse': "You want to know what you'd do with that ability.",
+  'The Absurdist': 'The less sense it makes, the harder you laugh.',
+  'The Survivor': "You like a story where tomorrow isn't promised.",
+  'The Swordsman': 'You like a fight settled by one clean stroke.',
+  'The Time Traveller': 'You like a story that rewinds, and makes you rewind it too.',
+  'The Gamer': "You'd read the patch notes for a world that doesn't exist.",
+  'The Strategist': 'You like the battle plan as much as the battle.',
+  'The Nine-to-Fiver': 'You find office politics more gripping than most fights.',
+};
+
 /** Tags about who is in the cast, or the magazine's audience: true of a list, but not a theme. */
 export const NOT_THEMES = new Set([
   'Male Protagonist',
@@ -135,6 +196,8 @@ export interface TypeFinding {
   type: Archetype;
   /** Every type that was measured, strongest first (the chosen one included). */
   candidates: Archetype[];
+  /** The next type that also qualifies, under another name: "with a streak of …". */
+  runnerUp: Archetype | null;
   traits: Traits;
 }
 
@@ -374,9 +437,12 @@ export function pickType(input: TypeInput): TypeFinding {
           ids: [],
         };
 
+  const runnerUp = type.id === 'all' ? null : (candidates.find((c) => c !== type && c.strength >= QUALIFY && c.name !== type.name) ?? null);
+
   return {
     type,
     candidates,
+    runnerUp,
     traits: {
       mainstream: { count: popular.length, of: n },
       agreement: r,

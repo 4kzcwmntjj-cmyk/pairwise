@@ -63,7 +63,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           Taste opens with cards, each one finding with its number: your type, who climbed or fell this week, where you
           part from AniList's scores, the themes, era and studio your top 20 leans to, how long your #1 has held the top,
           the popular titles you haven't seen, and a few facts from your duels. Each card has its own Share. Your type
-          needs 30 ranked titles and 100 duels; Hot takes needs 30 ranked, Guilty pleasure 40. Below the cards, Taste in
+          is the pattern in your top titles least likely to happen by chance; when a second one also stands out, it shows
+          as "with a streak of". It needs 30 ranked titles and 100 duels; Hot takes needs 30 ranked, Guilty pleasure 40. Below the cards, Taste in
           numbers shows where each genre, theme, studio and decade sits in your list, and Your duels has the counts, the
           top-10 chart, how settled the list is and your duel records.
         </p>
