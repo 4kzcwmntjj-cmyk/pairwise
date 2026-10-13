@@ -81,7 +81,7 @@ export function Compare({
   return (
     <main className="screen settings compare">
       <div className="action-row start">
-        <button className="btn btn-quiet btn-small" onClick={onClose}>
+        <button className="btn btn-quiet btn-small btn-back" onClick={onClose}>
           Back
         </button>
       </div>

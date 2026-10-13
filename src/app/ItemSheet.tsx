@@ -74,7 +74,7 @@ export function ItemSheet({
                   {duels === 0
                     ? 'No duels yet'
                     : `${record.won} won, ${record.lost} lost${record.tied ? `, ${record.tied} too close` : ''}`}
-                  {duels > 0 && duels < PLACED_AFTER ? '. Still being placed.' : '.'}
+                  {duels > 0 && duels < PLACED_AFTER ? ' · still being placed' : ''}
                 </span>
               </p>
             )}

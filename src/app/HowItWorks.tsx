@@ -3,7 +3,7 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
   return (
     <main className="screen settings howto">
       <div className="action-row start">
-        <button className="btn btn-quiet btn-small" onClick={onClose}>
+        <button className="btn btn-quiet btn-small btn-back" onClick={onClose}>
           Back
         </button>
       </div>

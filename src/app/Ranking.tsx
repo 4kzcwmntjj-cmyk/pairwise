@@ -5,7 +5,17 @@ import { renderTop } from './shareImage';
 import { SharePreview } from './SharePreview';
 import type { AppState } from './useApp';
 
-export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id: string) => void; onCompare: () => void }) {
+export function Ranking({
+  app,
+  onOpen,
+  onCompare,
+  onDuel,
+}: {
+  app: AppState;
+  onOpen: (id: string) => void;
+  onCompare: () => void;
+  onDuel: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [previewing, setPreviewing] = useState(false);
 
@@ -31,6 +41,23 @@ export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id
     (i) => !q || [i.title, i.titleEnglish, i.titleRomaji].some((t) => t?.toLowerCase().includes(q)),
   );
 
+  if (lists.ranked.length === 0) {
+    return (
+      <main className="screen empty">
+        <h2>Nothing ranked yet</h2>
+        <p>Titles join your ranking when you pick them in a duel or log them as seen in the Library.</p>
+        <button className="btn btn-primary" onClick={onDuel}>
+          Go to Duel
+        </button>
+        <button className="btn btn-quiet btn-small" onClick={onCompare}>
+          Compare with a friend
+        </button>
+      </main>
+    );
+  }
+
+  const anySettled = app.fit.order.some((id) => isSettledIn(app.fit, id));
+
   return (
     <main className="screen ranking">
       <div className="ranking-head">
@@ -52,17 +79,16 @@ export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id
             Compare{app.friends.length > 0 ? ` (${app.friends.length})` : ' with a friend'}
           </button>
         </div>
-        {top.length >= 10 && (
+        {anySettled && (
           <p className="hint">
-            {settled} of your top 10 are settled. A title is settled once more duels are unlikely to move it far.
+            A tick <SettledMark /> marks a settled title: more duels are unlikely to move it far.
+            {top.length >= 10 && ` ${settled} of your top 10 are settled.`}
           </p>
         )}
       </div>
 
       {shown.length === 0 ? (
-        <p className="empty-list">
-          {q ? `Nothing ranked matches "${query.trim()}".` : 'Titles you mark as seen will be ranked here.'}
-        </p>
+        <p className="empty-list">Nothing ranked matches "{query.trim()}".</p>
       ) : (
         <ol className="rank-list">
           {shown.map((item) => {
@@ -82,8 +108,10 @@ export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id
                       {(
                         <>
                           {' · '}
-                          {duels === 0 ? 'no duels' : duels === 1 ? '1 duel' : `${duels} duels`}
-                          {isSettled ? ', settled' : ''}
+                          <span className="nowrap">
+                            {duels === 0 ? 'no duels' : duels === 1 ? '1 duel' : `${duels} duels`}
+                            {isSettled && <SettledMark label />}
+                          </span>
                         </>
                       )}
                     </span>
@@ -103,5 +131,23 @@ export function Ranking({ app, onOpen, onCompare }: { app: AppState; onOpen: (id
         />
       )}
     </main>
+  );
+}
+
+/** The tick after a settled title's duel count. With `label`, screen readers hear "settled". */
+function SettledMark({ label }: { label?: boolean }) {
+  return (
+    <svg
+      className="settled-mark"
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      role={label ? 'img' : undefined}
+      aria-label={label ? 'settled' : undefined}
+      aria-hidden={label ? undefined : true}
+    >
+      {label && <title>Settled</title>}
+      <path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

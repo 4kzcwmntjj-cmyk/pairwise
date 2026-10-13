@@ -150,9 +150,9 @@ export function App() {
       )}
       {!showCompare && current === 'duel' && <Duel app={app} onLibrary={() => setTab('sort')} onOpen={setOpenId} />}
       {!showCompare && current === 'sort' && <Sort app={app} onDone={() => setTab('duel')} onOpen={setOpenId} />}
-      {!showCompare && current === 'stats' && <Stats app={app} onOpen={setOpenId} />}
+      {!showCompare && current === 'stats' && <Stats app={app} onOpen={setOpenId} onDuel={() => setTab('duel')} />}
       {!showCompare && current === 'foryou' && <ForYou app={app} onOpen={setOpenId} onSort={() => setTab('sort')} />}
-      {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} />}
+      {!showCompare && current === 'ranking' && <Ranking app={app} onOpen={setOpenId} onCompare={() => setComparing({})} onDuel={() => setTab('duel')} />}
       {!showCompare && current === 'settings' && <SettingsScreen app={app} onHelp={() => setHelp(true)} />}
       {openId && <ItemSheet app={app} itemId={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />}
       <UpdateBar />

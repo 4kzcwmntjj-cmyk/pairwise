@@ -326,11 +326,13 @@ function SortGrid({
         </ul>
       )}
       <div ref={sentinel} aria-hidden="true" />
-      <p className="undo-row">
-        <button className="btn btn-quiet btn-small" onClick={() => app.undo('sort')} disabled={!app.canUndo('sort')}>
-          Undo
-        </button>
-      </p>
+      {app.canUndo('sort') && (
+        <p className="undo-row">
+          <button className="btn btn-quiet btn-small" onClick={() => app.undo('sort')}>
+            Undo
+          </button>
+        </p>
+      )}
     </>
   );
 }

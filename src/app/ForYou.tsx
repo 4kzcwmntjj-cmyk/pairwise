@@ -56,7 +56,7 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
     return (
       <main className="screen empty">
         <h2>Nothing to go on yet</h2>
-        <p>Mark a few titles as seen in the Library and do some duels. Suggestions come from the shows you rank highest.</p>
+        <p>Log a few titles you've seen in the Library and do some duels. Suggestions come from the shows you rank highest.</p>
         <button className="btn btn-primary" onClick={onSort}>
           Go to the Library
         </button>
@@ -138,8 +138,13 @@ export function ForYou({ app, onOpen, onSort }: { app: AppState; onOpen: (id: st
                       {status === 'unseen' && <span className="rank-meta">Logged as not seen</span>}
                     </span>
                   </button>
-                  <button className="btn btn-quiet btn-small rec-hide" onClick={() => hide(item.id)}>
-                    Not interested
+                  <button
+                    className="rec-hide"
+                    onClick={() => hide(item.id)}
+                    aria-label={`Not interested in ${title}`}
+                    title="Not interested"
+                  >
+                    <span aria-hidden="true">×</span>
                   </button>
                 </li>
               );

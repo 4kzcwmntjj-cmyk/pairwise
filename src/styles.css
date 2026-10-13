@@ -74,6 +74,7 @@ h3 {
 }
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 a {
   color: var(--accent);
@@ -383,6 +384,14 @@ a {
 .welcome-actions .btn-quiet {
   padding-left: 0;
 }
+.welcome-more {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+}
+.welcome-more .btn-quiet {
+  padding-inline: 0;
+}
 .loader {
   display: flex;
   flex-direction: column;
@@ -641,6 +650,23 @@ a {
   max-width: 40ch;
   color: var(--muted);
 }
+.empty h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.settled-mark {
+  display: inline-block;
+  vertical-align: -2px;
+  color: var(--accent);
+}
+.rank-meta .settled-mark {
+  margin-left: 4px;
+}
+.nowrap {
+  white-space: nowrap;
+}
 
 /* Sheet */
 .sheet-backdrop {
@@ -691,6 +717,10 @@ a {
   gap: 6px;
   min-width: 0;
 }
+.sheet-head .btn-link {
+  align-self: flex-start;
+  font-size: 0.9rem;
+}
 .sheet-rank {
   display: flex;
   align-items: baseline;
@@ -710,24 +740,44 @@ a {
 }
 
 /* Settings: one card of rows per section, label and text on the left, the control on the right. */
-.settings {
+.settings-page {
   gap: 22px;
 }
 .settings-title {
   font-size: 1.35rem;
 }
-.settings section {
+.settings-page section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.settings h3 {
+.settings-page section > h3 {
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
   padding-inline: 4px;
+}
+
+/* Compare and How it works: plain sections divided by a line. */
+.settings section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.settings section:last-of-type {
+  border-bottom: 0;
+}
+.settings section > h3 {
+  font-size: 1rem;
+}
+/* A Back button lines its word up with the heading below it. */
+.btn-back {
+  align-self: flex-start;
+  margin-inline-start: -12px;
 }
 .set-group {
   background: var(--surface);
@@ -1221,7 +1271,7 @@ a {
 }
 .rank-chart .axis {
   fill: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .legend-list {
@@ -1338,14 +1388,26 @@ a {
   min-width: 0;
   border-bottom: 0;
 }
+/* Not interested in the list: the same × as on the row covers, as a quiet round button. */
 .rec-hide {
   flex: none;
   align-self: center;
-  padding: 6px 8px;
-  font-size: 0.78rem;
-  max-width: 5.5em;
-  line-height: 1.15;
-  text-align: center;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.rec-hide:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 .hidden-recs {
   display: flex;
@@ -1414,23 +1476,33 @@ a {
   gap: 6px;
 }
 
-/* Duel: titles and details keep a fixed height (long ones are cut with an ellipsis), so the buttons
-   below never jump between duels. The full details are one tap away in the Ranking. */
+/* Duel: the title and its details sit together in a block of fixed height (each cut at two lines with an
+   ellipsis), so the buttons below never jump between duels and a one-line title leaves its spare room
+   below the details rather than between them. The full details are one tap away on the title card. */
+.contender-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: calc(2 * 1.25 * 0.98rem + 4px + 2 * 1.35 * 0.85rem);
+  overflow: hidden;
+}
 .contender .item-title {
   line-height: 1.25;
-  height: 2.5em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  flex: none;
 }
 .contender .item-meta {
   line-height: 1.35;
-  height: 4.05em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
+  flex: none;
 }
 
 /* Duel fits a phone screen: the covers shrink with the screen height so the cards, "Haven't seen" and the
@@ -1443,10 +1515,6 @@ a {
   width: min(100%, 260px, calc((100vh - 375px - var(--safe-y)) * 2 / 3));
   width: min(100%, 260px, calc((100svh - 375px - var(--safe-y)) * 2 / 3));
   min-width: 96px;
-}
-.duel .contender .item-meta {
-  height: 2.7em;
-  -webkit-line-clamp: 2;
 }
 
 /* Quick sort fits a phone screen the same way: the cover shrinks with the screen height. */
@@ -1724,8 +1792,9 @@ main.sort {
 .find-covers.count-1 {
   grid-template-columns: minmax(0, 150px);
 }
+/* Two covers take the size three would, so This week isn't the tallest card. */
 .find-covers.count-2 {
-  grid-template-columns: repeat(2, minmax(0, 130px));
+  grid-template-columns: repeat(3, minmax(0, 120px));
 }
 .find-covers.count-3 {
   grid-template-columns: repeat(3, minmax(0, 120px));
@@ -1911,14 +1980,43 @@ main.sort {
 }
 .more-detail {
   border-top: 1px solid var(--line);
-  padding-top: 12px;
+  padding-top: 4px;
 }
 .more-detail > summary {
   cursor: pointer;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1rem;
-  padding: 4px 0;
+  padding: 10px 4px 10px 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.more-detail > summary::-webkit-details-marker {
+  display: none;
+}
+/* The chevron Settings uses: points right when shut, down when open. */
+.more-detail > summary::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  border-radius: 1px;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.more-detail[open] > summary::after {
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .more-detail > summary::after {
+    transition: none;
+  }
 }
 .more-detail-body {
   display: flex;

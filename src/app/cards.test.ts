@@ -17,8 +17,9 @@ const item = (id: string, extra: Partial<Item> = {}): Item => ({
 const vote = (a: string, b: string, outcome: Vote['outcome'], at = 0): Vote => ({ a, b, outcome, mode: 'refine', at });
 const title = (id: string) => `T-${id}`;
 
-/** Your order is the reverse of AniList's scores: g0 is the lowest scored and g44 the highest. */
-const reversed = (n: number) => Array.from({ length: n }, (_, i) => item(`g${i}`, { averageScore: 60 + i, popularity: 5000 - i, startYear: 2000 + (i % 20) }));
+/** Your order is the reverse of AniList's scores: g0 is the lowest scored and g44 the highest. `step` widens the score gaps. */
+const reversed = (n: number, step = 1) =>
+  Array.from({ length: n }, (_, i) => item(`g${i}`, { averageScore: 60 + step * i, popularity: 5000 - i, startYear: 2000 + (i % 20) }));
 
 function input(ranked: Item[], extra: Partial<CardInput> = {}): CardInput {
   return {
@@ -58,18 +59,19 @@ describe('Hot takes', () => {
 
 describe('Guilty pleasure', () => {
   it('needs 40 ranked titles', () => {
-    expect(ids(buildCards(input(reversed(39))))).not.toContain('guilty');
-    expect(ids(buildCards(input(reversed(45))))).toContain('guilty');
+    expect(ids(buildCards(input(reversed(39, 2))))).not.toContain('guilty');
+    expect(ids(buildCards(input(reversed(45, 2))))).toContain('guilty');
   });
 
-  it('skips the title Hot takes leads with', () => {
-    const cards = buildCards(input(reversed(45)));
-    const lead = cards.find((c) => c.id === 'takes')!.covers[0].id;
+  it('skips every title Hot takes shows', () => {
+    const cards = buildCards(input(reversed(45, 2)));
+    const takes = cards.find((c) => c.id === 'takes')!;
+    const shown = [...takes.covers.map((c) => c.id), ...takes.rows!.map((r) => r.id)];
     const guilty = cards.find((c) => c.id === 'guilty')!;
-    expect(lead).toBe('g0');
-    // g0 has the lowest AniList score of the top 20; the next lowest is g1.
-    expect(guilty.covers[0].id).toBe('g1');
-    expect(guilty.lines[0]).toBe("Your #2, but AniList's average score for it is 61.");
+    expect(shown).toEqual(['g0', 'g44', 'g1']);
+    // g0 and g1 have the lowest AniList scores of the top 20 but are on Hot takes; the next lowest is g2.
+    expect(guilty.covers[0].id).toBe('g2');
+    expect(guilty.lines[0]).toBe("Your #3, but AniList's average score for it is 64.");
   });
 });
 
@@ -190,7 +192,7 @@ describe('This week, Your #1 and Undefeated', () => {
 
 describe('card order and colours', () => {
   it('follows the agreed order', () => {
-    const ranked = reversed(45);
+    const ranked = reversed(45, 2);
     const marks = new Map<string, Mark>([['g44', { itemId: 'g44', status: 'unseen', updatedAt: 0 }]]);
     const cards = buildCards(
       input(ranked, {

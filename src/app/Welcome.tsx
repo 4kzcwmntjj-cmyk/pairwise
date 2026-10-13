@@ -83,7 +83,7 @@ export function Welcome({ app, onHelp, onStart }: { app: AppState; onHelp: () =>
         </div>
       )}
 
-      <div className="welcome-actions">
+      <div className="welcome-actions welcome-more">
         <button className="btn btn-quiet" onClick={onHelp}>
           How it works
         </button>

@@ -117,8 +117,10 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           <Cover look={app.look(item)} title={title} size="lg" />
           <span className={`contender-rank${isNew ? ' is-new' : ''}`}>{isNew ? 'New' : `#${app.rankOf.get(item.id)}`}</span>
         </button>
-        <TitleLink title={title} onOpen={() => onOpen(item.id)} />
-        <p className="item-meta">{app.look(item).meta}</p>
+        <div className="contender-text">
+          <TitleLink title={title} onOpen={() => onOpen(item.id)} />
+          <p className="item-meta">{app.look(item).meta}</p>
+        </div>
         <button
           className="btn btn-quiet btn-small"
           onClick={() => {

@@ -203,13 +203,13 @@ export function buildCards(input: CardInput): CardSpec[] {
   }
 
   // Hot takes: the biggest gaps with AniList's order, either way. Needs 30 so the "of your N" makes sense.
-  let lead: string | undefined;
+  let takenIds: string[] = [];
   if (input.crowd && input.crowd.n >= HOT_TAKES_MIN_RANKED) {
     const takes = hotTakes(input.crowd);
     const n = input.crowd.n;
     if (takes.length) {
       const [first, ...rest] = takes;
-      lead = first.item.id;
+      takenIds = takes.map((x) => x.item.id);
       const way = (gap: number) => (gap > 0 ? 'You rank higher' : 'You rank lower');
       cards.push({
         id: 'takes',
@@ -288,8 +288,8 @@ export function buildCards(input: CardInput): CardSpec[] {
     });
   }
 
-  // Guilty pleasure never opens on the title Hot takes opens on.
-  const guilty = guiltyPleasure(ranked, undefined, undefined, lead ? [lead] : []);
+  // Guilty pleasure never repeats a title Hot takes shows.
+  const guilty = guiltyPleasure(ranked, undefined, undefined, takenIds);
   if (guilty)
     cards.push({
       id: 'guilty',

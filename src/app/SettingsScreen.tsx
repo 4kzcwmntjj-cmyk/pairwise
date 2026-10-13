@@ -74,7 +74,7 @@ export function SettingsScreen({ app, onHelp }: { app: AppState; onHelp: () => v
         : '';
 
   return (
-    <main className="screen settings">
+    <main className="screen settings-page">
       <h2 className="settings-title">Settings</h2>
 
       <section aria-labelledby="set-data">

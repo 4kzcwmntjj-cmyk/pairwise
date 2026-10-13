@@ -47,7 +47,7 @@ function lookedCatalogue(items: Item[], look: AppState['look']): Item[] {
   return out;
 }
 
-export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => void }) {
+export function Stats({ app, onOpen, onDuel }: { app: AppState; onOpen: (id: string) => void; onDuel: () => void }) {
   const { fit, votes, marks } = app;
 
   // Titles that have played at least one duel, best first. Unplayed ones sit at the midpoint and would blur the groups.
@@ -121,11 +121,12 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
 
   if (votes.length === 0) {
     return (
-      <main className="screen stats">
-        <div className="empty">
-          <h2>Nothing to show yet</h2>
-          <p>Taste is built from your duels. Play a few and they will appear here.</p>
-        </div>
+      <main className="screen empty">
+        <h2>Nothing to show yet</h2>
+        <p>Taste is built from your duels. Once 10 titles are ranked, cards about your taste appear here.</p>
+        <button className="btn btn-primary" onClick={onDuel}>
+          Go to Duel
+        </button>
       </main>
     );
   }
@@ -288,9 +289,9 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
                     pair(
                       r.a,
                       r.b,
-                      `${r.aWins} ${r.aWins === 1 ? 'win' : 'wins'} · #${rankOf.get(r.a)}`,
-                      `${r.bWins} ${r.bWins === 1 ? 'win' : 'wins'} · #${rankOf.get(r.b)}`,
-                      `${r.aWins}–${r.bWins}${r.ties ? `, ${r.ties} too close to call` : ''}.`,
+                      `#${rankOf.get(r.a)}`,
+                      `#${rankOf.get(r.b)}`,
+                      `${r.aWins}–${r.bWins} over ${r.aWins + r.bWins + r.ties} duels${r.ties ? `, ${r.ties} too close to call` : ''}.`,
                     ),
                   )}
                 </ol>
@@ -604,8 +605,22 @@ function TakeList({ heading, takes, onOpen, title, look }: { heading: string; ta
 function RankChart({ points, ids, title }: { points: HistoryPoint[]; ids: string[]; title: (id: string) => string }) {
   // Ten lines are hard to tell apart; tapping a name in the legend picks out its line.
   const [picked, setPicked] = useState<string | null>(null);
-  const W = 640;
-  const H = 260;
+  // Drawn at the width it is shown, so the labels stay their set size on a phone instead of being scaled down.
+  const frame = useRef<HTMLElement>(null);
+  const [W, setW] = useState(640);
+  useLayoutEffect(() => {
+    const el = frame.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const w = Math.round(el.clientWidth);
+      if (w > 0) setW((prev) => (prev === w ? prev : w));
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  const H = Math.round(Math.min(260, Math.max(200, W * 0.5)));
   const pad = { l: 34, r: 14, t: 12, b: 26 };
   const maxRank = Math.max(10, ...points.flatMap((p) => [...p.ranks.values()]));
   const x = (i: number) => pad.l + (i / (points.length - 1)) * (W - pad.l - pad.r);
@@ -615,8 +630,8 @@ function RankChart({ points, ids, title }: { points: HistoryPoint[]; ids: string
   const ticks = [1, ...[3, 10, 30, 100].filter((t) => t < maxRank * 0.8), maxRank];
 
   return (
-    <figure className="rank-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Rank of your current top 10 over time">
+    <figure className="rank-chart" ref={frame}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Rank of your current top 10 over time">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="grid-line" />
