@@ -26,7 +26,7 @@ const PAD = 64;
 
 export type Cover = Drawable | null;
 
-/** Breaks text into at most `maxLines` lines that fit `width`, ending the last with an ellipsis if cut. */
+/** Breaks text at spaces into at most `maxLines` lines that fit `width`, ending the last with an ellipsis if cut. */
 export function wrapLines(measure: (s: string) => number, text: string, width: number, maxLines: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -45,13 +45,14 @@ export function wrapLines(measure: (s: string) => number, text: string, width: n
     }
   }
   if (line) lines.push(line);
-  const last = lines.length - 1;
-  if (last >= 0 && measure(lines[last]) > width) {
-    let t = lines[last];
+  // A line wider than the box is cut and ends in an ellipsis: the last line when the text ran on, or a
+  // single long word on any line. Words are never broken to wrap.
+  return lines.slice(0, maxLines).map((l) => {
+    if (measure(l) <= width) return l;
+    let t = l;
     while (t.length > 1 && measure(`${t}…`) > width) t = t.slice(0, -1);
-    lines[last] = `${t.trimEnd()}…`;
-  }
-  return lines.slice(0, maxLines);
+    return `${t.trimEnd()}…`;
+  });
 }
 
 export function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
-import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, themeTags, QUALIFY } from './findings';
+import { binomialTail, blindSpots, eraLean, guiltyPleasure, hardestCall, hotTakes, pickType, studioLean, surprise, themeLeans, themeTags, GUILTY_MIN_RANKED, QUALIFY } from './findings';
 import { crowdView } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
@@ -103,10 +103,27 @@ describe('hot takes, guilty pleasure, blind spots', () => {
   });
 
   it('finds a low score in the top 20 only when it stands out', () => {
-    const ranked = Array.from({ length: 25 }, (_, i) => item(`g${i}`, { averageScore: i === 6 ? 58 : 82 }));
+    const ranked = Array.from({ length: 45 }, (_, i) => item(`g${i}`, { averageScore: i === 6 ? 58 : 82 }));
     expect(guiltyPleasure(ranked)).toMatchObject({ rank: 7, score: 58, of: 20 });
-    const flat = Array.from({ length: 25 }, (_, i) => item(`f${i}`, { averageScore: 80 - (i % 3) }));
+    const flat = Array.from({ length: 45 }, (_, i) => item(`f${i}`, { averageScore: 80 - (i % 3) }));
     expect(guiltyPleasure(flat)).toBeNull();
+  });
+
+  it('needs 40 ranked titles, so the top 20 is at most half the list', () => {
+    const list = (n: number) => Array.from({ length: n }, (_, i) => item(`s${i}`, { averageScore: i === 6 ? 58 : 82 }));
+    expect(GUILTY_MIN_RANKED).toBe(40);
+    expect(guiltyPleasure(list(39))).toBeNull();
+    expect(guiltyPleasure(list(20))).toBeNull();
+    expect(guiltyPleasure(list(40))).not.toBeNull();
+  });
+
+  it('passes over a title another card already leads with', () => {
+    const ranked = Array.from({ length: 45 }, (_, i) => item(`k${i}`, { averageScore: i === 2 ? 55 : i === 9 ? 60 : 82 }));
+    expect(guiltyPleasure(ranked)?.item.id).toBe('k2');
+    expect(guiltyPleasure(ranked, 20, 8, ['k2'])).toMatchObject({ rank: 10, score: 60 });
+    // Nothing else stands out once the lowest is skipped.
+    const one = Array.from({ length: 45 }, (_, i) => item(`o${i}`, { averageScore: i === 2 ? 55 : 82 }));
+    expect(guiltyPleasure(one, 20, 8, ['o2'])).toBeNull();
   });
 
   it('lists the most popular titles marked Haven’t seen', () => {
@@ -141,6 +158,25 @@ describe('hardestCall', () => {
 
   it('is null when every pair kept its result', () => {
     expect(hardestCall([vote('a', 'b', 'a', 1), vote('a', 'b', 'a', 2)], ['a', 'b'])).toBeNull();
+  });
+
+  it('records what happened at each meeting, oldest first', () => {
+    const h = hardestCall([vote('b', 'a', 'a', 1), vote('a', 'b', 'a', 2), vote('a', 'b', 'tie', 3)], ['a', 'b'])!;
+    // The first meeting went to b, the second to a, the third was too close.
+    expect(h.results).toEqual(['b', 'a', 'tie']);
+  });
+
+  it('prefers a pair that met 3 or more times over one that changed more often in two meetings', () => {
+    const order = ['a', 'b', 'c', 'd'];
+    const votes = [
+      vote('a', 'b', 'a', 1),
+      vote('a', 'b', 'b', 2),
+      vote('c', 'd', 'a', 3),
+      vote('c', 'd', 'a', 4),
+      vote('c', 'd', 'b', 5),
+    ];
+    // a v b flipped once in 2 meetings and sits higher; c v d flipped once in 3 meetings.
+    expect(hardestCall(votes, order)).toMatchObject({ a: 'c', b: 'd', aWins: 2, bWins: 1, results: ['c', 'c', 'd'] });
   });
 });
 

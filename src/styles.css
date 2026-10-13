@@ -985,51 +985,92 @@ a {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.meter,
-.bar {
+.meter {
   display: block;
   height: 8px;
   border-radius: 4px;
   background: var(--line);
   overflow: hidden;
 }
-.meter span,
-.bar span {
+.meter span {
   display: block;
   height: 100%;
   background: var(--accent);
 }
-.bar-list {
+/* Taste groups: a dot on a line from #1 to the last title, where the group's titles sit on average. */
+.dot-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
-.bar-list li {
+.dot-list li {
   display: grid;
-  grid-template-columns: minmax(6em, 10em) 1fr;
-  grid-template-areas: 'name bar' 'note note';
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name note' 'line line';
+  align-items: baseline;
   column-gap: 10px;
+  row-gap: 3px;
 }
-.bar-name {
+.dot-name {
   grid-area: name;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bar {
-  grid-area: bar;
-}
-.bar-note {
+.dot-note {
   grid-area: note;
   color: var(--muted);
   font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
 }
-.bar-list li.bad .bar span {
+.dot-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.dot-line {
+  grid-area: line;
+  position: relative;
+  height: 14px;
+}
+.dot-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+.dot-line::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--muted);
+  opacity: 0.55;
+}
+.dot {
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  z-index: 1;
+}
+.dot-list li.bad .dot {
   background: var(--muted);
 }
 .legend {
@@ -1595,13 +1636,16 @@ main.sort {
   border-radius: 8px;
 }
 .find-cover-title {
+  display: block;
+  min-width: 0;
   font-size: 0.78rem;
-  overflow-wrap: anywhere;
   font-weight: 600;
   line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+}
+/* Lines are cut in script (see CaptionTitle), so a word is never broken; one that is too wide ends in an ellipsis. */
+.cap-line {
+  display: block;
+  white-space: nowrap;
   overflow: hidden;
 }
 .find-cover-caption {
@@ -1633,6 +1677,88 @@ main.sort {
 }
 .find-card .action-row {
   margin-top: 4px;
+}
+/* Each kind of Taste card has its own hue (--card-h, set per card): the kicker and a faint tint. */
+.find-card.toned {
+  --tone: hsl(var(--card-h) 55% 36%);
+  background: linear-gradient(hsl(var(--card-h) 70% 50% / 0.09), hsl(var(--card-h) 70% 50% / 0.09)), var(--surface);
+  border-color: hsl(var(--card-h) 45% 50% / 0.35);
+}
+.find-card.toned .find-kicker {
+  color: var(--tone);
+}
+@media (prefers-color-scheme: dark) {
+  .find-card.toned {
+    --tone: hsl(var(--card-h) 80% 76%);
+    background: linear-gradient(hsl(var(--card-h) 70% 60% / 0.12), hsl(var(--card-h) 70% 60% / 0.12)), var(--surface);
+    border-color: hsl(var(--card-h) 50% 60% / 0.4);
+  }
+}
+/* A card with one or two covers: covers at the left, about a third of the width, text beside them. */
+.find-side {
+  display: grid;
+  /* A third of the card, but not more than a phone's worth on a wide screen. */
+  grid-template-columns: min(33%, 170px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.find-side.count-2 {
+  grid-template-columns: min(46%, 260px) minmax(0, 1fr);
+}
+.find-side .find-covers {
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.find-side .find-covers.count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.find-side-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.find-side-text .find-headline {
+  font-size: 1.2rem;
+}
+.unlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.unlock-title {
+  margin: 0;
+  font-weight: 600;
+}
+.progress {
+  display: grid;
+  grid-template-columns: 4.5em 1fr 4.5em;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+.progress-count {
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pair-rows {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.pair-rows .rank-row {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+.pair-rows .hint {
+  margin: 0;
+  padding: 0 4px;
 }
 .more-detail {
   border-top: 1px solid var(--line);

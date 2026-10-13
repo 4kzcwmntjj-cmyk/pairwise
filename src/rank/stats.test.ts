@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Mark, Vote } from '../types';
 import { fit } from './solver';
-import { crowdView, dayKey, duelStats, extremes, history, mainstream, movers, overview, settledBands, tasteBy } from './stats';
+import { crowdView, dayKey, duelStats, extremes, history, mainstream, movers, overview, recordOf, settledBands, tasteBy, topSpell } from './stats';
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
   id,
@@ -101,6 +101,17 @@ describe('duelStats', () => {
     expect(d.rivalries[1]).toMatchObject({ a: 'a', b: 'c', flipped: false });
   });
 
+  it('leaves out a pair that only ever called it too close', () => {
+    const d = duelStats([vote('a', 'b', 'tie'), vote('a', 'b', 'tie'), vote('a', 'c', 'a'), vote('c', 'a', 'a')], order);
+    expect(d.rivalries.map((r) => `${r.a}${r.b}`)).toEqual(['ac']);
+  });
+
+  it('counts a title\'s record', () => {
+    const votes = [vote('a', 'b', 'a'), vote('b', 'a', 'a'), vote('a', 'c', 'tie'), vote('d', 'e', 'a')];
+    expect(recordOf(votes, 'a')).toEqual({ wins: 1, losses: 1, ties: 1 });
+    expect(recordOf(votes, 'e')).toEqual({ wins: 0, losses: 1, ties: 0 });
+  });
+
   it('lists undefeated and winless titles with at least three duels', () => {
     const votes = [vote('a', 'b', 'a'), vote('a', 'c', 'a'), vote('a', 'd', 'a'), vote('e', 'd', 'a'), vote('e', 'd', 'a')];
     const d = duelStats(votes, order);
@@ -198,5 +209,38 @@ describe('settledBands', () => {
     expect(bands.map((b) => b.label)).toEqual(['Top 10', '11 to 30']);
     expect(bands[0].total).toBe(10);
     expect(bands[1].total).toBe(2);
+  });
+});
+
+describe('topSpell', () => {
+  const ids = ['a', 'b'];
+  const day = (k: number, n: number, winner: 'a' | 'b') =>
+    Array.from({ length: n }, () => (winner === 'a' ? vote('a', 'b', 'a', t0 + k * DAY) : vote('b', 'a', 'a', t0 + k * DAY)));
+
+  it('finds the day the current #1 took over, and how many days ago that was', () => {
+    const votes = [...day(0, 3, 'b'), ...day(1, 3, 'b'), ...day(2, 8, 'a')];
+    const s = topSpell(votes, ids, 'a', t0 + 5 * DAY)!;
+    expect(dayKey(s.since)).toBe(dayKey(t0 + 2 * DAY));
+    expect(s.days).toBe(3);
+    expect(s.fromStart).toBe(false);
+    expect(s.atLeast).toBe(false);
+  });
+
+  it('says so when it has been #1 since the first day', () => {
+    const s = topSpell([...day(0, 4, 'a'), ...day(1, 4, 'a')], ids, 'a', t0 + DAY)!;
+    expect(s).toMatchObject({ fromStart: true, days: 1, atLeast: false });
+  });
+
+  it('stops looking back after a limit and says the run is at least that long', () => {
+    const votes = [0, 1, 2, 3, 4, 5].flatMap((k) => day(k, 4, 'a'));
+    const s = topSpell(votes, ids, 'a', t0 + 5 * DAY, undefined, 3)!;
+    expect(s.atLeast).toBe(true);
+    expect(s.fromStart).toBe(false);
+    expect(dayKey(s.since)).toBe(dayKey(t0 + 3 * DAY));
+  });
+
+  it('is null when the title is not #1 in the replay', () => {
+    expect(topSpell([...day(0, 4, 'b')], ids, 'a', t0)).toBeNull();
+    expect(topSpell([], ids, 'a', t0)).toBeNull();
   });
 });

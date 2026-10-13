@@ -407,16 +407,25 @@ export interface GuiltyPleasure {
   of: number;
 }
 
-/** Lowest AniList score in your top 20, when it sits well below the rest of them. */
-export function guiltyPleasure(ranked: Item[], top = GENRE_TOP, minGap = 8): GuiltyPleasure | null {
+/** Ranked titles needed before Guilty pleasure shows: "top 20" is then at most half the list. */
+export const GUILTY_MIN_RANKED = 40;
+/** Ranked titles needed before Hot takes shows. */
+export const HOT_TAKES_MIN_RANKED = 30;
+
+/**
+ * Lowest AniList score in your top 20, when it sits well below the rest of them. Titles in `skip` (the one
+ * Hot takes leads with) are passed over, so two cards don't open on the same title.
+ */
+export function guiltyPleasure(ranked: Item[], top = GENRE_TOP, minGap = 8, skip: string[] = [], minRanked = GUILTY_MIN_RANKED): GuiltyPleasure | null {
+  if (ranked.length < minRanked) return null;
   const scored = ranked
     .slice(0, top)
     .map((item, i) => ({ item, rank: i + 1, score: item.averageScore }))
     .filter((x): x is { item: Item; rank: number; score: number } => x.score !== undefined);
   if (scored.length < 5) return null;
   const mean = scored.reduce((a, x) => a + x.score, 0) / scored.length;
-  const low = [...scored].sort((a, b) => a.score - b.score || a.rank - b.rank)[0];
-  if (mean - low.score < minGap) return null;
+  const low = [...scored].filter((x) => !skip.includes(x.item.id)).sort((a, b) => a.score - b.score || a.rank - b.rank)[0];
+  if (!low || mean - low.score < minGap) return null;
   return { item: low.item, rank: low.rank, score: low.score, topMean: Math.round(mean), of: Math.min(top, ranked.length) };
 }
 
@@ -448,13 +457,21 @@ export interface HardestCall {
   ties: number;
   /** How many times the result changed from one meeting to the next. */
   flips: number;
+  /** What happened at each meeting, oldest first: the id picked, or 'tie'. */
+  results: string[];
   aRank: number;
   bRank: number;
 }
 
+/** Whether `b` beats `a` when compared number by number, left to right. */
+function laterIsHigher(a: number[], b: number[]): boolean {
+  for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return b[k] > a[k];
+  return false;
+}
+
 /**
- * The pair whose result has changed most between meetings. Most pairs meet
- * twice at most, so ties are broken by meetings and then by how high the pair sits.
+ * The pair whose result has changed between meetings. Pairs that met 3 or more times come first, since
+ * most pairs meet twice at most; then the most changes, then the most meetings, then the pair sitting higher.
  * `a` is always the one ranked higher now.
  */
 export function hardestCall(votes: Vote[], order: string[]): HardestCall | null {
@@ -470,15 +487,14 @@ export function hardestCall(votes: Vote[], order: string[]): HardestCall | null 
     s.results.push(winner === null ? 'tie' : winner === lo ? 'lo' : 'hi');
   }
   let best: HardestCall | null = null;
-  let bestKey: [number, number, number] = [0, 0, 0];
+  let bestKey: [number, number, number, number] = [0, 0, 0, 0];
   for (const s of seq.values()) {
     const flips = s.results.filter((r, i) => i > 0 && r !== s.results[i - 1]).length;
     if (flips === 0) continue;
     const loRank = rank.get(s.lo)!;
     const hiRank = rank.get(s.hi)!;
-    const key: [number, number, number] = [flips, s.results.length, -Math.max(loRank, hiRank)];
-    const better = !best || key[0] > bestKey[0] || (key[0] === bestKey[0] && (key[1] > bestKey[1] || (key[1] === bestKey[1] && key[2] > bestKey[2])));
-    if (!better) continue;
+    const key: [number, number, number, number] = [s.results.length >= 3 ? 1 : 0, flips, s.results.length, -Math.max(loRank, hiRank)];
+    if (best && !laterIsHigher(bestKey, key)) continue;
     const loFirst = loRank <= hiRank;
     const count = (r: 'lo' | 'hi' | 'tie') => s.results.filter((x) => x === r).length;
     best = {
@@ -488,6 +504,7 @@ export function hardestCall(votes: Vote[], order: string[]): HardestCall | null 
       bWins: count(loFirst ? 'hi' : 'lo'),
       ties: count('tie'),
       flips,
+      results: s.results.map((r) => (r === 'tie' ? 'tie' : r === 'lo' ? s.lo : s.hi)),
       aRank: Math.min(loRank, hiRank),
       bRank: Math.max(loRank, hiRank),
     };

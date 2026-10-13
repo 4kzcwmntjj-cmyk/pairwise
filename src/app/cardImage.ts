@@ -1,6 +1,6 @@
 /** Draws a Stats card (see cards.ts) as a picture to share. Same palette as the top-10 picture. */
 
-import type { CardSpec } from './cards';
+import { CARD_HUES, type CardSpec } from './cards';
 import { loadCovers } from './coverLoader';
 import { ACCENT, BG, BODY, DISPLAY, INK, LINE, MUTED, SHARE_WIDTH, SURFACE, coverBox, fixBlankCovers, round, wrapLines, type Box, type Cover } from './shareImage';
 
@@ -44,26 +44,60 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
   ctx.textBaseline = 'alphabetic';
   const measure = (s: string) => ctx.measureText(s).width;
 
+  // Each kind of card has its own hue: a faint tint over the background and the kicker's colour.
+  const hue = CARD_HUES[spec.id];
+  if (hue !== undefined) {
+    ctx.fillStyle = `hsla(${hue}, 70%, 60%, 0.1)`;
+    ctx.fillRect(0, 0, W, SCRATCH_H);
+  }
+
+  // One or two covers at the left, a third of the width, with the text beside them.
+  const side = !!spec.side && spec.covers.length > 0 && spec.covers.length <= 2;
+  const sideCount = spec.covers.length;
+  const sideGap = 20;
+  const sideW = side ? (sideCount === 1 ? Math.round(INNER / 3) : Math.round(INNER * 0.46)) : 0;
+  const sideCw = side ? Math.floor((sideW - sideGap * (sideCount - 1)) / sideCount) : 0;
+  const sideCh = Math.round(sideCw * 1.5);
+  const colX = side ? PAD + sideW + 44 : PAD;
+  const colW = side ? INNER - sideW - 44 : INNER;
+  let sideBottom = 0;
+  if (side) {
+    const top = PAD + 8;
+    let below = 0;
+    spec.covers.forEach((c, i) => {
+      const x = PAD + i * (sideCw + sideGap);
+      coverBox(ctx, pictured[i], covers[i], x, top, sideCw, sideCh, 16, boxes, i);
+      if (c.caption) {
+        ctx.fillStyle = MUTED;
+        ctx.font = `26px ${BODY}`;
+        ctx.fillText(wrapLines(measure, c.caption, sideCw, 1)[0], x, top + sideCh + 38);
+        below = 46;
+      }
+    });
+    sideBottom = top + sideCh + below;
+  }
+
   // Kicker
   let y = PAD + 30;
-  ctx.fillStyle = ACCENT;
+  ctx.fillStyle = hue !== undefined ? `hsl(${hue}, 80%, 76%)` : ACCENT;
   ctx.font = `600 28px ${DISPLAY}`;
-  ctx.fillText(spec.kicker.toUpperCase(), PAD, y);
+  ctx.fillText(spec.kicker.toUpperCase(), colX, y);
 
-  // Headline: as large as fits in three lines.
+  // Headline: as large as fits in three lines (four beside a cover).
   let size = 72;
   let lines: string[] = [];
-  for (const s of [72, 64, 56, 48]) {
+  const most = side ? 4 : 3;
+  for (const s of side ? [56, 48, 42] : [72, 64, 56, 48]) {
     size = s;
     ctx.font = `600 ${size}px ${DISPLAY}`;
-    lines = wrapLines(measure, spec.headline, INNER, 3);
-    if (!lines[lines.length - 1].endsWith('…') && lines.length <= (size > 56 ? 2 : 3)) break;
+    lines = wrapLines(measure, spec.headline, colW, most);
+    if (!lines[lines.length - 1].endsWith('…') && lines.length <= (side ? 3 : size > 56 ? 2 : 3)) break;
   }
   ctx.fillStyle = INK;
   y += 28;
   for (const l of lines) {
     y += Math.round(size * 1.2);
-    ctx.fillText(l, PAD, y);
+    ctx.fillText(l, colX, y);
   }
 
   // The finding, then its context in a quieter style.
@@ -72,12 +106,13 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
     const first = k === 0;
     ctx.font = first ? `500 38px ${BODY}` : `32px ${BODY}`;
     ctx.fillStyle = first ? INK : MUTED;
-    for (const l of wrapLines(measure, text, INNER, 4)) {
+    for (const l of wrapLines(measure, text, colW, side ? 6 : 4)) {
       y += first ? 50 : 44;
-      ctx.fillText(l, PAD, y);
+      ctx.fillText(l, colX, y);
     }
     y += 10;
   });
+  if (side) y = Math.max(y, sideBottom);
 
   /** A small heading over the covers or the rows. */
   const label = (text: string | undefined) => {
@@ -94,7 +129,7 @@ export async function renderCard(spec: CardSpec, art: (id: string) => CardArt): 
 
   // Cover strip, with titles and captions underneath when there are several.
   const count = spec.covers.length;
-  if (count) {
+  if (count && !side) {
     label(spec.coversLabel);
     y += 30;
     const gap = 24;

@@ -1,5 +1,5 @@
 import { themeTags } from '../rank/findings';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   MIN_DUELS_FOR_TASTE,
   MIN_RANKED_FOR_CROWD,
@@ -15,6 +15,7 @@ import {
   overview,
   settledBands,
   tasteBy,
+  topSpell,
   type HistoryPoint,
   type HotTake,
   type TasteGroup,
@@ -23,9 +24,10 @@ import type { Item } from '../types';
 import { Cover } from './Cover';
 import { withLook, type Look } from '../rank/look';
 import type { AppState } from './useApp';
-import { buildCards, type CardSpec } from './cards';
+import { buildCards, CARD_HUES, type CardSpec } from './cards';
 import { renderCard } from './cardImage';
 import { SharePreview } from './SharePreview';
+import { wrapLines } from './shareImage';
 
 const shortDate = (at: number | string) => {
   const d = typeof at === 'string' ? new Date(`${at}T12:00:00`) : new Date(at);
@@ -71,6 +73,11 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
   const main = useMemo(() => mainstream(app.items, marks), [app.items, marks]);
   const duels = useMemo(() => duelStats(votes, fit.order), [votes, fit.order]);
   const bands = useMemo(() => settledBands(fit), [fit]);
+  // How long the title at #1 has held the top spot: a replay of the votes, so only when there are cards to show.
+  const spell = useMemo(
+    () => (ranked.length >= 10 ? topSpell(votes, seenIds, ranked[0].id, now, within) : null),
+    [ranked, votes, seenIds, now, within],
+  );
   const noun = app.view === 'both' ? 'titles' : app.view;
   // Every title in the view, as you know it: the base for "typical" and popularity positions.
   const catalogue = useMemo(() => app.items.map((i) => withLook(i, app.look(i))), [app.items, app.look]);
@@ -88,12 +95,15 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
             tieShare: over.tieShare,
             enoughForType: unlocked,
             noun,
+            week,
+            topSpell: spell,
+            undefeated: duels.undefeated[0] ?? null,
             title: (id) => {
               const item = app.itemById.get(id);
               return item ? app.title(item) : id;
             },
           }),
-    [ranked, catalogue, marks, votes, fit.order, crowd, over.tieShare, unlocked, noun, app.itemById, app.title],
+    [ranked, catalogue, marks, votes, fit.order, crowd, over.tieShare, unlocked, noun, week, spell, duels, app.itemById, app.title],
   );
   const [sharing, setSharing] = useState<CardSpec | null>(null);
 
@@ -112,20 +122,29 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
     const item = app.itemById.get(id);
     return item ? app.title(item) : id;
   };
-  const link = (id: string) => (
-    <button className="btn-link inline" onClick={() => onOpen(id)}>
-      {title(id)}
-    </button>
+  const rankOf = new Map(fit.order.map((id, i) => [id, i + 1]));
+  const row = (id: string, meta: ReactNode) => <TitleRow key={id} id={id} meta={meta} app={app} onOpen={onOpen} />;
+  const moves = (list: { id: string; from: number; to: number }[], up: boolean) =>
+    list.length > 0 && (
+      <ol className="rank-list">
+        {list.map((m) => (
+          <li key={m.id}>{row(m.id, `${up ? '▲' : '▼'} ${Math.abs(m.from - m.to)} (#${m.from} to #${m.to})`)}</li>
+        ))}
+      </ol>
+    );
+  /** Two titles side by side as rank rows, with what happened between them underneath. */
+  const pair = (a: string, b: string, aMeta: ReactNode, bMeta: ReactNode, note: ReactNode) => (
+    <li key={`${a}|${b}`} className="pair-rows">
+      {row(a, aMeta)}
+      {row(b, bMeta)}
+      <p className="hint">{note}</p>
+    </li>
   );
+  const recordCount = duels.upsets.length + duels.rivalries.length + duels.undefeated.length + duels.winless.length;
 
   return (
     <main className="screen stats">
-      {!unlocked && (
-        <Locked
-          text={`Your type needs at least ${MIN_RANKED_FOR_TASTE} ranked titles and ${MIN_DUELS_FOR_TASTE} duels.`}
-          have={`You have ${n(ranked.length)} and ${n(votes.length)}.`}
-        />
-      )}
+      {!unlocked && <Unlock ranked={ranked.length} duels={votes.length} />}
       {cards.length > 0 && (
         <div className="find-cards">
           {cards.map((c) => (
@@ -135,68 +154,20 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
       )}
 
       <details className="more-detail" open={cards.length === 0}>
-        <summary>More detail</summary>
+        <summary>Taste in numbers</summary>
         <div className="more-detail-body">
-          <div className="stat-tiles">
-            <Tile value={n(over.duels)} label="duels" />
-            <Tile value={n(over.seen)} label="seen" sub={`${n(over.unseen)} not seen`} />
-            <Tile value={`${Math.round(over.tieShare * 100)}%`} label="too close to call" />
-            <Tile
-              value={n(over.activeDays)}
-              label={over.activeDays === 1 ? 'day played' : 'days played'}
-              sub={over.currentStreak > 1 ? `${over.currentStreak} in a row now` : over.longestStreak > 1 ? `best run ${over.longestStreak}` : undefined}
-            />
-          </div>
-          <p className="hint">
-            {over.firstAt ? `Since ${shortDate(over.firstAt)}. ` : ''}
-            {over.busiest && over.busiest.count > 1 ? `Busiest day: ${shortDate(over.busiest.day)}, ${n(over.busiest.count)} duels. ` : ''}
-            {over.activeDays > 1 ? `About ${Math.round(over.perActiveDay)} duels on a day you play.` : ''}
-          </p>
-
-          <Section title="Your top 10 over time">
-            {points.length >= 3 ? (
-              <RankChart points={points} ids={top10} title={title} />
-            ) : (
-              <p className="hint">The chart needs duels on at least three different days. Come back after a few sessions.</p>
-            )}
-            {week && (week.climbers.length > 0 || week.fallers.length > 0) && (
-              <div className="stat-cols">
-                <MoveList heading="Climbed this week" moves={week.climbers} link={link} up />
-                <MoveList heading="Fell this week" moves={week.fallers} link={link} />
-              </div>
-            )}
-            {week && <p className="hint">{n(week.duelsSince)} duels in the last 7 days.</p>}
-          </Section>
-
-          <Section title="How settled it is" note="A title is settled once more duels are unlikely to move it far.">
-            <ul className="bands">
-              {bands.map((b) => (
-                <li key={b.label}>
-                  <span>{b.label}</span>
-                  <span className="meter" aria-hidden="true">
-                    <span style={{ width: `${(b.settled / b.total) * 100}%` }} />
-                  </span>
-                  <span className="band-count">
-                    {b.settled} of {b.total}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          <Section title="Your taste" note="Where each group's titles sit in your ranking, compared with the middle of your list.">
+          <Section title="Your taste" note="Where each group's titles sit in your ranking, from #1 to your last title. The tick is the middle of your list.">
             {taste ? (
               <>
-                <TasteBlock heading="Genres" data={taste.genres} />
-                <TasteBlock heading="Themes (AniList tags)" data={taste.tags} />
-                <TasteBlock heading="Studios" data={taste.studios} />
-                <TasteBlock heading="Decades" data={taste.decades} />
+                <TasteBlock heading="Genres" data={taste.genres} total={ranked.length} />
+                <TasteBlock heading="Themes (AniList tags)" data={taste.tags} total={ranked.length} />
+                <TasteBlock heading="Studios" data={taste.studios} total={ranked.length} />
+                <TasteBlock heading="Decades" data={taste.decades} total={ranked.length} />
               </>
             ) : (
-              <Locked
-                text={`Group stats need at least ${MIN_RANKED_FOR_TASTE} ranked titles and ${MIN_DUELS_FOR_TASTE} duels, or they mostly show noise.`}
-                have={`You have ${n(ranked.length)} and ${n(votes.length)}.`}
-              />
+              <p className="hint">
+                Group stats unlock at {MIN_RANKED_FOR_TASTE} ranked titles and {MIN_DUELS_FOR_TASTE} duels, as Your type does. Before that they mostly show noise.
+              </p>
             )}
           </Section>
 
@@ -221,60 +192,119 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
               </p>
             )}
           </Section>
+        </div>
+      </details>
 
-          <Section title="Duels">
+      <details className="more-detail" open={cards.length === 0}>
+        <summary>Your duels</summary>
+        <div className="more-detail-body">
+          <div className="stat-tiles">
+            <Tile value={n(over.duels)} label="duels" />
+            <Tile value={n(over.seen)} label="seen" sub={`${n(over.unseen)} not seen`} />
+            <Tile value={`${Math.round(over.tieShare * 100)}%`} label="too close to call" />
+            <Tile
+              value={n(over.activeDays)}
+              label={over.activeDays === 1 ? 'day played' : 'days played'}
+              sub={over.currentStreak > 1 ? `${over.currentStreak} in a row now` : over.longestStreak > 1 ? `best run ${over.longestStreak}` : undefined}
+            />
+          </div>
+          <p className="hint">
+            {over.firstAt ? `Since ${shortDate(over.firstAt)}. ` : ''}
+            {over.busiest && over.busiest.count > 1 ? `Busiest day: ${shortDate(over.busiest.day)}, ${n(over.busiest.count)} duels. ` : ''}
+            {over.activeDays > 1 ? `About ${Math.round(over.perActiveDay)} duels on a day you play.` : ''}
+          </p>
+
+          <Section title="Your top 10 over time">
+            {points.length >= 3 ? (
+              <RankChart points={points} ids={top10} title={title} />
+            ) : (
+              <p className="hint">The chart needs duels on at least three different days. Come back after a few sessions.</p>
+            )}
+            {week && week.climbers.length > 0 && (
+              <div className="stat-block">
+                <h4>Climbed this week</h4>
+                {moves(week.climbers, true)}
+              </div>
+            )}
+            {week && week.fallers.length > 0 && (
+              <div className="stat-block">
+                <h4>Fell this week</h4>
+                {moves(week.fallers, false)}
+              </div>
+            )}
+            {week && <p className="hint">{n(week.duelsSince)} duels in the last 7 days.</p>}
+          </Section>
+
+          <Section title="How settled it is" note="A title is settled once more duels are unlikely to move it far.">
+            <ul className="bands">
+              {bands.map((b) => (
+                <li key={b.label}>
+                  <span>{b.label}</span>
+                  <span className="meter" aria-hidden="true">
+                    <span style={{ width: `${(b.settled / b.total) * 100}%` }} />
+                  </span>
+                  <span className="band-count">
+                    {b.settled} of {b.total}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title="Duel records">
             {duels.upsets.length > 0 && (
               <div className="stat-block">
                 <h4>Results your ranking overruled</h4>
-                <ul className="plain-list">
-                  {duels.upsets.map((u) => (
-                    <li key={`${u.winner}${u.loser}`}>
-                      {link(u.winner)} beat {link(u.loser)}, who now sits {u.gap} {u.gap === 1 ? 'place' : 'places'} higher.
-                    </li>
-                  ))}
-                </ul>
+                <ol className="rank-list">
+                  {duels.upsets.map((u) =>
+                    pair(
+                      u.winner,
+                      u.loser,
+                      `Won · #${rankOf.get(u.winner)}`,
+                      `Lost · #${rankOf.get(u.loser)}`,
+                      `The winner now sits ${u.gap} ${u.gap === 1 ? 'place' : 'places'} lower than the loser.`,
+                    ),
+                  )}
+                </ol>
               </div>
             )}
             {duels.rivalries.length > 0 && (
               <div className="stat-block">
                 <h4>Rivalries</h4>
-                <ul className="plain-list">
-                  {duels.rivalries.map((r) => (
-                    <li key={`${r.a}${r.b}`}>
-                      {link(r.a)} v {link(r.b)}: {r.aWins}–{r.bWins}
-                      {r.ties ? `, ${r.ties} too close` : ''}
-                    </li>
-                  ))}
-                </ul>
+                <ol className="rank-list">
+                  {duels.rivalries.map((r) =>
+                    pair(
+                      r.a,
+                      r.b,
+                      `${r.aWins} ${r.aWins === 1 ? 'win' : 'wins'} · #${rankOf.get(r.a)}`,
+                      `${r.bWins} ${r.bWins === 1 ? 'win' : 'wins'} · #${rankOf.get(r.b)}`,
+                      `${r.aWins}–${r.bWins}${r.ties ? `, ${r.ties} too close to call` : ''}.`,
+                    ),
+                  )}
+                </ol>
               </div>
             )}
             {duels.undefeated.length > 0 && (
               <div className="stat-block">
                 <h4>Undefeated</h4>
-                <ul className="plain-list">
+                <ol className="rank-list">
                   {duels.undefeated.map((r) => (
-                    <li key={r.id}>
-                      {link(r.id)}, {r.wins}–0
-                    </li>
+                    <li key={r.id}>{row(r.id, `${r.wins}–0 · #${rankOf.get(r.id)}`)}</li>
                   ))}
-                </ul>
+                </ol>
               </div>
             )}
             {duels.winless.length > 0 && (
               <div className="stat-block">
                 <h4>Winless</h4>
-                <ul className="plain-list">
+                <ol className="rank-list">
                   {duels.winless.map((r) => (
-                    <li key={r.id}>
-                      {link(r.id)}, 0–{r.losses}
-                    </li>
+                    <li key={r.id}>{row(r.id, `0–${r.losses} · #${rankOf.get(r.id)}`)}</li>
                   ))}
-                </ul>
+                </ol>
               </div>
             )}
-            {duels.upsets.length + duels.rivalries.length + duels.undefeated.length + duels.winless.length === 0 && (
-              <p className="hint">Nothing stands out yet. Rivalries and streaks show up as titles meet more than once.</p>
-            )}
+            {recordCount === 0 && <p className="hint">Nothing stands out yet. Rivalries and streaks show up as titles meet more than once.</p>}
           </Section>
         </div>
       </details>
@@ -298,11 +328,58 @@ export function Stats({ app, onOpen }: { app: AppState; onOpen: (id: string) => 
   );
 }
 
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+const measurer = () => (measureCtx === undefined ? (measureCtx = document.createElement('canvas').getContext('2d')) : measureCtx);
+
+/**
+ * A title under a cover: at most two lines, broken only at spaces. A word wider than the cover, or a title
+ * that runs past two lines, ends in an ellipsis instead of being broken mid-word.
+ */
+function CaptionTitle({ text }: { text: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [lines, setLines] = useState<string[] | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let alive = true;
+    const fit = () => {
+      const ctx = measurer();
+      const width = el.clientWidth;
+      if (!alive || !ctx || !width) return;
+      const cs = getComputedStyle(el);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const next = wrapLines((t) => ctx.measureText(t).width, text, width, 2);
+      setLines((prev) => (prev && prev.join('\n') === next.join('\n') ? prev : next));
+    };
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    // The web font may arrive after the first measure.
+    void document.fonts?.ready.then(fit);
+    return () => {
+      alive = false;
+      watch.disconnect();
+    };
+  }, [text]);
+  return (
+    <span ref={box} className="find-cover-title">
+      {(lines ?? [text]).map((l, k) => (
+        <span key={k} className="cap-line">
+          {l}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: AppState; onOpen: (id: string) => void; onShare: () => void }) {
   const itemOf = (id: string) => app.itemById.get(id);
-  const many = card.covers.length > 1;
-  return (
-    <article className={`find-card find-${card.id}`}>
+  const hue = CARD_HUES[card.id];
+  // One or two covers at the left, with the text beside them.
+  const side = !!card.side && card.covers.length > 0 && card.covers.length <= 2;
+  const many = card.covers.length > 1 && !side;
+  const head = (
+    <>
       <p className="find-kicker">{card.kicker}</p>
       <h3 className="find-headline">{card.headline}</h3>
       {card.lines.map((l, k) => (
@@ -310,47 +387,54 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
           {l}
         </p>
       ))}
-      {card.coversLabel && card.covers.length > 0 && <p className="find-label">{card.coversLabel}</p>}
-      {card.covers.length > 0 && (
-        <ul className={`find-covers count-${card.covers.length}`}>
-          {card.covers.map((c) => {
-            const item = itemOf(c.id);
-            if (!item) return null;
-            const title = app.title(item);
-            return (
-              <li key={c.id}>
-                <button className="find-cover" onClick={() => onOpen(c.id)} aria-label={`${title}${c.caption ? `, ${c.caption}` : ''}`}>
-                  <Cover look={app.look(item)} title={title} size="lg" />
-                  {many && <span className="find-cover-title">{title}</span>}
-                  {c.caption && <span className="find-cover-caption">{c.caption}</span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+    </>
+  );
+  const covers = card.covers.length > 0 && (
+    <ul className={`find-covers count-${card.covers.length}`}>
+      {card.covers.map((c) => {
+        const item = itemOf(c.id);
+        if (!item) return null;
+        const title = app.title(item);
+        return (
+          <li key={c.id}>
+            <button className="find-cover" onClick={() => onOpen(c.id)} aria-label={`${title}${c.caption ? `, ${c.caption}` : ''}`}>
+              <Cover look={app.look(item)} title={title} size="lg" />
+              {many && <CaptionTitle text={title} />}
+              {c.caption && <span className="find-cover-caption">{c.caption}</span>}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+  return (
+    <article
+      className={`find-card find-${card.id}${hue !== undefined ? ' toned' : ''}`}
+      style={hue !== undefined ? ({ '--card-h': hue } as CSSProperties) : undefined}
+    >
+      {side ? (
+        <div className={`find-side count-${card.covers.length}`}>
+          {covers}
+          <div className="find-side-text">{head}</div>
+        </div>
+      ) : (
+        <>
+          {head}
+          {card.coversLabel && card.covers.length > 0 && <p className="find-label">{card.coversLabel}</p>}
+          {covers}
+        </>
       )}
       {card.rowsLabel && card.rows && card.rows.length > 0 && <p className="find-label">{card.rowsLabel}</p>}
       {card.rows && card.rows.length > 0 && (
         <ol className="rank-list">
-          {card.rows.map((r) => {
-            const item = itemOf(r.id);
-            if (!item) return null;
-            const title = app.title(item);
-            return (
-              <li key={r.id}>
-                <button className="rank-row" onClick={() => onOpen(r.id)}>
-                  <Cover look={app.look(item)} title={title} size="sm" />
-                  <span className="rank-body">
-                    <span className="rank-title">{title}</span>
-                    <span className="rank-meta">{r.line}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {card.rows.map((r) => (
+            <li key={r.id}>
+              <TitleRow id={r.id} meta={r.line} app={app} onOpen={onOpen} />
+            </li>
+          ))}
         </ol>
       )}
-      {card.facts && (
+      {card.facts && card.facts.length > 0 && (
         <dl className="find-facts">
           {card.facts.map((f) => (
             <div key={f.label}>
@@ -366,6 +450,50 @@ export function FindCard({ card, app, onOpen, onShare }: { card: CardSpec; app: 
         </button>
       </div>
     </article>
+  );
+}
+
+/** A title as it looks in Ranking: small cover, name, and a line under it. Opens the title card. */
+function TitleRow({ id, meta, app, onOpen }: { id: string; meta: ReactNode; app: AppState; onOpen: (id: string) => void }) {
+  const item = app.itemById.get(id);
+  if (!item) return null;
+  const title = app.title(item);
+  return (
+    <button className="rank-row" onClick={() => onOpen(id)}>
+      <Cover look={app.look(item)} title={title} size="sm" />
+      <span className="rank-body">
+        <span className="rank-title">{title}</span>
+        <span className="rank-meta">{meta}</span>
+      </span>
+    </button>
+  );
+}
+
+/** What the locked type card needs, as two small bars. */
+function Unlock({ ranked, duels }: { ranked: number; duels: number }) {
+  return (
+    <section className="unlock" aria-label="Your type is locked">
+      <p className="unlock-title">
+        Your type unlocks at {MIN_RANKED_FOR_TASTE} ranked and {MIN_DUELS_FOR_TASTE} duels
+      </p>
+      <Progress label="Ranked" have={ranked} need={MIN_RANKED_FOR_TASTE} />
+      <Progress label="Duels" have={duels} need={MIN_DUELS_FOR_TASTE} />
+    </section>
+  );
+}
+
+function Progress({ label, have, need }: { label: string; have: number; need: number }) {
+  const shown = Math.min(have, need);
+  return (
+    <div className="progress">
+      <span className="progress-label">{label}</span>
+      <span className="meter" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={need} aria-valuenow={shown}>
+        <span style={{ width: `${(shown / need) * 100}%` }} />
+      </span>
+      <span className="progress-count">
+        {shown}/{need}
+      </span>
+    </div>
   );
 }
 
@@ -397,62 +525,37 @@ function Locked({ text, have }: { text: string; have: string }) {
   );
 }
 
-function MoveList({
-  heading,
-  moves,
-  link,
-  up,
-}: {
-  heading: string;
-  moves: { id: string; from: number; to: number }[];
-  link: (id: string) => ReactNode;
-  up?: boolean;
-}) {
-  if (moves.length === 0) return null;
-  return (
-    <div className="stat-block">
-      <h4>{heading}</h4>
-      <ul className="plain-list">
-        {moves.map((m) => (
-          <li key={m.id}>
-            {link(m.id)}{' '}
-            <span className="moved">
-              {up ? '▲' : '▼'} {Math.abs(m.from - m.to)} (#{m.from} to #{m.to})
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function TasteBlock({ heading, data }: { heading: string; data: { best: TasteGroup[]; worst: TasteGroup[] } }) {
+/** Each group as a dot on a line from #1 to your last title: where its titles sit on average. */
+function TasteBlock({ heading, data, total }: { heading: string; data: { best: TasteGroup[]; worst: TasteGroup[] }; total: number }) {
   if (data.best.length === 0 && data.worst.length === 0) return null;
-  const max = Math.max(...[...data.best, ...data.worst].map((g) => Math.abs(g.score)), 0.001);
   const row = (g: TasteGroup, good: boolean) => (
     <li key={g.name} className={good ? 'good' : 'bad'}>
-      <span className="bar-name">{g.name}</span>
-      <span className="bar" aria-hidden="true">
-        <span style={{ width: `${(Math.abs(g.score) / max) * 100}%` }} />
-      </span>
-      <span className="bar-note">
+      <span className="dot-name">{g.name}</span>
+      <span className="dot-note">
         {g.n} {g.n === 1 ? 'title' : 'titles'}, avg #{Math.round(g.avgRank)}
+      </span>
+      <span className="dot-line" role="img" aria-label={`Average position ${Math.round(g.avgRank)} of ${total}`}>
+        <span className="dot" style={{ left: `${total > 1 ? ((g.avgRank - 1) / (total - 1)) * 100 : 50}%` }} />
       </span>
     </li>
   );
   return (
     <div className="stat-block">
       <h4>{heading}</h4>
+      <div className="dot-scale" aria-hidden="true">
+        <span>#1</span>
+        <span>#{total}</span>
+      </div>
       {data.best.length > 0 && (
         <>
           <p className="hint legend">Ranked above your middle</p>
-          <ul className="bar-list">{data.best.map((g) => row(g, true))}</ul>
+          <ul className="dot-list">{data.best.map((g) => row(g, true))}</ul>
         </>
       )}
       {data.worst.length > 0 && (
         <>
           <p className="hint legend">Ranked below it</p>
-          <ul className="bar-list">{data.worst.map((g) => row(g, false))}</ul>
+          <ul className="dot-list">{data.worst.map((g) => row(g, false))}</ul>
         </>
       )}
     </div>

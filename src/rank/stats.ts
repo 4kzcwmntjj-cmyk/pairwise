@@ -301,7 +301,8 @@ export function duelStats(votes: Vote[], order: string[], count = 5): DuelStats 
   }
 
   const rivalries = [...pairs.values()]
-    .filter((p) => p.aWins + p.bWins + p.ties >= 2)
+    // Two meetings, and at least one of them with a winner: "0–0, 2 too close" says nothing.
+    .filter((p) => p.aWins + p.bWins + p.ties >= 2 && p.aWins + p.bWins >= 1)
     .map((p) => ({ ...p, flipped: (p.aWins > 0 && p.bWins > 0) || p.ties > 0 }))
     .sort((x, y) => Number(y.flipped) - Number(x.flipped) || y.aWins + y.bWins + y.ties - (x.aWins + x.bWins + x.ties));
 
@@ -319,6 +320,18 @@ export function duelStats(votes: Vote[], order: string[], count = 5): DuelStats 
       .sort((a, b) => games(b) - games(a) || rank.get(b.id)! - rank.get(a.id)!)
       .slice(0, count),
   };
+}
+
+/** Wins, losses and ties of one title across the vote log. */
+export function recordOf(votes: Vote[], id: string): { wins: number; losses: number; ties: number } {
+  const r = { wins: 0, losses: 0, ties: 0 };
+  for (const v of votes) {
+    if (v.a !== id && v.b !== id) continue;
+    if (v.outcome === 'tie') r.ties++;
+    else if ((v.outcome === 'a' ? v.a : v.b) === id) r.wins++;
+    else r.losses++;
+  }
+  return r;
 }
 
 // ----------------------------------------------------------------- history
@@ -394,6 +407,52 @@ export function movers(votes: Vote[], seenIds: string[], since: number, count = 
     newlyPlayed,
     duelsSince: after.length,
   };
+}
+
+export interface TopSpell {
+  /** A time on the first day of the current run at #1. */
+  since: number;
+  /** Whole calendar days from that day to today; 0 means it took the top spot today. */
+  days: number;
+  /** It has been #1 since the first day you played. */
+  fromStart: boolean;
+  /** The check stopped looking back before the run began, so the true run is at least this long. */
+  atLeast: boolean;
+}
+
+const calendarDay = (at: number) => {
+  const d = new Date(at);
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY);
+};
+
+/**
+ * How long `id` has been #1: refits the ranking as it stood at the end of each day, newest first, until
+ * someone else was on top. Looks back at most `maxDays` days played, since each day costs a fit.
+ * Null when `id` isn't #1 in this replay (the replay ignores anchors, as `history` does).
+ */
+export function topSpell(votes: Vote[], seenIds: string[], id: string, now: number, within?: Set<string>, maxDays = 40): TopSpell | null {
+  const sorted = byTime(votes);
+  if (sorted.length === 0) return null;
+  const dayEnds: number[] = [];
+  sorted.forEach((v, i) => {
+    if (i === sorted.length - 1 || dayKey(sorted[i + 1].at) !== dayKey(v.at)) dayEnds.push(i);
+  });
+  let held = dayEnds.length;
+  let warm: Map<string, number> | undefined;
+  let stopped = false;
+  for (let d = dayEnds.length - 1, looked = 0; d >= 0; d--, looked++) {
+    if (looked >= maxDays) {
+      stopped = true;
+      break;
+    }
+    const f = fitModel({ ids: seenIds, anchors: {}, votes: sorted.slice(0, dayEnds[d] + 1), warm });
+    warm = f.theta;
+    if (playedOrder(f, within)[0] !== id) break;
+    held = d;
+  }
+  if (held === dayEnds.length) return null;
+  const since = sorted[dayEnds[held]].at;
+  return { since, days: Math.max(0, calendarDay(now) - calendarDay(since)), fromStart: held === 0, atLeast: stopped && held > 0 };
 }
 
 // ----------------------------------------------------------------- settled

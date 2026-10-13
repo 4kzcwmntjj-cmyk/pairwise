@@ -21,4 +21,11 @@ describe('wrapLines', () => {
     expect(l.endsWith('…')).toBe(true);
     expect(measure(l)).toBeLessThanOrEqual(80);
   });
+  it('never breaks inside a word: a long word on an early line is cut with an ellipsis', () => {
+    const lines = wrapLines(measure, 'Cyberpunk: Edgerunners', 80, 2);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe('Cyberpu…');
+    expect(lines[1]).toBe('Edgerun…');
+    expect(lines.every((l) => measure(l) <= 80)).toBe(true);
+  });
 });
