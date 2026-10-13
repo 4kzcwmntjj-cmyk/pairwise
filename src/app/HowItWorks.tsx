@@ -25,7 +25,8 @@ export function HowItWorks({ onClose }: { onClose: () => void }) {
           it, pick as usual and it joins your list. If not, press Haven't seen under it (or N) and another takes its place.
           New titles come often while your list is short, and less often later, depending on how many you turn out to
           know. Two titles that have met twice aren't asked again for a few months, so the top of your list doesn't keep
-          replaying the same close calls.
+          replaying the same close calls. Duel only brings in titles you're likely to know, so if yours are less popular,
+          few new ones may come up; a line under the buttons then points to the Library, where you can log them yourself.
         </p>
         <p>
           In the both view, a new title that is both an anime and a manga could be either. Every few picks, Duel asks

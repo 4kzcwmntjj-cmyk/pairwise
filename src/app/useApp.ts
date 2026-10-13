@@ -7,7 +7,7 @@ import { askPersistence, checkPersisted, PERSIST_AFTER, type Persistence } from 
 import { loadCatalogueFile, loadCatalogueVersion, mergeCatalogue } from '../anilist/catalogueFile';
 import { isManga, storylinesOf } from '../anilist/group';
 import { fit as fitModel, type Fit } from '../rank/solver';
-import { newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
+import { NEWCOMER_MIN_P, newcomerShare, nextPair, pairKey, replaceSide, type Newcomer, type Pair } from '../rank/pairs';
 import { seenModel } from '../rank/seen';
 import { afterShown, NO_TIPS, pickTip, type Tip, type TipState } from '../rank/tips';
 import { applyGroupOps, resolveMarks, resolveVotes, splitId, type GroupOp } from '../anilist/overrides';
@@ -218,6 +218,9 @@ export function useApp() {
       .sort((x, y) => y.p - x.p)
       .slice(0, 20);
   }, [seenGuess, marks, skipped, passed]);
+
+  /** How many of those newcomer duels would actually offer (the same cut-off the pair picker uses). */
+  const newcomersWaiting = useMemo(() => newcomers.filter((c) => c.p >= NEWCOMER_MIN_P).length, [newcomers]);
 
   // Keep a valid duel ready.
   const isValid = useCallback(
@@ -871,6 +874,7 @@ export function useApp() {
     clearMark,
     skipSort,
     seenGuess,
+    newcomersWaiting,
     notSeenInDuel,
     tip,
     dismissTip: () => setTip(null),

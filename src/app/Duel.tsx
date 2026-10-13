@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PLACED_AFTER, type Pair } from '../rank/pairs';
+import { NICHE_HINT, showNicheHint } from '../rank/nicheHint';
 import type { Look } from '../rank/look';
 import type { Item, Outcome } from '../types';
 import { BackupNote } from './BackupNote';
@@ -240,6 +241,14 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
             </span>
           ) : fresh.length === 1 ? (
             <span key="one">New to your list. Pick as usual if you know it.</span>
+          ) : showNicheHint(app.newcomersWaiting, app.votes.length) ? (
+            <span key="niche">
+              {NICHE_HINT}{' '}
+              <button className="btn-link inline" onClick={onLibrary}>
+                Library
+              </button>
+              .
+            </span>
           ) : null}
         </p>
       )}
