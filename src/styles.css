@@ -447,7 +447,6 @@ a {
   gap: 6px;
   text-align: center;
   min-width: 0;
-  transition: opacity 0.2s;
 }
 .contender-pick {
   position: relative;
@@ -460,8 +459,12 @@ a {
   border-radius: var(--radius);
   transition: transform 0.2s ease;
 }
-.contender-pick:hover {
-  transform: translateY(-2px);
+/* Hover lift only where there is a real pointer: on a phone a tap leaves :hover stuck on whatever sits under the
+   finger, which made the next pair's cover jump 2 px. */
+@media (hover: hover) {
+  .contender-pick:hover {
+    transform: translateY(-2px);
+  }
 }
 .contender-rank {
   position: absolute;
@@ -476,32 +479,79 @@ a {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
+/* A pick, in one 220 ms piece (the vote lands at 220 ms, Duel.tsx): the chosen cover grows a little and the other
+   fades, then the whole pair fades nearly out, and the next pair fades in from there (arena-in), so there is no
+   empty frame between them. Nothing is cut off half way, and
+   only transform and opacity change, so the browser can run it off the main thread. */
 .contender.won .contender-pick {
-  transform: scale(1.035);
-  transition-duration: 0.18s;
-  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: pick-grow 220ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
-/* Each new pair eases in rather than snapping, so the hand-off after a pick feels smooth. Opacity and a few
-   pixels only: the buttons below don't move, and the covers can be tapped at once. */
+.contender.won {
+  animation: pick-out-won 220ms ease-in forwards;
+}
+.contender.lost {
+  animation: pick-out-lost 220ms ease-out forwards;
+}
+.contender.tied {
+  animation: pick-out-tied 220ms ease-out forwards;
+}
+.arena.picking .vs {
+  animation: pick-out-won 220ms ease-in forwards;
+}
+@keyframes pick-grow {
+  from {
+    transform: scale(1);
+  }
+  60%,
+  to {
+    transform: scale(1.04);
+  }
+}
+@keyframes pick-out-won {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+@keyframes pick-out-lost {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 0.12;
+  }
+}
+@keyframes pick-out-tied {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+/* Each new pair fades in, settling from just under full size. The covers can be tapped at once,
+   and the buttons below don't move. */
 .arena {
-  animation: arena-in 0.16s ease-out;
+  animation: arena-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes arena-in {
   from {
-    opacity: 0.35;
-    transform: translateY(4px);
+    opacity: 0.2;
+    transform: scale(0.985);
   }
   to {
     opacity: 1;
     transform: none;
   }
-}
-.contender.lost {
-  opacity: 0.4;
-}
-/* Too close to call: both fade a little. No outlines on a pick. */
-.contender.tied {
-  opacity: 0.7;
 }
 .contender .item-title {
   font-size: 0.98rem;
@@ -590,6 +640,9 @@ a {
     transition: none;
   }
   .arena,
+  .arena .vs,
+  .contender,
+  .contender .contender-pick,
   .top-burst::before,
   .top-burst::after {
     animation: none;

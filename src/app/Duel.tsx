@@ -140,7 +140,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
   return (
     <main className="screen duel">
       <p className="duel-question">Which do you prefer?</p>
-      <div className="arena" key={`${pair!.a}|${pair!.b}`}>
+      <div className={`arena${picked ? ' picking' : ''}`} key={`${pair!.a}|${pair!.b}`}>
         {side(a, 'a')}
         <div className="vs" aria-hidden="true">
           vs

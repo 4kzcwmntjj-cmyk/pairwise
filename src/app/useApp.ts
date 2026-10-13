@@ -398,16 +398,19 @@ export function useApp() {
         const fresh = pair.fresh.map((id) => itemById.get(id)).filter((i): i is Item => !!i);
         if (fresh.length !== pair.fresh.length) return;
         const newMarks = fresh.map(newcomerMark);
-        setMarks((m) => {
-          const n = new Map(m);
-          for (const mk of newMarks) n.set(mk.itemId, mk);
-          return n;
-        });
+        // Save first, then update the marks and the votes together. Setting the marks before the saves let the
+        // screen render in between with the newcomer marked but no vote yet: the pair turned invalid, a stop-gap
+        // pair was drawn from a half-updated ranking, and a moment later it was replaced (a visible flash).
         await Promise.all(newMarks.map((mk) => store.setMark(mk)));
         const v = voteFor(pair, outcome);
         const id = await store.addVote(v);
         const saved = { ...v, id };
         const nextVotes = [...votes, saved];
+        setMarks((m) => {
+          const n = new Map(m);
+          for (const mk of newMarks) n.set(mk.itemId, mk);
+          return n;
+        });
         setVotes((vs) => [...vs, saved]);
         pushUndo({ scope: 'duel', kind: 'newcomer', voteId: id, itemIds: fresh.map((i) => i.id), pair });
         logNewcomer(true);
