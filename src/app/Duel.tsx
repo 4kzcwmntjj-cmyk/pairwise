@@ -1,18 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PLACED_AFTER } from '../rank/pairs';
 import type { Item, Outcome } from '../types';
 import { BackupNote } from './BackupNote';
-import { Cover } from './Cover';
+import { Cover, preloadCover } from './Cover';
 import { TitleLink } from './TitleLink';
 import { viewWords } from './meta';
 import type { AppState } from './useApp';
 
 /** Titles waiting for "anime or manga?" before Duel asks about them together. */
 const FORM_BATCH = 4;
+/** A pick's animation (the keyframes in styles.css): the next pair never comes in sooner. */
+const MIN_PICK_MS = 260;
+/** From the tap, the longest the next pair waits for its covers before it comes in anyway. */
+const MAX_WAIT_MS = 550;
 
 export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () => void; onOpen: (id: string) => void }) {
   const [picked, setPicked] = useState<Outcome | null>(null);
+  // The pair that was picked and when. While the next pair waits for its covers, the faded picked pair stays on
+  // screen (heldView, the last render of it).
+  const pickRef = useRef<{ key: string; at: number } | null>(null);
+  const heldView = useRef<ReactNode>(null);
   const pair = app.pair;
+  const pairKey = pair ? `${pair.a}|${pair.b}` : '';
   const fresh = pair?.fresh ?? [];
   // Once the watched-or-read card opens, it stays until every title on it is answered.
   const [formOpen, setFormOpen] = useState(false);
@@ -26,20 +35,50 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
 
   function choose(outcome: Outcome) {
     if (!pair || picked) return;
+    pickRef.current = { key: pairKey, at: performance.now() };
     setPicked(outcome);
-    window.setTimeout(
-      () => {
-        app.vote(outcome);
-        setPicked(null);
-      },
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220,
-    );
+    // Vote once the pick has painted: the next pair is worked out while the animation runs, not after it.
+    requestAnimationFrame(() => window.setTimeout(() => app.vote(outcome), 0));
   }
+
+  // Let the next pair in once the pick's animation has run and its covers are loaded, or at MAX_WAIT_MS.
+  // The cap also ends a pick whose vote changed nothing.
+  useEffect(() => {
+    const p = pickRef.current;
+    if (!picked || !p) return;
+    let live = true;
+    const release = () => {
+      if (!live) return;
+      live = false;
+      pickRef.current = null;
+      setPicked(null);
+    };
+    const now = performance.now();
+    const cap = window.setTimeout(release, Math.max(0, p.at + MAX_WAIT_MS - now));
+    let min: number | undefined;
+    if (a && b && pairKey !== p.key) {
+      const minEnd = p.at + (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : MIN_PICK_MS);
+      Promise.all([preloadCover(app.look(a)), preloadCover(app.look(b))]).then(() => {
+        if (live) min = window.setTimeout(release, Math.max(0, minEnd - performance.now()));
+      });
+    }
+    return () => {
+      live = false;
+      window.clearTimeout(cap);
+      if (min !== undefined) window.clearTimeout(min);
+    };
+    // Only the pick and the pair matter here; the covers are looked up for whichever pair has arrived.
+  }, [picked, pairKey]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // Not while a title card is open over the duel, or the quick check is up.
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || (formOpen && pending > 0) || document.querySelector('[aria-modal="true"]')) return;
+      // Nothing else while a pick is under way.
+      if (picked) {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowDown'].includes(e.key)) e.preventDefault();
+        return;
+      }
       if (e.key === 'ArrowLeft') choose('a');
       else if (e.key === 'ArrowRight') choose('b');
       else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 't') choose('tie');
@@ -52,6 +91,9 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  // The picked pair, faded, while the next one waits for its covers.
+  if (picked && pickRef.current && pairKey !== pickRef.current.key && heldView.current) return heldView.current;
 
   if (!a || !b) {
     return (
@@ -137,7 +179,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     );
   };
 
-  return (
+  const view = (
     <main className="screen duel">
       <p className="duel-question">Which do you prefer?</p>
       <div className={`arena${picked ? ' picking' : ''}`} key={`${pair!.a}|${pair!.b}`}>
@@ -151,10 +193,10 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
         <button className="btn" onClick={() => choose('tie')} title="Down arrow or T">
           Too close to call
         </button>
-        <button className="btn btn-quiet" onClick={app.skipPair} title="Key S">
+        <button className="btn btn-quiet" onClick={() => !picked && app.skipPair()} title="Key S">
           Skip
         </button>
-        <button className="btn btn-quiet" onClick={() => app.undo('duel')} disabled={!app.canUndo('duel')} title="Key Z">
+        <button className="btn btn-quiet" onClick={() => !picked && app.undo('duel')} disabled={!app.canUndo('duel')} title="Key Z">
           Undo
         </button>
       </div>
@@ -216,4 +258,7 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
       <p className="keys">Keys: ← → pick, ↓ too close, S skip, Z undo{fresh.length === 1 ? ', N haven\'t seen the new one' : ''}</p>
     </main>
   );
+  // Kept so the faded pick can stay on screen while the next pair waits for its covers.
+  if (picked) heldView.current = view;
+  return view;
 }
