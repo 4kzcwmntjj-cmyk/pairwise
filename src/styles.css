@@ -1,22 +1,24 @@
 /* Layout: one centred column, 720px max. Tabs sit at the top on wide screens and at the bottom on phones.
    The duel screen is the loud part: big covers either side of a heavy "vs". Everything else stays quiet. */
 :root {
-  /* Paper, ink and vermilion. Dark mode mirrors it below. The indigo palette before 13 Oct 2026 is recorded in
-     claude/roadmap.md; another palette would be one more block like these. */
-  --bg: #f3efe7;
-  --surface: #fbf9f5;
-  --ink: #1b1814;
-  --muted: #6b6359;
-  --line: #ddd5c8;
-  --accent: #c9361f;
+  --bg: #ecebf3;
+  --surface: #f9f9fd;
+  --ink: #1c1a33;
+  --muted: #5d5a78;
+  --line: #d2d0e2;
+  --accent: #3b3fd8;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(201, 54, 31, 0.11);
-  --danger: #a3123a;
-  --shade: 27, 24, 20;
-  /* Archivo is a variable font with a width axis; display text sets font-stretch (semi-condensed, the wordmark condensed). */
-  --font-display: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+  --accent-soft: rgba(59, 63, 216, 0.12);
+  --danger: #b4233c;
+  /* The spark: tangerine for the moments (the vs, the top three, New, a new #1). Buttons, tabs and links stay indigo.
+     --spark is for text, dark enough for large type on the ground; --spark-fill sits behind --spark-ink. */
+  --spark: #cc610a;
+  --spark-fill: #ffa64d;
+  --spark-ink: #1c1a33;
+  --shade: 20, 19, 40;
+  --font-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --radius: 10px;
+  --radius: 14px;
   --nav-h: 60px;
   /* Room above the top bar. Saved to the iPhone home screen, the page runs under the status bar, and iOS blurs
      a band a little deeper than the status bar itself, so the top bar sits further down there. */
@@ -33,16 +35,19 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1916;
-    --surface: #26221e;
-    --ink: #efe9df;
-    --muted: #a89e91;
-    --line: #3a342d;
-    --accent: #ff6a4d;
-    --accent-ink: #1c1916;
-    --accent-soft: rgba(255, 106, 77, 0.16);
-    --danger: #ff8fa3;
-    --shade: 10, 8, 6;
+    --bg: #15142a;
+    --surface: #1f1e3a;
+    --ink: #ecebf7;
+    --muted: #a3a1c2;
+    --line: #353459;
+    --accent: #8f93ff;
+    --accent-ink: #15142a;
+    --accent-soft: rgba(143, 147, 255, 0.16);
+    --danger: #ff8597;
+    --spark: #ffa64d;
+    --spark-fill: #ffa64d;
+    --spark-ink: #15142a;
+    --shade: 8, 7, 22;
     color-scheme: dark;
   }
 }
@@ -103,11 +108,9 @@ a {
   align-items: center;
   gap: 7px;
   font-family: var(--font-display);
-  font-stretch: condensed;
-  font-weight: 800;
-  font-size: 1.2rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
   background: none;
   border: 0;
   padding: 0;
@@ -306,15 +309,14 @@ a {
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 1.6rem;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .cover-sm {
   width: 44px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .cover-sm .cover-fallback {
   font-size: 0.75rem;
@@ -356,11 +358,9 @@ a {
 }
 .welcome h1 {
   font-family: var(--font-display);
-  font-stretch: condensed;
-  font-size: clamp(2.8rem, 12vw, 4rem);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: clamp(2.2rem, 9vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 .lede {
@@ -425,8 +425,7 @@ a {
 .duel-question {
   text-align: center;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 1rem;
 }
 .arena {
@@ -471,13 +470,25 @@ a {
   background: rgba(var(--shade), 0.78);
   color: #fff;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 .contender.won .contender-pick {
   transform: scale(1.03);
+  animation: pick-pop 220ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+/* The chosen cover swells a little past its resting size and settles, inside the existing 220 ms. */
+@keyframes pick-pop {
+  0% {
+    transform: scale(1);
+  }
+  60% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1.03);
+  }
 }
 .contender.won .cover {
   box-shadow: 0 0 0 4px var(--accent);
@@ -496,19 +507,74 @@ a {
   align-self: center;
   margin-top: -40%;
   font-family: var(--font-display);
-  font-stretch: extra-condensed;
+  font-weight: 800;
   font-style: italic;
-  font-weight: 900;
   font-size: clamp(1.1rem, 5vw, 2rem);
-  color: var(--accent);
-  letter-spacing: 0.01em;
-  padding-right: 0.08em;
-  text-transform: uppercase;
+  color: var(--spark);
+  letter-spacing: -0.04em;
+  padding-right: 0.1em;
 }
 .moved {
   min-height: 1.45em;
   text-align: center;
   font-weight: 600;
+}
+/* A title that has just taken the top spot: the line in the spark colour, with the mark's two cards flicking
+   out from either side once. */
+.moved.is-top {
+  color: var(--spark);
+}
+.top-burst {
+  position: relative;
+  display: inline-block;
+}
+.top-burst::before,
+.top-burst::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 15px;
+  margin-top: -7.5px;
+  border-radius: 3px;
+  opacity: 0;
+  pointer-events: none;
+}
+.top-burst::before {
+  left: -16px;
+  background: var(--accent);
+  animation: burst-left 900ms ease-out 1;
+}
+.top-burst::after {
+  right: -16px;
+  background: var(--spark-fill);
+  animation: burst-right 900ms ease-out 1;
+}
+@keyframes burst-left {
+  0% {
+    opacity: 0;
+    transform: translate(16px, 0) rotate(0deg) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-10px, -14px) rotate(-28deg) scale(1);
+  }
+}
+@keyframes burst-right {
+  0% {
+    opacity: 0;
+    transform: translate(-16px, 0) rotate(0deg) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(10px, -14px) rotate(28deg) scale(1);
+  }
 }
 .hint .btn-link {
   font-size: inherit;
@@ -518,6 +584,11 @@ a {
   .contender,
   .bar-fill {
     transition: none;
+  }
+  .contender.won .contender-pick,
+  .top-burst::before,
+  .top-burst::after {
+    animation: none;
   }
 }
 
@@ -584,18 +655,17 @@ a {
   background: var(--accent-soft);
 }
 .rank-num {
-  width: 2.1em;
+  width: 2.3em;
   flex: none;
   text-align: right;
   font-family: var(--font-display);
-  font-stretch: condensed;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-size: 1.45rem;
+  font-size: 1.3rem;
   line-height: 1;
 }
 .rank-list li:nth-child(-n + 3) .rank-num {
-  color: var(--accent);
+  color: var(--spark);
 }
 .rank-body {
   flex: 1;
@@ -651,9 +721,8 @@ a {
 }
 .empty h2 {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .settled-mark {
@@ -731,8 +800,7 @@ a {
 }
 .big-rank {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 1.6rem;
   color: var(--ink);
 }
@@ -839,8 +907,7 @@ a {
 }
 .set-counts b {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 800;
+  font-weight: 600;
 }
 .set-message {
   font-weight: 600;
@@ -1082,8 +1149,7 @@ a {
 }
 .stat-value {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.6rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -1136,9 +1202,8 @@ a {
 }
 .big-line {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 .big-line .hint {
   font-family: var(--font-body);
@@ -1432,7 +1497,9 @@ a {
 
 /* Newcomer duels */
 .contender-rank.is-new {
-  background: var(--accent);
+  background: var(--spark-fill);
+  color: var(--spark-ink);
+  font-weight: 700;
 }
 .newcomer-hint {
   text-align: center;
@@ -1767,9 +1834,8 @@ main.sort {
 }
 .find-kicker {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
@@ -1777,9 +1843,8 @@ main.sort {
 .find-headline {
   margin: 0;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.45rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -1904,9 +1969,8 @@ main.sort {
 }
 .find-tagline {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.18rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.35;
   margin: 4px 0 2px !important;
 }
@@ -1992,8 +2056,7 @@ main.sort {
 .more-detail > summary {
   cursor: pointer;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1rem;
   padding: 10px 4px 10px 0;
   list-style: none;
@@ -2139,9 +2202,8 @@ main.sort {
   border: 0;
   background: none;
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.2;
   text-align: left;
   color: var(--ink);
@@ -2150,9 +2212,8 @@ main.sort {
 }
 .row-heading {
   font-family: var(--font-display);
-  font-stretch: semi-condensed;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
 }
 .rec-block {

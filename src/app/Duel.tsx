@@ -106,6 +106,9 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
     );
   }
 
+  // A new #1 once the list has 10 titles (before that the top changes every few duels): a title that moved into
+  // the top spot, or a single title that joined there.
+  const toTop = !!app.moved && app.moved.to === 1 && app.fit.order.length >= 10 && (app.moved.isNew ? !app.moved.both : app.moved.from !== 1);
   const placing = app.fit.order.filter((id) => (app.fit.duels.get(id) ?? 0) < PLACED_AFTER).length;
   const side = (item: Item, outcome: 'a' | 'b') => {
     const title = app.title(item);
@@ -190,9 +193,13 @@ export function Duel({ app, onLibrary, onOpen }: { app: AppState; onLibrary: () 
           New to your list. Pick as usual if you know it.
         </p>
       ) : null}
-      <p className="moved" aria-live="polite">
+      <p className={`moved${toTop ? ' is-top' : ''}`} aria-live="polite">
         {app.moved &&
-          (app.moved.isNew
+          (toTop ? (
+            <span className="top-burst" key={`${app.moved.title}|${app.moved.from}`}>
+              {app.moved.isNew ? `${app.moved.title} joins your list at #1.` : `${app.moved.title} takes the top spot (was #${app.moved.from}).`}
+            </span>
+          ) : app.moved.isNew
             ? app.moved.both
               ? `${app.moved.title} join your list.`
               : `${app.moved.title} joins your list at #${app.moved.to}.`

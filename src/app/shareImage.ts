@@ -13,62 +13,16 @@ export interface ShareRow {
 
 export const SHARE_WIDTH = 1080;
 
-export const BG = '#1c1916';
-export const SURFACE = '#26221e';
-export const LINE = '#3a342d';
-export const INK = '#f5f0e8';
-export const MUTED = '#a89e91';
-export const ACCENT = '#ff6a4d';
+export const BG = '#15142a';
+export const SURFACE = '#1f1e3a';
+export const LINE = '#353459';
+export const INK = '#f2f1fb';
+export const MUTED = '#a3a1c2';
+export const ACCENT = '#8f93ff';
+/** The tangerine spark, as in the app's dark mode: the top three badges. */
+export const SPARK = '#ffa64d';
 
-export const DISPLAY = '"Archivo", "Arial Narrow", system-ui, sans-serif';
-
-/**
- * Sets a display font (`spec` is weight and size, e.g. "600 40px"), narrowed as in the app where the browser
- * supports `fontStretch` on a canvas; elsewhere Archivo draws at its normal width. Setting `ctx.font` resets the
- * width, so body fonts need nothing.
- */
-export function displayFont(ctx: CanvasRenderingContext2D, spec: string, stretch: 'semi-condensed' | 'condensed' = 'semi-condensed') {
-  ctx.font = `${spec} ${DISPLAY}`;
-  if ('fontStretch' in ctx) (ctx as CanvasRenderingContext2D & { fontStretch: string }).fontStretch = stretch;
-}
-
-/** The mark (two cards crossed on vermilion), drawn as public/icon.svg is, `size` px square at x, y. */
-export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  const k = size / 512;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(k, k);
-  ctx.fillStyle = '#d63b25';
-  round(ctx, 0, 0, 512, 512, 112);
-  ctx.fill();
-  const card = (cx: number, cy: number, deg: number, fill: string) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate((deg * Math.PI) / 180);
-    round(ctx, -82, -123, 164, 246, 20);
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.lineWidth = 22;
-    ctx.strokeStyle = '#d63b25';
-    ctx.stroke();
-    ctx.restore();
-  };
-  card(318, 259, 10, '#1b1814');
-  card(190, 249, -10, '#fbf9f5');
-  ctx.restore();
-}
-
-/** The mark and SHŌBU at the foot of a picture, right-aligned at `right`, text sitting on `baseline`. */
-export function drawSignature(ctx: CanvasRenderingContext2D, right: number, baseline: number) {
-  displayFont(ctx, '800 34px', 'condensed');
-  const word = 'SHŌBU';
-  const w = ctx.measureText(word).width;
-  const mark = 40;
-  ctx.fillStyle = INK;
-  ctx.textAlign = 'left';
-  ctx.fillText(word, right - w, baseline);
-  drawMark(ctx, right - w - 12 - mark, baseline - mark + 4, mark);
-}
+export const DISPLAY = '"Unbounded", "Arial Black", system-ui, sans-serif';
 export const BODY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const PAD = 64;
 
@@ -103,6 +57,44 @@ export function wrapLines(measure: (s: string) => number, text: string, width: n
   });
 }
 
+/** The mark (two cards crossed on indigo, the back one tangerine), drawn as public/icon.svg is, `size` px square at x, y. */
+export function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  const k = size / 512;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.fillStyle = '#3b3fd8';
+  round(ctx, 0, 0, 512, 512, 112);
+  ctx.fill();
+  const card = (cx: number, cy: number, deg: number, fill: string) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((deg * Math.PI) / 180);
+    round(ctx, -82, -123, 164, 246, 20);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 22;
+    ctx.strokeStyle = '#3b3fd8';
+    ctx.stroke();
+    ctx.restore();
+  };
+  card(318, 259, 10, '#ffa64d');
+  card(190, 249, -10, '#ffffff');
+  ctx.restore();
+}
+
+/** The mark and the name at the foot of a picture, right-aligned at `right`, the name sitting on `baseline`. */
+export function drawSignature(ctx: CanvasRenderingContext2D, right: number, baseline: number) {
+  ctx.font = `700 28px ${DISPLAY}`;
+  const word = 'Shōbu';
+  const w = ctx.measureText(word).width;
+  const mark = 38;
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'left';
+  ctx.fillText(word, right - w, baseline);
+  drawMark(ctx, right - w - 12 - mark, baseline - mark + 6, mark);
+}
+
 export function round(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
@@ -125,20 +117,20 @@ export function coverBox(ctx: CanvasRenderingContext2D, row: { color?: string },
   ctx.clip();
   if (img) drawCover(ctx, img, x, y, w, h);
   else {
-    ctx.fillStyle = row.color ?? LINE;
+    ctx.fillStyle = row.color ?? '#353459';
     ctx.fillRect(x, y, w, h);
   }
   ctx.restore();
 }
 
 function badge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, size: number, hot: boolean) {
-  ctx.fillStyle = hot ? ACCENT : BG;
+  ctx.fillStyle = hot ? SPARK : BG;
   ctx.globalAlpha = hot ? 1 : 0.85;
   round(ctx, x, y, size, size, size / 3);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.fillStyle = hot ? BG : INK;
-  displayFont(ctx, `800 ${Math.round(size * 0.52)}px`);
+  ctx.font = `700 ${Math.round(size * 0.52)}px ${DISPLAY}`;
   ctx.textAlign = 'center';
   ctx.fillText(String(n), x + size / 2, y + size / 2 + size * 0.19);
   ctx.textAlign = 'left';
@@ -164,7 +156,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     if (i < 3) {
       const x = PAD + i * (TOP_W + 24);
       const y = GRID_TOP;
-      coverBox(ctx, row, covers[i], x, y, TOP_W, TOP_H, 14, boxes, i);
+      coverBox(ctx, row, covers[i], x, y, TOP_W, TOP_H, 20, boxes, i);
       badge(ctx, row.rank, x + 10, y + 10, 56, true);
       ctx.fillStyle = INK;
       ctx.font = `600 28px ${BODY}`;
@@ -183,11 +175,11 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
 
     const y = GRID_TOP_END + 30 + (i - 3) * (ROW_H + ROW_GAP);
     ctx.fillStyle = SURFACE;
-    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, ROW_H, 18);
+    round(ctx, PAD, y, SHARE_WIDTH - PAD * 2, ROW_H, 24);
     ctx.fill();
 
     ctx.fillStyle = MUTED;
-    displayFont(ctx, `800 30px`);
+    ctx.font = `600 30px ${DISPLAY}`;
     ctx.textAlign = 'center';
     ctx.fillText(String(row.rank), PAD + 46, y + ROW_H / 2 + 11);
     ctx.textAlign = 'left';
@@ -195,7 +187,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, rows: ShareRow[], covers: Cover
     const ch = ROW_H - 16;
     const cw = Math.round((ch * 2) / 3);
     const cx = PAD + 92;
-    coverBox(ctx, row, covers[i], cx, y + 8, cw, ch, 8, boxes, i);
+    coverBox(ctx, row, covers[i], cx, y + 8, cw, ch, 10, boxes, i);
 
     const tx = cx + cw + 24;
     const tw = SHARE_WIDTH - PAD - 24 - tx;
@@ -254,7 +246,7 @@ export async function fixBlankCovers(
       details[i] += '; drew blank';
       const alt = await decodeAsImage(row.cover);
       if (alt) {
-        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, box.r ?? 14);
+        coverBox(ctx, row, alt, box.x, box.y, box.w, box.h, box.r ?? 20);
         if (!isFlat(ctx, box)) {
           details[i] += '; fixed by redrawing from an image element';
           continue;
@@ -287,7 +279,7 @@ export async function renderTop(rows: ShareRow[], heading: string): Promise<Shar
 
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = INK;
-  displayFont(ctx, `800 52px`);
+  ctx.font = `600 52px ${DISPLAY}`;
   ctx.fillText(heading, PAD, 112);
 
   const boxes: Box[] = [];
